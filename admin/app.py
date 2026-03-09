@@ -90,7 +90,7 @@ class Database:
             conn = await asyncpg.connect(**DB_CONFIG)
             query = f"""
                 SELECT DISTINCT company
-                FROM {DB_SCHEMA}.user_company
+                FROM {DB_SCHEMA}.user_profiles
                 WHERE company IS NOT NULL
                 ORDER BY company
             """

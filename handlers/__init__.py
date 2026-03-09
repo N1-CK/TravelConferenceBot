@@ -19,4 +19,5 @@ __all__ = [
     'navigation_router',
     'affiliate_router',
     'managers_chat_router',
+    'menu_router'
 ]

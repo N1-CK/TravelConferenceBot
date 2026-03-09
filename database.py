@@ -46,7 +46,6 @@ class Database:
             async with self.pool.acquire() as conn:
                 # Существующие таблицы Conference Bot
                 tables = [
-                    # Whitelist (объединенный)
                     f'''
                     CREATE TABLE IF NOT EXISTS {self.db_schema}.whitelist (
                         username TEXT PRIMARY KEY,
@@ -294,6 +293,21 @@ class Database:
                     )
                     ''',
 
+                    f'''
+                    CREATE TABLE IF NOT EXISTS {self.db_schema}.user_conferences (
+                        id SERIAL PRIMARY KEY,
+                        username TEXT NOT NULL,
+                        conference_name TEXT NOT NULL,
+                        trip_start_date TEXT,
+                        trip_end_date TEXT,
+                        conference_start_date TEXT,
+                        conference_end_date TEXT,
+                        city TEXT,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW(),
+                        UNIQUE(username, conference_name)
+                    )
+                    ''',
 
                     # Логи статуса бота
                     f'''
@@ -683,7 +697,6 @@ class Database:
             logger.error(f"Error getting incomplete forms: {e}")
             return []
 
-    # В класс Database добавить:
 
     async def get_user_flights(self, username: str) -> List[str]:
         """Get user's conferences from database (using travelconference_bot schema)"""
@@ -1126,21 +1139,28 @@ class Database:
             return False
 
     async def get_user_data(self, user_id: int) -> dict:
-        """Получение данных пользователя"""
+        """Получение данных пользователя с форматированием даты"""
         try:
             async with self.pool.acquire() as conn:
                 row = await conn.fetchrow(f"""
-                    SELECT * FROM {self.db_schema}.user_profiles 
+                    SELECT user_id, username, language, full_name, position, company, 
+                           registered_at, updated_at
+                    FROM {self.db_schema}.user_profiles 
                     WHERE user_id = $1
                 """, user_id)
-                return dict(row) if row else {}
+
+                if row:
+                    result = dict(row)
+                    # Форматируем даты для отображения
+                    if result.get('registered_at'):
+                        result['registered_at'] = result['registered_at']
+                    return result
+                return {}
         except Exception as e:
             logger.error(f"Error getting user data: {e}")
             return {}
 
-    # Добавить в класс Database (после существующих методов)
-
-    async def sync_whitelist_from_google_sheets(self, spreadsheet_name: str = "Whitelists") -> bool:
+    async def sync_whitelist_from_google_sheets(self, spreadsheet_name: str = "Whitelist") -> bool:
         """
         Синхронизация whitelist из Google Sheets
         """
@@ -1151,6 +1171,7 @@ class Database:
             if not await sync.connect_to_google_sheets():
                 logger.error("Failed to connect to Google Sheets")
                 return False
+
 
             # Открываем таблицу
             sh = sync.gc.open(spreadsheet_name)
@@ -1232,7 +1253,6 @@ class Database:
         """
         try:
             async with self.pool.acquire() as conn:
-                # Сначала проверяем таблицу user_conferences
                 try:
                     rows = await conn.fetch(f"""
                         SELECT conference_name, trip_start_date, trip_end_date,

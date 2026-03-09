@@ -2,6 +2,8 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from keyboards import get_back_next_keyboard, get_event_menu_keyboard
 from database import db
 import logging
@@ -281,6 +283,21 @@ async def process_event_question_category(callback: CallbackQuery, state: FSMCon
         "Введите ваш вопрос (максимум 500 символов):",
         reply_markup=get_back_next_keyboard(back_to="event_question", next_disabled=True)
     )
+
+@router.callback_query(F.data == "event_booth")
+async def show_booth_info(callback: CallbackQuery):
+    """Показать информацию о стенде"""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="◀️ Назад в EVENT", callback_data="menu_event"),
+        InlineKeyboardButton(text="🏠 Главная", callback_data="menu_main")
+    )
+
+    text = (
+        "ℹ️ Информация о стенде\n\n"
+    )
+
+    await callback.message.edit_text(text, reply_markup=builder.as_markup())
 
 
 @router.message(EventQuestionForm.waiting_for_question, F.text.len() <= 500)

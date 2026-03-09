@@ -55,15 +55,12 @@ def get_event_menu_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
     builder.row(
-        InlineKeyboardButton(text="📋 Правила", callback_data="event_rules"),
-        InlineKeyboardButton(text="ℹ️ Информация", callback_data="event_info")
+        InlineKeyboardButton(text="🎫 Билет на конференцию", callback_data="event_ticket"),
+        InlineKeyboardButton(text="ℹ️ О стенде", callback_data="event_booth")
     )
     builder.row(
-        InlineKeyboardButton(text="🎫 Билет", callback_data="event_ticket"),
-        InlineKeyboardButton(text="📄 Справка", callback_data="event_certificate")
-    )
-    builder.row(
-        InlineKeyboardButton(text="❓ Вопрос менеджеру", callback_data="event_question")
+        InlineKeyboardButton(text="ℹ️ О конференции", callback_data="event_info"),
+        InlineKeyboardButton(text="❓ Вопрос", callback_data="event_question")
     )
     builder.row(
         InlineKeyboardButton(text="◀️ Назад", callback_data="menu_main")
@@ -160,4 +157,42 @@ def get_form_navigation_keyboard(back_to: str) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🏠 Главная", callback_data="menu_main")
     )
 
+    return builder.as_markup()
+
+
+# Добавить в файл keyboards.py:
+
+def get_profile_edit_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура для редактирования профиля"""
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="✏️ Имя", callback_data="profile_edit_name"),
+        InlineKeyboardButton(text="✏️ Должность", callback_data="profile_edit_position")
+    )
+    builder.row(
+        InlineKeyboardButton(text="✏️ Компания", callback_data="profile_edit_company"),
+        InlineKeyboardButton(text="🌐 Язык", callback_data="profile_edit_language")
+    )
+    builder.row(
+        InlineKeyboardButton(text="◀️ Назад к профилю", callback_data="menu_profile")
+    )
+    return builder.as_markup()
+
+
+def get_language_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура выбора языка"""
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="🇷🇺 Русский", callback_data="lang_ru"),
+        InlineKeyboardButton(text="🇬🇧 English", callback_data="lang_en")
+    )
+    builder.row(
+        InlineKeyboardButton(text="◀️ Назад к профилю", callback_data="menu_profile")
+    )
     return builder.as_markup()

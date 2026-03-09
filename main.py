@@ -64,7 +64,12 @@ async def main():
     # except Exception as e:
     #     logger.error(f"❌ Failed to start sync scheduler: {e}")
 
-    # Register handlers
+    try:
+        await db.sync_whitelist_from_google_sheets()
+        logger.info("✅ Whitelist synced from Google Sheets")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not sync whitelist: {e}")
+
     try:
         from handlers import (
             start_router, menu_router, pr_router,

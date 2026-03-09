@@ -66,20 +66,24 @@ def escape_markdown(text: str) -> str:
 
 def get_travel_menu_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    # 1. Самая большая кнопка
     builder.row(
-        InlineKeyboardButton(text="✈️ Flight Info", callback_data="travel_flight_info"),
-        InlineKeyboardButton(text="🏨 Hotel", callback_data="travel_hotel_info")
+        InlineKeyboardButton(text="✈️ Flight Request", callback_data="travel_flight_request")
     )
+    # 2. Ряд из двух
     builder.row(
         InlineKeyboardButton(text="🛂 Visa Support", callback_data="travel_visa_support"),
-        InlineKeyboardButton(text="💰 Per Diem", callback_data="travel_per_diem")
+        InlineKeyboardButton(text="ℹ️ Flight Info", callback_data="travel_flight_info")
     )
+    # 3. Ряд из двух
     builder.row(
-        InlineKeyboardButton(text="📝 Flight Request", callback_data="travel_flight_request"),
-        InlineKeyboardButton(text="📋 My Requests", callback_data="travel_my_requests")  # НОВАЯ КНОПКА
+        InlineKeyboardButton(text="🏨 Hotel", callback_data="travel_hotel_info"),
+        InlineKeyboardButton(text="💰 Daily allowance", callback_data="travel_per_diem")
     )
+    # 4. Ряд из двух
     builder.row(
-        InlineKeyboardButton(text="❓ Question to Manager", callback_data="travel_question")
+        InlineKeyboardButton(text="📋 My requests", callback_data="travel_my_requests"),
+        InlineKeyboardButton(text="❓ Question", callback_data="travel_question")
     )
     builder.row(
         InlineKeyboardButton(text="◀️ Back", callback_data="menu_main")
