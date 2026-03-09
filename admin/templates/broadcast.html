@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель | Рассылка</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: #f8f9fa;
+        }
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 12px 20px;
+            margin: 5px 0;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+        .sidebar .nav-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            transform: translateX(5px);
+        }
+        .sidebar .nav-link.active {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        .sidebar .nav-link i {
+            margin-right: 10px;
+            width: 20px;
+        }
+        .main-content {
+            padding: 30px;
+        }
+        .broadcast-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        .user-info {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            margin-bottom: 20px;
+        }
+        .user-info h5 {
+            color: white;
+            margin-bottom: 5px;
+        }
+        .user-info p {
+            color: rgba(255,255,255,0.7);
+            margin: 0;
+            font-size: 0.9rem;
+        }
+        .counter {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 10px;
+        }
+        .counter.warning {
+            color: #dc3545;
+        }
+        .preview-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 px-0 sidebar">
+                <div class="user-info">
+                    <h5><i class="bi bi-person-circle"></i> {{ session.username }}</h5>
+                    <p>Администратор</p>
+                </div>
+
+                <nav class="nav flex-column">
+                    <a class="nav-link" href="/">
+                        <i class="bi bi-speedometer2"></i> Дашборд
+                    </a>
+                    <a class="nav-link active" href="/broadcast">
+                        <i class="bi bi-megaphone"></i> Рассылка
+                    </a>
+                    <a class="nav-link" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                        <i class="bi bi-box-arrow-right"></i> Выход
+                    </a>
+                </nav>
+                <form id="logout-form" action="/logout" method="GET" style="display: none;"></form>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-9 col-lg-10 main-content">
+                <h2 class="mb-4">📨 Массовая рассылка</h2>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="broadcast-card">
+                    <form method="POST" action="/broadcast" id="broadcastForm">
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Тип рассылки:</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="target_type" id="targetAll" value="all" checked onclick="toggleCompanySelect()">
+                                <label class="form-check-label" for="targetAll">
+                                    Всем пользователям
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="target_type" id="targetCompany" value="company" onclick="toggleCompanySelect()">
+                                <label class="form-check-label" for="targetCompany">
+                                    По компании
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-4" id="companySelect" style="display: none;">
+                            <label class="form-label fw-bold">Выберите компанию:</label>
+                            <select class="form-select" name="company">
+                                <option value="">-- Выберите компанию --</option>
+                                {% for company in companies %}
+                                <option value="{{ company }}">{{ company }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Сообщение:</label>
+                            <textarea class="form-control" name="message" rows="8" placeholder="Введите текст сообщения (можно использовать HTML разметку)" required></textarea>
+                            <div class="counter" id="charCounter">0 / 4000 символов</div>
+                        </div>
+
+                        <div class="preview-card" id="preview" style="display: none;">
+                            <h6><i class="bi bi-eye"></i> Предпросмотр:</h6>
+                            <div id="previewText" class="mt-2"></div>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <strong>Внимание!</strong> Рассылка может занять некоторое время в зависимости от количества получателей.
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/" class="btn btn-secondary me-md-2">Отмена</a>
+                            <button type="submit" class="btn btn-primary" id="submitBtn">
+                                <i class="bi bi-send"></i> Отправить рассылку
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleCompanySelect() {
+            const companySelect = document.getElementById('companySelect');
+            const targetCompany = document.getElementById('targetCompany');
+            companySelect.style.display = targetCompany.checked ? 'block' : 'none';
+        }
+
+        // Счетчик символов и предпросмотр
+        const messageInput = document.querySelector('textarea[name="message"]');
+        const charCounter = document.getElementById('charCounter');
+        const preview = document.getElementById('preview');
+        const previewText = document.getElementById('previewText');
+
+        messageInput.addEventListener('input', function() {
+            const len = this.value.length;
+            charCounter.textContent = `${len} / 4000 символов`;
+
+            if (len > 3500) {
+                charCounter.classList.add('warning');
+            } else {
+                charCounter.classList.remove('warning');
+            }
+
+            if (len > 0) {
+                preview.style.display = 'block';
+                previewText.innerHTML = this.value.replace(/\n/g, '<br>');
+            } else {
+                preview.style.display = 'none';
+            }
+        });
+
+        // Подтверждение отправки
+        document.getElementById('broadcastForm').addEventListener('submit', function(e) {
+            const message = messageInput.value.trim();
+            const targetType = document.querySelector('input[name="target_type"]:checked').value;
+            let confirmText = `Отправить сообщение длиной ${message.length} символов `;
+
+            if (targetType === 'all') {
+                confirmText += 'ВСЕМ пользователям?';
+            } else {
+                const company = document.querySelector('select[name="company"]').value;
+                if (!company) {
+                    alert('Выберите компанию!');
+                    e.preventDefault();
+                    return;
+                }
+                confirmText += `пользователям компании "${company}"?`;
+            }
+
+            if (!confirm(confirmText)) {
+                e.preventDefault();
+            }
+        });
+
+        // Инициализация
+        toggleCompanySelect();
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
