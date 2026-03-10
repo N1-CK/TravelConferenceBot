@@ -94,6 +94,25 @@
             background: #dc3545;
             color: white;
         }
+        .conference-card {
+            border-left: 4px solid #667eea;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+        }
+        .conference-card:hover {
+            background: #f8f9fa;
+        }
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -113,6 +132,12 @@
                     </a>
                     <a class="nav-link" href="/broadcast">
                         <i class="bi bi-megaphone"></i> Рассылка
+                    </a>
+                    <a class="nav-link" href="/conferences">
+                        <i class="bi bi-calendar-event"></i> Активные конференции
+                    </a>
+                    <a class="nav-link" href="/users">
+                        <i class="bi bi-people"></i> Активные пользователи
                     </a>
                     <a class="nav-link" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                         <i class="bi bi-box-arrow-right"></i> Выход
@@ -148,19 +173,19 @@
                     <div class="col-md-3 mb-3">
                         <div class="stat-card">
                             <div class="stat-icon">
-                                <i class="bi bi-card-image"></i>
+                                <i class="bi bi-calendar-check"></i>
                             </div>
-                            <div class="stat-number">{{ stats.banner_requests }}</div>
-                            <div class="stat-label">Заявок на баннер</div>
+                            <div class="stat-number">{{ stats.active_conferences }}</div>
+                            <div class="stat-label">Активных конференций</div>
                         </div>
                     </div>
                     <div class="col-md-3 mb-3">
                         <div class="stat-card">
                             <div class="stat-icon">
-                                <i class="bi bi-passport"></i>
+                                <i class="bi bi-envelope"></i>
                             </div>
-                            <div class="stat-number">{{ stats.visa_requests }}</div>
-                            <div class="stat-label">Визовых заявок</div>
+                            <div class="stat-number">{{ stats.total_broadcasts }}</div>
+                            <div class="stat-label">Всего рассылок</div>
                         </div>
                     </div>
                 </div>
@@ -213,8 +238,12 @@
                                         <td>
                                             {% if broadcast.broadcast_type == 'all' %}
                                                 <span class="badge bg-info">Всем</span>
-                                            {% else %}
+                                            {% elif broadcast.broadcast_type == 'company' %}
                                                 <span class="badge bg-warning">Компания</span>
+                                            {% elif broadcast.broadcast_type == 'conference' %}
+                                                <span class="badge bg-success">Конференция</span>
+                                            {% elif broadcast.broadcast_type == 'specific' %}
+                                                <span class="badge bg-secondary">Выборочно</span>
                                             {% endif %}
                                         </td>
                                         <td>{{ broadcast.company or '-' }}</td>
@@ -243,7 +272,7 @@
                 </div>
 
                 <!-- Quick Actions -->
-                <div class="row">
+                <div class="row mb-4">
                     <div class="col-12">
                         <div class="stat-card">
                             <h5 class="mb-3"><i class="bi bi-lightning"></i> Быстрые действия</h5>
@@ -254,10 +283,79 @@
                                     </a>
                                 </div>
                                 <div class="col-md-3 mb-2">
-                                    <a href="/broadcast" class="btn btn-outline-success w-100">
-                                        <i class="bi bi-building"></i> Рассылка по компании
+                                    <a href="/broadcast?type=companies" class="btn btn-outline-success w-100">
+                                        <i class="bi bi-building"></i> Рассылка по компаниям
                                     </a>
                                 </div>
+                                <div class="col-md-3 mb-2">
+                                    <a href="/conferences" class="btn btn-outline-info w-100">
+                                        <i class="bi bi-calendar-event"></i> Управление конференциями
+                                    </a>
+                                </div>
+                                <div class="col-md-3 mb-2">
+                                    <a href="/users" class="btn btn-outline-warning w-100">
+                                        <i class="bi bi-people"></i> Активные пользователи
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Conferences Preview -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="stat-card">
+                            <h5 class="mb-3"><i class="bi bi-calendar-event"></i> Активные конференции</h5>
+                            {% for conference in active_conferences[:5] %}
+                            <div class="conference-card p-2 border-bottom">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ conference.name }}</strong><br>
+                                        <small class="text-muted">{{ conference.city }} | {{ conference.start_date }} - {{ conference.end_date }}</small>
+                                    </div>
+                                    <div>
+                                        <span class="badge bg-primary">{{ conference.user_count }} уч.</span>
+                                    </div>
+                                </div>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">Нет активных конференций</p>
+                            {% endfor %}
+                            <div class="text-center mt-3">
+                                <a href="/conferences" class="btn btn-sm btn-outline-primary">Все конференции</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Active Users -->
+                    <div class="col-md-6">
+                        <div class="stat-card">
+                            <h5 class="mb-3"><i class="bi bi-people"></i> Недавно активные</h5>
+                            {% for user in recent_users[:5] %}
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="user-avatar me-2">
+                                    {{ user.username[0]|upper if user.username else '?' }}
+                                </div>
+                                <div>
+                                    <strong>@{{ user.username }}</strong><br>
+                                    <small class="text-muted">
+                                        {% if user.last_active %}
+                                            {{ user.last_active.strftime('%H:%M %d.%m') }}
+                                        {% else %}
+                                            никогда
+                                        {% endif %}
+                                    </small>
+                                </div>
+                                <div class="ms-auto">
+                                    <span class="badge bg-info">{{ user.company|default('-') }}</span>
+                                </div>
+                            </div>
+                            {% else %}
+                            <p class="text-muted">Нет активных пользователей</p>
+                            {% endfor %}
+                            <div class="text-center mt-3">
+                                <a href="/users" class="btn btn-sm btn-outline-primary">Все пользователи</a>
                             </div>
                         </div>
                     </div>

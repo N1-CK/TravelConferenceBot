@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель | Конференции</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f8f9fa;
+        }
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 12px 20px;
+            margin: 5px 0;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+        .sidebar .nav-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            transform: translateX(5px);
+        }
+        .sidebar .nav-link.active {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        .sidebar .nav-link i {
+            margin-right: 10px;
+            width: 20px;
+        }
+        .main-content {
+            padding: 30px;
+        }
+        .user-info {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            margin-bottom: 20px;
+        }
+        .user-info h5 {
+            color: white;
+            margin-bottom: 5px;
+        }
+        .user-info p {
+            color: rgba(255,255,255,0.7);
+            margin: 0;
+            font-size: 0.9rem;
+        }
+        .conference-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+        .conference-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-upcoming {
+            background: #cce5ff;
+            color: #004085;
+        }
+        .status-ended {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .conference-header {
+            cursor: pointer;
+        }
+        .conference-details {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 px-0 sidebar">
+                <div class="user-info">
+                    <h5><i class="bi bi-person-circle"></i> {{ username }}</h5>
+                    <p>Администратор</p>
+                </div>
+
+                <nav class="nav flex-column">
+                    <a class="nav-link" href="/">
+                        <i class="bi bi-speedometer2"></i> Дашборд
+                    </a>
+                    <a class="nav-link" href="/broadcast">
+                        <i class="bi bi-megaphone"></i> Рассылка
+                    </a>
+                    <a class="nav-link active" href="/conferences">
+                        <i class="bi bi-calendar-event"></i> Активные конференции
+                    </a>
+                    <a class="nav-link" href="/users">
+                        <i class="bi bi-people"></i> Активные пользователи
+                    </a>
+                    <a class="nav-link" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                        <i class="bi bi-box-arrow-right"></i> Выход
+                    </a>
+                </nav>
+                <form id="logout-form" action="/logout" method="GET" style="display: none;"></form>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-9 col-lg-10 main-content">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2><i class="bi bi-calendar-event"></i> Активные конференции</h2>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addConferenceModal">
+                        <i class="bi bi-plus-circle"></i> Добавить конференцию
+                    </button>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <div class="conference-card">
+                            <div class="stat-icon text-primary">
+                                <i class="bi bi-calendar-check"></i>
+                            </div>
+                            <div class="stat-number">{{ stats.total_conferences }}</div>
+                            <div class="stat-label">Всего конференций</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="conference-card">
+                            <div class="stat-icon text-success">
+                                <i class="bi bi-play-circle"></i>
+                            </div>
+                            <div class="stat-number">{{ stats.active_conferences }}</div>
+                            <div class="stat-label">Активных сейчас</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="conference-card">
+                            <div class="stat-icon text-warning">
+                                <i class="bi bi-clock"></i>
+                            </div>
+                            <div class="stat-number">{{ stats.upcoming_conferences }}</div>
+                            <div class="stat-label">Предстоящих</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="conference-card">
+                            <div class="stat-icon text-info">
+                                <i class="bi bi-people"></i>
+                            </div>
+                            <div class="stat-number">{{ stats.total_participants }}</div>
+                            <div class="stat-label">Всего участников</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Conferences List -->
+                <div class="conference-card">
+                    <ul class="nav nav-tabs mb-3" id="conferenceTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button" role="tab">Все</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="active-tab" data-bs-toggle="tab" data-bs-target="#active" type="button" role="tab">Активные</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="upcoming-tab" data-bs-toggle="tab" data-bs-target="#upcoming" type="button" role="tab">Предстоящие</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="ended-tab" data-bs-toggle="tab" data-bs-target="#ended" type="button" role="tab">Завершенные</button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="conferenceTabsContent">
+                        <div class="tab-pane fade show active" id="all" role="tabpanel">
+                            <table id="conferencesTable" class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Конференция</th>
+                                        <th>Город</th>
+                                        <th>Даты</th>
+                                        <th>Участников</th>
+                                        <th>Статус</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for conf in conferences %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ conf.name }}</strong>
+                                        </td>
+                                        <td>{{ conf.city }}</td>
+                                        <td>{{ conf.start_date }} - {{ conf.end_date }}</td>
+                                        <td>
+                                            <span class="badge bg-primary">{{ conf.user_count }}</span>
+                                        </td>
+                                        <td>
+                                            {% if conf.status == 'active' %}
+                                                <span class="status-badge status-active">Активна</span>
+                                            {% elif conf.status == 'upcoming' %}
+                                                <span class="status-badge status-upcoming">Предстоит</span>
+                                            {% else %}
+                                                <span class="status-badge status-ended">Завершена</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary" onclick="showConferenceDetails('{{ conf.name }}')">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-success" onclick="broadcastToConference('{{ conf.name }}')">
+                                                <i class="bi bi-megaphone"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger" onclick="deleteConference('{{ conf.name }}')">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="tab-pane fade" id="active" role="tabpanel">
+                            <!-- Аналогичная таблица для активных -->
+                        </div>
+                        <div class="tab-pane fade" id="upcoming" role="tabpanel">
+                            <!-- Для предстоящих -->
+                        </div>
+                        <div class="tab-pane fade" id="ended" role="tabpanel">
+                            <!-- Для завершенных -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Conference Details Modal -->
+                <div class="modal fade" id="conferenceModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="conferenceModalTitle">Детали конференции</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body" id="conferenceModalBody">
+                                <!-- Загружается через AJAX -->
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Conference Modal -->
+                <div class="modal fade" id="addConferenceModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Добавить конференцию</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="addConferenceForm" action="/api/conferences/add" method="POST">
+                                    <div class="mb-3">
+                                        <label class="form-label">Название конференции</label>
+                                        <input type="text" class="form-control" name="name" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Город</label>
+                                        <input type="text" class="form-control" name="city">
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Дата начала</label>
+                                            <input type="date" class="form-control" name="start_date">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Дата окончания</label>
+                                            <input type="date" class="form-control" name="end_date">
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Описание</label>
+                                        <textarea class="form-control" name="description" rows="3"></textarea>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                <button type="submit" form="addConferenceForm" class="btn btn-primary">Добавить</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#conferencesTable').DataTable({
+                language: {
+                    url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/ru.json'
+                },
+                pageLength: 25,
+                order: [[2, 'desc']]
+            });
+        });
+
+        function showConferenceDetails(conferenceName) {
+            fetch(`/api/conferences/${encodeURIComponent(conferenceName)}`)
+                .then(response => response.json())
+                .then(data => {
+                    let html = `
+                        <h6>Информация о конференции</h6>
+                        <table class="table">
+                            <tr>
+                                <th>Название:</th>
+                                <td>${data.name}</td>
+                            </tr>
+                            <tr>
+                                <th>Город:</th>
+                                <td>${data.city || '-'}</td>
+                            </tr>
+                            <tr>
+                                <th>Даты:</th>
+                                <td>${data.start_date || '??'} - ${data.end_date || '??'}</td>
+                            </tr>
+                            <tr>
+                                <th>Участников:</th>
+                                <td><span class="badge bg-primary">${data.user_count}</span></td>
+                            </tr>
+                        </table>
+
+                        <h6 class="mt-4">Участники конференции</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Компания</th>
+                                        <th>Статус</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    data.users.forEach(user => {
+                        html += `
+                            <tr>
+                                <td>@${user.username}</td>
+                                <td>${user.company || '-'}</td>
+                                <td><span class="badge bg-success">Активен</span></td>
+                            </tr>
+                        `;
+                    });
+
+                    html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+
+                    document.getElementById('conferenceModalTitle').textContent = data.name;
+                    document.getElementById('conferenceModalBody').innerHTML = html;
+
+                    new bootstrap.Modal(document.getElementById('conferenceModal')).show();
+                });
+        }
+
+        function broadcastToConference(conferenceName) {
+            window.location.href = `/broadcast?conference=${encodeURIComponent(conferenceName)}`;
+        }
+
+        function deleteConference(conferenceName) {
+            if (confirm(`Удалить конференцию ${conferenceName}?`)) {
+                fetch(`/api/conferences/delete/${encodeURIComponent(conferenceName)}`, {
+                    method: 'POST'
+                }).then(response => {
+                    if (response.ok) {
+                        location.reload();
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+</html>
