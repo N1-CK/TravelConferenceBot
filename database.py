@@ -1,8 +1,8 @@
+import logging
+import os
 from typing import List, Dict
 
 import asyncpg
-import logging
-import os
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -324,6 +324,74 @@ class Database:
                     )
                     '''
                 ]
+
+                await conn.execute(f"""
+                                CREATE TABLE IF NOT EXISTS {self.db_schema}.admin_users (
+                                    id SERIAL PRIMARY KEY,
+                                    username TEXT UNIQUE NOT NULL,
+                                    password_hash TEXT NOT NULL,
+                                    full_name TEXT,
+                                    role TEXT NOT NULL DEFAULT 'user',
+                                    can_manage_users BOOLEAN DEFAULT FALSE,
+                                    can_broadcast BOOLEAN DEFAULT TRUE,
+                                    can_view_stats BOOLEAN DEFAULT TRUE,
+                                    can_manage_conferences BOOLEAN DEFAULT FALSE,
+                                    created_at TIMESTAMP DEFAULT NOW(),
+                                    last_login TIMESTAMP,
+                                    is_active BOOLEAN DEFAULT TRUE
+                                )
+                            """)
+
+                # Таблица ролей для обычных пользователей
+                await conn.execute(f"""
+                                CREATE TABLE IF NOT EXISTS {self.db_schema}.user_roles (
+                                    user_id BIGINT PRIMARY KEY,
+                                    username TEXT NOT NULL,
+                                    role TEXT NOT NULL DEFAULT 'user',
+                                    permissions JSONB DEFAULT '{{}}'::jsonb,
+                                    assigned_by TEXT,
+                                    assigned_at TIMESTAMP DEFAULT NOW(),
+                                    updated_at TIMESTAMP DEFAULT NOW()
+                                )
+                            """)
+
+                # Таблица сессий админки
+                await conn.execute(f"""
+                                CREATE TABLE IF NOT EXISTS {self.db_schema}.admin_sessions (
+                                    id SERIAL PRIMARY KEY,
+                                    admin_id INTEGER REFERENCES {self.db_schema}.admin_users(id),
+                                    session_token TEXT UNIQUE,
+                                    ip_address TEXT,
+                                    user_agent TEXT,
+                                    created_at TIMESTAMP DEFAULT NOW(),
+                                    expires_at TIMESTAMP
+                                )
+                            """)
+
+                # Таблица логов действий админов
+                await conn.execute(f"""
+                                CREATE TABLE IF NOT EXISTS {self.db_schema}.admin_logs (
+                                    id SERIAL PRIMARY KEY,
+                                    admin_id INTEGER REFERENCES {self.db_schema}.admin_users(id),
+                                    action TEXT NOT NULL,
+                                    details JSONB,
+                                    ip_address TEXT,
+                                    created_at TIMESTAMP DEFAULT NOW()
+                                )
+                            """)
+
+                # Создаем первого админа если нет
+                from hashlib import sha256
+                default_admin = os.getenv('ADMIN_USERNAME', 'admin')
+                default_pass = os.getenv('ADMIN_PASSWORD', 'admin123')
+                password_hash = sha256(default_pass.encode()).hexdigest()
+
+                await conn.execute(f"""
+                                INSERT INTO {self.db_schema}.admin_users 
+                                (username, password_hash, full_name, role, can_manage_users, can_broadcast, can_view_stats, can_manage_conferences)
+                                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                                ON CONFLICT (username) DO NOTHING
+                            """, default_admin, password_hash, 'Administrator', 'admin', True, True, True, True)
 
                 for table_sql in tables:
                     try:
@@ -1341,6 +1409,618 @@ class Database:
         except Exception as e:
             logger.error(f"Error getting travel status: {e}")
             return {"status": "error", "details": {"error": str(e)}}
+
+    async def add_admin_user(self, username: str, password: str, full_name: str = None,
+                             role: str = 'user', permissions: dict = None) -> bool:
+        """Добавление администратора"""
+        try:
+            from hashlib import sha256
+            password_hash = sha256(password.encode()).hexdigest()
+
+            async with self.pool.acquire() as conn:
+                # Проверяем, существует ли уже
+                exists = await conn.fetchval(f"""
+                    SELECT id FROM {self.db_schema}.admin_users WHERE username = $1
+                """, username)
+
+                if exists:
+                    return False
+
+                perms = permissions or {}
+                await conn.execute(f"""
+                    INSERT INTO {self.db_schema}.admin_users 
+                    (username, password_hash, full_name, role, 
+                     can_manage_users, can_broadcast, can_view_stats, can_manage_conferences)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                """, username, password_hash, full_name, role,
+                                   perms.get('manage_users', False),
+                                   perms.get('broadcast', True),
+                                   perms.get('view_stats', True),
+                                   perms.get('manage_conferences', False))
+
+                return True
+        except Exception as e:
+            logger.error(f"Error adding admin user: {e}")
+            return False
+
+    async def verify_admin(self, username: str, password: str) -> dict:
+        """Проверка учетных данных администратора"""
+        try:
+            from hashlib import sha256
+            password_hash = sha256(password.encode()).hexdigest()
+
+            async with self.pool.acquire() as conn:
+                admin = await conn.fetchrow(f"""
+                    SELECT id, username, full_name, role, 
+                           can_manage_users, can_broadcast, can_view_stats, can_manage_conferences,
+                           is_active
+                    FROM {self.db_schema}.admin_users 
+                    WHERE username = $1 AND password_hash = $2 AND is_active = TRUE
+                """, username, password_hash)
+
+                if admin:
+                    # Обновляем время последнего входа
+                    await conn.execute(f"""
+                        UPDATE {self.db_schema}.admin_users 
+                        SET last_login = NOW() 
+                        WHERE id = $1
+                    """, admin['id'])
+
+                    return dict(admin)
+                return {}
+        except Exception as e:
+            logger.error(f"Error verifying admin: {e}")
+            return {}
+
+    async def get_all_admin_users(self) -> list:
+        """Получить всех администраторов"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT id, username, full_name, role, 
+                           can_manage_users, can_broadcast, can_view_stats, can_manage_conferences,
+                           created_at, last_login, is_active
+                    FROM {self.db_schema}.admin_users
+                    ORDER BY id
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting admin users: {e}")
+            return []
+
+    async def update_admin_user(self, admin_id: int, data: dict) -> bool:
+        """Обновление данных администратора"""
+        try:
+            async with self.pool.acquire() as conn:
+                set_clauses = []
+                values = []
+                i = 1
+
+                for key, value in data.items():
+                    if key != 'id' and key != 'password_hash':
+                        set_clauses.append(f"{key} = ${i}")
+                        values.append(value)
+                        i += 1
+
+                if 'password' in data and data['password']:
+                    from hashlib import sha256
+                    set_clauses.append(f"password_hash = ${i}")
+                    values.append(sha256(data['password'].encode()).hexdigest())
+                    i += 1
+
+                if set_clauses:
+                    values.append(admin_id)
+                    query = f"""
+                        UPDATE {self.db_schema}.admin_users 
+                        SET {', '.join(set_clauses)}
+                        WHERE id = ${i}
+                    """
+                    await conn.execute(query, *values)
+
+                return True
+        except Exception as e:
+            logger.error(f"Error updating admin user: {e}")
+            return False
+
+    async def delete_admin_user(self, admin_id: int) -> bool:
+        """Удаление администратора"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    DELETE FROM {self.db_schema}.admin_users WHERE id = $1
+                """, admin_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error deleting admin user: {e}")
+            return False
+
+    async def set_user_role(self, user_id: int, username: str, role: str,
+                            permissions: dict = None, assigned_by: str = None) -> bool:
+        """Установка роли для пользователя"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    INSERT INTO {self.db_schema}.user_roles 
+                    (user_id, username, role, permissions, assigned_by, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, NOW())
+                    ON CONFLICT (user_id) DO UPDATE
+                    SET role = EXCLUDED.role,
+                        permissions = EXCLUDED.permissions,
+                        assigned_by = EXCLUDED.assigned_by,
+                        updated_at = NOW()
+                """, user_id, username, role, permissions or {}, assigned_by)
+
+                return True
+        except Exception as e:
+            logger.error(f"Error setting user role: {e}")
+            return False
+
+    async def get_user_role(self, user_id: int) -> dict:
+        """Получить роль пользователя"""
+        try:
+            async with self.pool.acquire() as conn:
+                role = await conn.fetchrow(f"""
+                    SELECT role, permissions, assigned_at
+                    FROM {self.db_schema}.user_roles
+                    WHERE user_id = $1
+                """, user_id)
+
+                if role:
+                    return dict(role)
+                return {'role': 'user', 'permissions': {}}
+        except Exception as e:
+            logger.error(f"Error getting user role: {e}")
+            return {'role': 'user', 'permissions': {}}
+
+    async def log_admin_action(self, admin_id: int, action: str, details: dict = None,
+                               ip_address: str = None) -> bool:
+        """Логирование действий администратора"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    INSERT INTO {self.db_schema}.admin_logs 
+                    (admin_id, action, details, ip_address)
+                    VALUES ($1, $2, $3, $4)
+                """, admin_id, action, details or {}, ip_address)
+                return True
+        except Exception as e:
+            logger.error(f"Error logging admin action: {e}")
+            return False
+
+    async def check_admin_permission(self, admin_id: int, permission: str) -> bool:
+        """Проверка прав администратора"""
+        try:
+            async with self.pool.acquire() as conn:
+                admin = await conn.fetchrow(f"""
+                    SELECT role, can_manage_users, can_broadcast, can_view_stats, can_manage_conferences
+                    FROM {self.db_schema}.admin_users
+                    WHERE id = $1 AND is_active = TRUE
+                """, admin_id)
+
+                if not admin:
+                    return False
+
+                # Админ имеет все права
+                if admin['role'] == 'admin':
+                    return True
+
+                # Проверяем конкретное право
+                perm_map = {
+                    'manage_users': 'can_manage_users',
+                    'broadcast': 'can_broadcast',
+                    'view_stats': 'can_view_stats',
+                    'manage_conferences': 'can_manage_conferences'
+                }
+
+                if permission in perm_map:
+                    return admin[perm_map[permission]]
+
+                return False
+        except Exception as e:
+            logger.error(f"Error checking admin permission: {e}")
+            return False
+
+    # ===== МЕТОДЫ ДЛЯ УПРАВЛЕНИЯ ГРУППАМИ И ФУНКЦИЯМИ =====
+
+    async def create_groups_tables(self):
+        """Создание таблиц для групп и функций"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Таблица групп
+                await conn.execute(f"""
+                    CREATE TABLE IF NOT EXISTS {self.db_schema}.user_groups (
+                        id SERIAL PRIMARY KEY,
+                        name TEXT NOT NULL UNIQUE,
+                        description TEXT,
+                        color TEXT DEFAULT '#667eea',
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+
+                # Таблица функций
+                await conn.execute(f"""
+                    CREATE TABLE IF NOT EXISTS {self.db_schema}.features (
+                        id SERIAL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        code TEXT NOT NULL UNIQUE,
+                        description TEXT,
+                        icon TEXT DEFAULT 'bi-grid',
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+
+                # Таблица связи пользователей с группами
+                await conn.execute(f"""
+                    CREATE TABLE IF NOT EXISTS {self.db_schema}.user_group_membership (
+                        user_id BIGINT NOT NULL,
+                        group_id INTEGER NOT NULL REFERENCES {self.db_schema}.user_groups(id) ON DELETE CASCADE,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        PRIMARY KEY (user_id, group_id)
+                    )
+                """)
+
+                # Таблица связи групп с функциями
+                await conn.execute(f"""
+                    CREATE TABLE IF NOT EXISTS {self.db_schema}.group_features (
+                        group_id INTEGER NOT NULL REFERENCES {self.db_schema}.user_groups(id) ON DELETE CASCADE,
+                        feature_id INTEGER NOT NULL REFERENCES {self.db_schema}.features(id) ON DELETE CASCADE,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        PRIMARY KEY (group_id, feature_id)
+                    )
+                """)
+
+                # Добавить базовые функции, если их нет
+                basic_features = [
+                    ('PR-баннеры', 'pr_banner', 'Заказ баннеров для конференций', 'bi-megaphone'),
+                    ('PR-визитки', 'pr_business_cards', 'Заказ визиток', 'bi-card-text'),
+                    ('Справки-вызовы', 'event_certificate', 'Заказ справок для участия', 'bi-file-text'),
+                    ('Визы', 'travel_visa', 'Оформление виз', 'bi-passport'),
+                    ('Авиабилеты', 'travel_flights', 'Бронирование авиабилетов', 'bi-airplane'),
+                    ('Отели', 'travel_hotels', 'Бронирование отелей', 'bi-building'),
+                    ('Суточные', 'travel_per_diem', 'Оформление суточных', 'bi-cash'),
+                    ('Бронирование столиков', 'affiliate_bookings', 'Бронь в ресторанах', 'bi-calendar-check'),
+                    ('Отчеты', 'affiliate_reports', 'Отчеты о встречах', 'bi-file-earmark-text')
+                ]
+
+                for name, code, desc, icon in basic_features:
+                    await conn.execute(f"""
+                        INSERT INTO {self.db_schema}.features (name, code, description, icon)
+                        VALUES ($1, $2, $3, $4)
+                        ON CONFLICT (code) DO NOTHING
+                    """, name, code, desc, icon)
+
+                return True
+        except Exception as e:
+            logger.error(f"Error creating groups tables: {e}")
+            return False
+
+    async def get_all_groups(self) -> list:
+        """Получить все группы с количеством пользователей и функций"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT 
+                        g.*,
+                        COUNT(DISTINCT ugm.user_id) as users_count,
+                        COUNT(DISTINCT gf.feature_id) as features_count
+                    FROM {self.db_schema}.user_groups g
+                    LEFT JOIN {self.db_schema}.user_group_membership ugm ON g.id = ugm.group_id
+                    LEFT JOIN {self.db_schema}.group_features gf ON g.id = gf.group_id
+                    GROUP BY g.id
+                    ORDER BY g.name
+                """)
+
+                groups = []
+                for row in rows:
+                    group = dict(row)
+                    # Получаем функции группы
+                    features = await conn.fetch(f"""
+                        SELECT f.* 
+                        FROM {self.db_schema}.features f
+                        JOIN {self.db_schema}.group_features gf ON f.id = gf.feature_id
+                        WHERE gf.group_id = $1
+                    """, row['id'])
+                    group['features'] = [dict(f) for f in features]
+                    groups.append(group)
+
+                return groups
+        except Exception as e:
+            logger.error(f"Error getting groups: {e}")
+            return []
+
+    async def get_group(self, group_id: int) -> dict:
+        """Получить информацию о группе"""
+        try:
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(f"""
+                    SELECT * FROM {self.db_schema}.user_groups WHERE id = $1
+                """, group_id)
+                return dict(row) if row else {}
+        except Exception as e:
+            logger.error(f"Error getting group: {e}")
+            return {}
+
+    async def add_group(self, name: str, description: str = None, color: str = '#667eea') -> bool:
+        """Добавить новую группу"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    INSERT INTO {self.db_schema}.user_groups (name, description, color)
+                    VALUES ($1, $2, $3)
+                """, name, description, color)
+                return True
+        except Exception as e:
+            logger.error(f"Error adding group: {e}")
+            return False
+
+    async def update_group(self, group_id: int, name: str = None,
+                           description: str = None, color: str = None) -> bool:
+        """Обновить информацию о группе"""
+        try:
+            async with self.pool.acquire() as conn:
+                updates = []
+                values = []
+                i = 1
+
+                if name is not None:
+                    updates.append(f"name = ${i}")
+                    values.append(name)
+                    i += 1
+                if description is not None:
+                    updates.append(f"description = ${i}")
+                    values.append(description)
+                    i += 1
+                if color is not None:
+                    updates.append(f"color = ${i}")
+                    values.append(color)
+                    i += 1
+
+                updates.append("updated_at = NOW()")
+
+                if updates:
+                    values.append(group_id)
+                    query = f"""
+                        UPDATE {self.db_schema}.user_groups 
+                        SET {', '.join(updates)}
+                        WHERE id = ${i}
+                    """
+                    await conn.execute(query, *values)
+
+                return True
+        except Exception as e:
+            logger.error(f"Error updating group: {e}")
+            return False
+
+    async def delete_group(self, group_id: int) -> bool:
+        """Удалить группу"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    DELETE FROM {self.db_schema}.user_groups WHERE id = $1
+                """, group_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error deleting group: {e}")
+            return False
+
+    async def get_group_users(self, group_id: int) -> list:
+        """Получить пользователей группы"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT up.user_id, up.username, up.full_name, up.company
+                    FROM {self.db_schema}.user_profiles up
+                    JOIN {self.db_schema}.user_group_membership ugm ON up.user_id = ugm.user_id
+                    WHERE ugm.group_id = $1
+                    ORDER BY up.username
+                """, group_id)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting group users: {e}")
+            return []
+
+    async def add_user_to_group(self, user_id: int, group_id: int) -> bool:
+        """Добавить пользователя в группу"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    INSERT INTO {self.db_schema}.user_group_membership (user_id, group_id)
+                    VALUES ($1, $2)
+                    ON CONFLICT DO NOTHING
+                """, user_id, group_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error adding user to group: {e}")
+            return False
+
+    async def remove_user_from_group(self, user_id: int, group_id: int) -> bool:
+        """Удалить пользователя из группы"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    DELETE FROM {self.db_schema}.user_group_membership
+                    WHERE user_id = $1 AND group_id = $2
+                """, user_id, group_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error removing user from group: {e}")
+            return False
+
+    async def get_user_groups(self, user_id: int) -> list:
+        """Получить группы пользователя"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT g.*
+                    FROM {self.db_schema}.user_groups g
+                    JOIN {self.db_schema}.user_group_membership ugm ON g.id = ugm.group_id
+                    WHERE ugm.user_id = $1
+                """, user_id)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting user groups: {e}")
+            return []
+
+    async def get_all_features(self) -> list:
+        """Получить все доступные функции"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT * FROM {self.db_schema}.features
+                    ORDER BY name
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting features: {e}")
+            return []
+
+    async def add_feature(self, name: str, code: str, description: str = None,
+                          icon: str = 'bi-grid') -> bool:
+        """Добавить новую функцию"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    INSERT INTO {self.db_schema}.features (name, code, description, icon)
+                    VALUES ($1, $2, $3, $4)
+                    ON CONFLICT (code) DO UPDATE
+                    SET name = EXCLUDED.name,
+                        description = EXCLUDED.description,
+                        icon = EXCLUDED.icon
+                """, name, code, description, icon)
+                return True
+        except Exception as e:
+            logger.error(f"Error adding feature: {e}")
+            return False
+
+    async def delete_feature(self, feature_id: int) -> bool:
+        """Удалить функцию"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    DELETE FROM {self.db_schema}.features WHERE id = $1
+                """, feature_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error deleting feature: {e}")
+            return False
+
+    async def assign_features_to_group(self, group_id: int, feature_ids: list) -> bool:
+        """Назначить функции группе"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Удаляем старые связи
+                await conn.execute(f"""
+                    DELETE FROM {self.db_schema}.group_features
+                    WHERE group_id = $1
+                """, group_id)
+
+                # Добавляем новые
+                for feature_id in feature_ids:
+                    await conn.execute(f"""
+                        INSERT INTO {self.db_schema}.group_features (group_id, feature_id)
+                        VALUES ($1, $2)
+                        ON CONFLICT DO NOTHING
+                    """, group_id, feature_id)
+
+                return True
+        except Exception as e:
+            logger.error(f"Error assigning features to group: {e}")
+            return False
+
+    async def get_group_features(self, group_id: int) -> list:
+        """Получить функции группы"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT f.*
+                    FROM {self.db_schema}.features f
+                    JOIN {self.db_schema}.group_features gf ON f.id = gf.feature_id
+                    WHERE gf.group_id = $1
+                """, group_id)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting group features: {e}")
+            return []
+
+    async def get_all_users_with_groups(self) -> list:
+        """Получить всех пользователей с их группами и функциями"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT 
+                        up.user_id,
+                        up.username,
+                        up.full_name,
+                        up.company,
+                        up.position
+                    FROM {self.db_schema}.user_profiles up
+                    ORDER BY up.username
+                """)
+
+                users = []
+                for row in rows:
+                    user = dict(row)
+
+                    # Получаем группы пользователя
+                    groups = await conn.fetch(f"""
+                        SELECT g.*
+                        FROM {self.db_schema}.user_groups g
+                        JOIN {self.db_schema}.user_group_membership ugm ON g.id = ugm.group_id
+                        WHERE ugm.user_id = $1
+                    """, user['user_id'])
+                    user['groups'] = [dict(g) for g in groups]
+                    user['group_ids'] = [g['id'] for g in groups]
+
+                    # Получаем функции пользователя (через группы)
+                    features = await conn.fetch(f"""
+                        SELECT DISTINCT f.*
+                        FROM {self.db_schema}.features f
+                        JOIN {self.db_schema}.group_features gf ON f.id = gf.feature_id
+                        JOIN {self.db_schema}.user_group_membership ugm ON gf.group_id = ugm.group_id
+                        WHERE ugm.user_id = $1
+                    """, user['user_id'])
+                    user['features'] = [dict(f) for f in features]
+
+                    users.append(user)
+
+                return users
+        except Exception as e:
+            logger.error(f"Error getting users with groups: {e}")
+            return []
+
+    async def get_all_users_basic(self) -> list:
+        """Получить базовую информацию о всех пользователях"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT user_id, username, full_name, company
+                    FROM {self.db_schema}.user_profiles
+                    ORDER BY username
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting users basic: {e}")
+            return []
+
+    async def user_has_feature(self, user_id: int, feature_code: str) -> bool:
+        """Проверить, имеет ли пользователь доступ к функции"""
+        try:
+            async with self.pool.acquire() as conn:
+                result = await conn.fetchval(f"""
+                    SELECT 1
+                    FROM {self.db_schema}.user_group_membership ugm
+                    JOIN {self.db_schema}.group_features gf ON ugm.group_id = gf.group_id
+                    JOIN {self.db_schema}.features f ON gf.feature_id = f.id
+                    WHERE ugm.user_id = $1 AND f.code = $2
+                    LIMIT 1
+                """, user_id, feature_code)
+                return bool(result)
+        except Exception as e:
+            logger.error(f"Error checking user feature: {e}")
+            return False
+
+
 
 
 # Глобальный экземпляр

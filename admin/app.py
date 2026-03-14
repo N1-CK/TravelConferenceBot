@@ -11,6 +11,9 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 
+from database import db
+from locales import get_text
+
 # Загружаем переменные окружения
 load_dotenv()
 
@@ -53,6 +56,10 @@ def run_async(coro):
     finally:
         loop.close()
 
+@app.context_processor
+def utility_processor():
+    """Добавляет функцию get_text во все шаблоны"""
+    return dict(get_text=get_text)
 
 # ============================================
 # МОДЕЛИ ДЛЯ РАБОТЫ С БД
@@ -533,9 +540,20 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
 
-        if username == ADMIN_USERNAME and hashlib.sha256(password.encode()).hexdigest() == ADMIN_PASSWORD_HASH:
+        # Проверяем в таблице admin_users
+        admin = run_async(db.verify_admin(username, password))
+
+        if admin:
             session['logged_in'] = True
             session['username'] = username
+            session['admin_id'] = admin['id']
+            session['role'] = admin['role']
+            session['permissions'] = {
+                'manage_users': admin.get('can_manage_users', False),
+                'broadcast': admin.get('can_broadcast', True),
+                'view_stats': admin.get('can_view_stats', True),
+                'manage_conferences': admin.get('can_manage_conferences', False)
+            }
             session['login_time'] = datetime.now().isoformat()
             flash('Вы успешно вошли в систему!', 'success')
             return redirect(url_for('dashboard'))
@@ -822,5 +840,242 @@ def api_preview_recipients():
     return jsonify({'count': 0})
 
 
+@app.route('/user_groups')
+@login_required
+def user_groups_page():
+    """Страница управления группами и функциями"""
+    # Проверка прав администратора
+    if session.get('role') != 'admin':
+        flash('Доступ запрещен', 'danger')
+        return redirect(url_for('dashboard'))
+
+    groups = run_async(Database.get_all_groups())
+    features = run_async(Database.get_all_features())
+    all_users = run_async(Database.get_all_users_with_groups())
+
+    # Статистика
+    stats = {
+        'total_groups': len(groups),
+        'total_users': len(all_users),
+        'users_in_groups': sum(1 for u in all_users if u.get('groups')),
+        'total_features': len(features)
+    }
+
+    return render_template('user_groups.html',
+                           groups=groups,
+                           features=features,
+                           all_users=all_users,
+                           stats=stats,
+                           username=session.get('username'))
+
+
+@app.route('/api/groups/add', methods=['POST'])
+@login_required
+def api_add_group():
+    """API для добавления группы"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Access denied'}), 403
+
+    name = request.form.get('name')
+    description = request.form.get('description')
+    color = request.form.get('color', '#667eea')
+
+    if not name:
+        flash('Название группы обязательно', 'danger')
+        return redirect(url_for('user_groups_page'))
+
+    success = run_async(Database.add_group(name, description, color))
+    if success:
+        flash('Группа создана', 'success')
+    else:
+        flash('Ошибка при создании группы', 'danger')
+
+    return redirect(url_for('user_groups_page'))
+
+
+@app.route('/api/groups/<int:group_id>')
+@login_required
+def api_get_group(group_id):
+    """API для получения информации о группе"""
+    group = run_async(Database.get_group(group_id))
+    return jsonify(group)
+
+
+@app.route('/api/groups/edit/<int:group_id>', methods=['POST'])
+@login_required
+def api_edit_group(group_id):
+    """API для редактирования группы"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Access denied'}), 403
+
+    name = request.form.get('name')
+    description = request.form.get('description')
+    color = request.form.get('color')
+
+    success = run_async(Database.update_group(group_id, name, description, color))
+    if success:
+        flash('Группа обновлена', 'success')
+    else:
+        flash('Ошибка при обновлении группы', 'danger')
+
+    return redirect(url_for('user_groups_page'))
+
+
+@app.route('/api/groups/delete/<int:group_id>', methods=['POST'])
+@login_required
+def api_delete_group(group_id):
+    """API для удаления группы"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Access denied'}), 403
+
+    success = run_async(Database.delete_group(group_id))
+    if success:
+        flash('Группа удалена', 'success')
+    else:
+        flash('Ошибка при удалении группы', 'danger')
+
+    return redirect(url_for('user_groups_page'))
+
+
+@app.route('/api/groups/<int:group_id>/users')
+@login_required
+def api_get_group_users(group_id):
+    """API для получения пользователей группы"""
+    users = run_async(Database.get_group_users(group_id))
+    return jsonify(users)
+
+
+@app.route('/api/groups/<int:group_id>/users/<int:user_id>/add', methods=['POST'])
+@login_required
+def api_add_user_to_group(group_id, user_id):
+    """API для добавления пользователя в группу"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Access denied'}), 403
+
+    success = run_async(Database.add_user_to_group(user_id, group_id))
+    return jsonify({'success': success})
+
+
+@app.route('/api/groups/<int:group_id>/users/<int:user_id>/remove', methods=['POST'])
+@login_required
+def api_remove_user_from_group(group_id, user_id):
+    """API для удаления пользователя из группы"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Access denied'}), 403
+
+    success = run_async(Database.remove_user_from_group(user_id, group_id))
+    return jsonify({'success': success})
+
+
+@app.route('/api/features/add', methods=['POST'])
+@login_required
+def api_add_feature():
+    """API для добавления функции"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Access denied'}), 403
+
+    name = request.form.get('name')
+    code = request.form.get('code')
+    description = request.form.get('description')
+    icon = request.form.get('icon', 'bi-grid')
+
+    if not name or not code:
+        flash('Название и код функции обязательны', 'danger')
+        return redirect(url_for('user_groups_page'))
+
+    success = run_async(Database.add_feature(name, code, description, icon))
+    if success:
+        flash('Функция добавлена', 'success')
+    else:
+        flash('Ошибка при добавлении функции', 'danger')
+
+    return redirect(url_for('user_groups_page'))
+
+
+@app.route('/api/features/delete/<int:feature_id>', methods=['POST'])
+@login_required
+def api_delete_feature(feature_id):
+    """API для удаления функции"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Access denied'}), 403
+
+    success = run_async(Database.delete_feature(feature_id))
+    return jsonify({'success': success})
+
+
+@app.route('/api/groups/features/assign', methods=['POST'])
+@login_required
+def api_assign_features_to_group():
+    """API для назначения функций группе"""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Access denied'}), 403
+
+    data = request.get_json()
+    group_id = data.get('group_id')
+    features = data.get('features', [])
+
+    success = run_async(Database.assign_features_to_group(group_id, features))
+    return jsonify({'success': success})
+
+
+@app.route('/api/users/all')
+@login_required
+def api_get_all_users():
+    """API для получения всех пользователей"""
+    users = run_async(Database.get_all_users_basic())
+    return jsonify(users)
+
+
+@app.route('/user_groups/<int:user_id>')
+@login_required
+def user_groups_management(user_id):
+    """Страница управления группами конкретного пользователя"""
+    if session.get('role') != 'admin':
+        flash('Доступ запрещен', 'danger')
+        return redirect(url_for('dashboard'))
+
+    user = run_async(Database.get_user_details(user_id))
+    groups = run_async(Database.get_all_groups())
+    user_groups = run_async(Database.get_user_groups(user_id))
+
+    return render_template('user_groups_edit.html',
+                           user=user,
+                           groups=groups,
+                           user_groups=user_groups)
+
+
+@app.route('/group_features/<int:group_id>')
+@login_required
+def group_features_management(group_id):
+    """Страница управления функциями группы"""
+    if session.get('role') != 'admin':
+        flash('Доступ запрещен', 'danger')
+        return redirect(url_for('dashboard'))
+
+    group = run_async(Database.get_group(group_id))
+    features = run_async(Database.get_all_features())
+    group_features = run_async(Database.get_group_features(group_id))
+
+    return render_template('group_features.html',
+                           group=group,
+                           features=features,
+                           group_features=group_features)
+
+
+# ============================================
+# МАРШРУТ ДЛЯ ПРОВЕРКИ ДОСТУПА К ФУНКЦИЯМ
+# ============================================
+
+@app.route('/api/user/<int:user_id>/check_feature/<feature_code>')
+@login_required
+def api_check_user_feature(user_id, feature_code):
+    """API для проверки доступа пользователя к функции"""
+    has_access = run_async(Database.user_has_feature(user_id, feature_code))
+    return jsonify({'has_access': has_access})
+
+
 if __name__ == '__main__':
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(db.create_pool())
     app.run(host='0.0.0.0', port=5005, debug=True)
