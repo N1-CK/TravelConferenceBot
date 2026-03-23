@@ -137,36 +137,45 @@
     <div class="row">
         <!-- Sidebar -->
         <div class="col-md-3 col-lg-2 px-0 sidebar">
-            <div class="user-info">
-                <h5><i class="bi bi-person-circle"></i> {{ session.username }}</h5>
-                <p>Администратор</p>
-            </div>
+                <div class="user-info">
+                    <h5><i class="bi bi-person-circle"></i> {{ session.username }}</h5>
+                    <p>{{ get_text('role_' + session.role) }}</p>
+                </div>
 
-            <nav class="nav flex-column">
-                <a class="nav-link" href="/">
-                    <i class="bi bi-speedometer2"></i> Дашборд
-                </a>
-                <a class="nav-link" href="/broadcast">
-                    <i class="bi bi-megaphone"></i> Рассылка
-                </a>
-                <a class="nav-link" href="/conferences">
-                    <i class="bi bi-calendar-event"></i> Активные конференции
-                </a>
-                <a class="nav-link" href="/users">
-                    <i class="bi bi-people"></i> Активные пользователи
-                </a>
-                <a class="nav-link active" href="/user_groups">
-                    <i class="bi bi-diagram-3"></i> Управление группами
-                </a>
-                <a class="nav-link" href="/admin_users">
-                    <i class="bi bi-shield-lock"></i> Управление админами
-                </a>
-                <a class="nav-link" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                    <i class="bi bi-box-arrow-right"></i> Выход
-                </a>
-            </nav>
-            <form id="logout-form" action="/logout" method="GET" style="display: none;"></form>
-        </div>
+                <nav class="nav flex-column">
+                    <a class="nav-link" href="/">
+                        <i class="bi bi-speedometer2"></i> {{ get_text('dashboard') }}
+                    </a>
+                    <a class="nav-link" href="/broadcast">
+                        <i class="bi bi-megaphone"></i> {{ get_text('broadcast') }}
+                    </a>
+                    <a class="nav-link" href="/event">
+                        <i class="bi bi-calendar-event"></i> Event-панель
+                    </a>
+                    <a class="nav-link" href="/travel">
+                        <i class="bi bi-airplane"></i> Travel-панель
+                    </a>
+                    <a class="nav-link" href="/pr">
+                        <i class="bi bi-megaphone"></i> PR-панель
+                    </a>
+                    <a class="nav-link" href="/users">
+                        <i class="bi bi-people"></i> {{ get_text('users') }}
+                    </a>
+                    <a class="nav-link active" href="/conferences">
+                        <i class="bi bi-calendar3"></i> Конференции
+                    </a>
+                    <a class="nav-link" href="/user_groups">
+                        <i class="bi bi-diagram-3"></i> Управление группами
+                    </a>
+                    <a class="nav-link" href="/admin_users">
+                        <i class="bi bi-shield-lock"></i> Управление админами
+                    </a>
+                    <a class="nav-link" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                        <i class="bi bi-box-arrow-right"></i> {{ get_text('logout') }}
+                    </a>
+                </nav>
+                <form id="logout-form" action="/logout" method="GET" style="display: none;"></form>
+            </div>
 
         <!-- Main Content -->
         <div class="col-md-9 col-lg-10 main-content">

@@ -1,3 +1,5 @@
+# app.py - замените весь код после импортов на это:
+
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from functools import wraps
 import asyncio
@@ -11,7 +13,12 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from database import db
+
 from locales import get_text
 
 # Загружаем переменные окружения
@@ -21,6 +28,68 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 app.config['UPLOAD_FOLDER'] = '/tmp'
+
+# ============================================
+# КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: ОДИН EVENT LOOP
+# ============================================
+
+# Создаем один event loop для всего приложения
+_loop = None
+_db_initialized = False
+
+def get_event_loop():
+    """Получить или создать единственный event loop"""
+    global _loop
+    if _loop is None or _loop.is_closed():
+        _loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_loop)
+    return _loop
+
+def run_async(coro):
+    """Выполнить асинхронную функцию в единственном event loop"""
+    loop = get_event_loop()
+    try:
+        if loop.is_running():
+            # Если loop уже запущен, создаем задачу
+            import concurrent.futures
+            future = asyncio.run_coroutine_threadsafe(coro, loop)
+            return future.result()
+        else:
+            # Если loop не запущен, запускаем его
+            return loop.run_until_complete(coro)
+    except RuntimeError as e:
+        if "cannot run" in str(e) or "closed" in str(e):
+            # Пересоздаем loop
+            global _loop
+            _loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(_loop)
+            return _loop.run_until_complete(coro)
+        raise
+
+
+def init_db():
+    """Инициализация БД"""
+    global _db_initialized
+    if not _db_initialized:
+        try:
+            run_async(db.create_pool())
+
+            # КРИТИЧЕСКИ ВАЖНО: создаем таблицы для групп и функций
+            run_async(db.create_groups_tables())
+
+            # СОЗДАЕМ ТАБЛИЦЫ ДЛЯ МЕНЕДЖЕРОВ
+            run_async(db.create_managers_tables())
+
+            _db_initialized = True
+            print("✅ Database connection initialized")
+            print("✅ Groups and features tables created")
+            print("✅ Managers tables created")
+        except Exception as e:
+            print(f"❌ Database connection failed: {e}")
+            raise
+
+# Инициализируем БД сразу при старте
+init_db()
 
 # Конфигурация
 DB_CONFIG = {
@@ -46,400 +115,34 @@ def login_required(f):
 
     return decorated_function
 
+def role_required(allowed_roles=None, permissions=None):
+    """Декоратор для проверки роли и прав"""
 
-# Вспомогательная функция для выполнения async запросов к БД
-def run_async(coro):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'logged_in' not in session:
+                return redirect(url_for('login'))
 
-@app.context_processor
-def utility_processor():
-    """Добавляет функцию get_text во все шаблоны"""
-    return dict(get_text=get_text)
+            role = session.get('role', 'user')
 
-# ============================================
-# МОДЕЛИ ДЛЯ РАБОТЫ С БД
-# ============================================
+            # Проверка роли
+            if allowed_roles and role not in allowed_roles:
+                flash('У вас нет доступа к этой странице', 'danger')
+                return redirect(url_for('dashboard'))
 
-class Database:
-    @staticmethod
-    async def get_users_by_company(companies=None):
-        """Получить пользователей по списку компаний"""
-        conn = None
-        try:
-            conn = await asyncpg.connect(**DB_CONFIG)
+            # Проверка конкретных прав (для user-ролей)
+            if permissions:
+                for perm in permissions:
+                    if not session.get('permissions', {}).get(perm, False):
+                        flash(f'У вас нет права "{perm}"', 'danger')
+                        return redirect(url_for('dashboard'))
 
-            if companies:
-                if isinstance(companies, str):
-                    companies = [companies]
+            return f(*args, **kwargs)
 
-                query = f"""
-                    SELECT user_id, username, company
-                    FROM {DB_SCHEMA}.user_company
-                    WHERE company = ANY($1::text[])
-                """
-                rows = await conn.fetch(query, companies)
-            else:
-                query = f"""
-                    SELECT user_id, username, company
-                    FROM {DB_SCHEMA}.user_company
-                """
-                rows = await conn.fetch(query)
+        return decorated_function
 
-            return [dict(row) for row in rows]
-        except Exception as e:
-            print(f"Error getting users: {e}")
-            return []
-        finally:
-            if conn:
-                await conn.close()
-
-    @staticmethod
-    async def get_users_by_ids(user_ids):
-        """Получить пользователей по списку ID"""
-        conn = None
-        try:
-            conn = await asyncpg.connect(**DB_CONFIG)
-
-            query = f"""
-                SELECT user_id, username, company
-                FROM {DB_SCHEMA}.user_company
-                WHERE user_id = ANY($1::bigint[])
-            """
-            rows = await conn.fetch(query, user_ids)
-            return [dict(row) for row in rows]
-        except Exception as e:
-            print(f"Error getting users by ids: {e}")
-            return []
-        finally:
-            if conn:
-                await conn.close()
-
-    @staticmethod
-    async def get_users_by_conference(conferences):
-        """Получить пользователей по списку конференций"""
-        conn = None
-        try:
-            conn = await asyncpg.connect(**DB_CONFIG)
-
-            if isinstance(conferences, str):
-                conferences = [conferences]
-
-            query = f"""
-                SELECT DISTINCT uc.user_id, uc.username, uc.company
-                FROM {DB_SCHEMA}.user_company uc
-                JOIN {DB_SCHEMA}.user_conferences uconf ON uc.username = uconf.username
-                WHERE uconf.conference_name = ANY($1::text[])
-            """
-            rows = await conn.fetch(query, conferences)
-            return [dict(row) for row in rows]
-        except Exception as e:
-            print(f"Error getting users by conference: {e}")
-            return []
-        finally:
-            if conn:
-                await conn.close()
-
-    @staticmethod
-    async def get_companies():
-        """Получить список компаний"""
-        conn = None
-        try:
-            conn = await asyncpg.connect(**DB_CONFIG)
-            query = f"""
-                SELECT DISTINCT company
-                FROM {DB_SCHEMA}.user_profiles
-                WHERE company IS NOT NULL AND company != ''
-                ORDER BY company
-            """
-            rows = await conn.fetch(query)
-            return [row['company'] for row in rows]
-        except Exception as e:
-            print(f"Error getting companies: {e}")
-            return []
-        finally:
-            if conn:
-                await conn.close()
-
-    @staticmethod
-    async def get_conferences():
-        """Получить список активных конференций"""
-        conn = None
-        try:
-            conn = await asyncpg.connect(**DB_CONFIG)
-
-            # Пытаемся получить из user_conferences
-            try:
-                query = f"""
-                    SELECT DISTINCT conference_name as name, 
-                           COUNT(DISTINCT username) as user_count
-                    FROM {DB_SCHEMA}.user_conferences
-                    GROUP BY conference_name
-                    ORDER BY conference_name
-                """
-                rows = await conn.fetch(query)
-                if rows:
-                    return [dict(row) for row in rows]
-            except:
-                pass
-
-            # Fallback: получаем из company как конференции
-            companies = await Database.get_companies()
-            return [{'name': c, 'user_count': 0} for c in companies]
-        except Exception as e:
-            print(f"Error getting conferences: {e}")
-            return []
-        finally:
-            if conn:
-                await conn.close()
-
-    @staticmethod
-    async def get_all_users():
-        """Получить всех пользователей с деталями"""
-        conn = None
-        try:
-            conn = await asyncpg.connect(**DB_CONFIG)
-
-            query = f"""
-                SELECT 
-                    up.user_id,
-                    up.username,
-                    up.full_name,
-                    up.company,
-                    up.position,
-                    up.language,
-                    up.registered_at,
-                    (SELECT MAX(timestamp) FROM {DB_SCHEMA}.user_logs WHERE user_id = up.user_id) as last_active,
-                    (SELECT COUNT(*) FROM {DB_SCHEMA}.user_logs WHERE user_id = up.user_id AND timestamp > NOW() - INTERVAL '5 minutes') > 0 as is_online
-                FROM {DB_SCHEMA}.user_profiles up
-                ORDER BY up.registered_at DESC
-            """
-            rows = await conn.fetch(query)
-            users = [dict(row) for row in rows]
-
-            # Добавляем конференции и количество заявок для каждого пользователя
-            for user in users:
-                # Конференции пользователя
-                conf_query = f"""
-                    SELECT conference_name
-                    FROM {DB_SCHEMA}.user_conferences
-                    WHERE username = $1
-                """
-                conferences = await conn.fetch(conf_query, user['username'])
-                user['conferences'] = [c['conference_name'] for c in conferences]
-
-                # Количество заявок
-                requests_count = 0
-                for table in ['pr_banner_requests', 'pr_business_cards', 'event_certificates', 'travel_visa_requests']:
-                    try:
-                        count = await conn.fetchval(f"""
-                            SELECT COUNT(*) FROM {DB_SCHEMA}.{table}
-                            WHERE username = $1
-                        """, user['username'])
-                        requests_count += count
-                    except:
-                        pass
-                user['requests_count'] = requests_count
-
-            return users
-        except Exception as e:
-            print(f"Error getting all users: {e}")
-            return []
-        finally:
-            if conn:
-                await conn.close()
-
-    @staticmethod
-    async def get_user_details(user_id):
-        """Получить детальную информацию о пользователе"""
-        conn = None
-        try:
-            conn = await asyncpg.connect(**DB_CONFIG)
-
-            # Основная информация
-            user = await conn.fetchrow(f"""
-                SELECT 
-                    up.*,
-                    (SELECT MAX(timestamp) FROM {DB_SCHEMA}.user_logs WHERE user_id = up.user_id) as last_active
-                FROM {DB_SCHEMA}.user_profiles up
-                WHERE up.user_id = $1
-            """, user_id)
-
-            if not user:
-                return None
-
-            result = dict(user)
-
-            # Конференции пользователя
-            conf_query = f"""
-                SELECT conference_name
-                FROM {DB_SCHEMA}.user_conferences
-                WHERE username = $1
-            """
-            conferences = await conn.fetch(conf_query, result['username'])
-            result['conferences'] = [c['conference_name'] for c in conferences]
-
-            # Заявки пользователя
-            requests = []
-            request_tables = [
-                ('pr_banner_requests', 'Баннер'),
-                ('pr_business_cards', 'Визитки'),
-                ('event_certificates', 'Справка'),
-                ('travel_visa_requests', 'Виза')
-            ]
-
-            for table, type_name in request_tables:
-                try:
-                    rows = await conn.fetch(f"""
-                        SELECT id, created_at, 'pending' as status
-                        FROM {DB_SCHEMA}.{table}
-                        WHERE username = $1
-                        ORDER BY created_at DESC
-                        LIMIT 5
-                    """, result['username'])
-                    for row in rows:
-                        requests.append({
-                            'type': type_name,
-                            'created_at': row['created_at'].strftime('%d.%m.%Y %H:%M'),
-                            'status': 'pending'
-                        })
-                except:
-                    pass
-
-            result['requests'] = requests
-            return result
-
-        except Exception as e:
-            print(f"Error getting user details: {e}")
-            return None
-        finally:
-            if conn:
-                await conn.close()
-
-    @staticmethod
-    async def get_recent_broadcasts(limit=10):
-        """Получить последние рассылки"""
-        conn = None
-        try:
-            conn = await asyncpg.connect(**DB_CONFIG)
-            query = f"""
-                SELECT 
-                    details->>'type' as broadcast_type,
-                    details->>'company' as company,
-                    details->>'message_length' as length,
-                    details->>'success' as success_count,
-                    details->>'failed' as failed_count,
-                    timestamp
-                FROM {DB_SCHEMA}.user_logs
-                WHERE action = 'broadcast_sent'
-                ORDER BY timestamp DESC
-                LIMIT $1
-            """
-            rows = await conn.fetch(query, limit)
-            return [dict(row) for row in rows]
-        except Exception as e:
-            print(f"Error getting broadcasts: {e}")
-            return []
-        finally:
-            if conn:
-                await conn.close()
-
-    @staticmethod
-    async def get_stats():
-        """Получить статистику"""
-        conn = None
-        try:
-            conn = await asyncpg.connect(**DB_CONFIG)
-
-            # Общая статистика
-            total_users = await conn.fetchval(f"""
-                SELECT COUNT(DISTINCT user_id) 
-                FROM {DB_SCHEMA}.user_profiles
-            """)
-
-            active_today = await conn.fetchval(f"""
-                SELECT COUNT(DISTINCT user_id)
-                FROM {DB_SCHEMA}.user_logs
-                WHERE timestamp > NOW() - INTERVAL '1 day'
-            """)
-
-            # По компаниям
-            companies_stats = await conn.fetch(f"""
-                SELECT company, COUNT(DISTINCT user_id) as user_count
-                FROM {DB_SCHEMA}.user_profiles
-                WHERE company IS NOT NULL
-                GROUP BY company
-                ORDER BY user_count DESC
-                LIMIT 5
-            """)
-
-            # Заявки
-            banner_requests = 0
-            visa_requests = 0
-            try:
-                banner_requests = await conn.fetchval(f"SELECT COUNT(*) FROM {DB_SCHEMA}.pr_banner_requests") or 0
-                visa_requests = await conn.fetchval(f"SELECT COUNT(*) FROM {DB_SCHEMA}.travel_visa_requests") or 0
-            except:
-                pass
-
-            # Активные конференции
-            active_conferences = await conn.fetchval(f"""
-                SELECT COUNT(DISTINCT conference_name)
-                FROM {DB_SCHEMA}.user_conferences
-            """) or 0
-
-            # Всего рассылок
-            total_broadcasts = await conn.fetchval(f"""
-                SELECT COUNT(*)
-                FROM {DB_SCHEMA}.user_logs
-                WHERE action = 'broadcast_sent'
-            """) or 0
-
-            return {
-                'total_users': total_users or 0,
-                'active_today': active_today or 0,
-                'companies_stats': [dict(row) for row in companies_stats],
-                'banner_requests': banner_requests,
-                'visa_requests': visa_requests,
-                'active_conferences': active_conferences,
-                'total_broadcasts': total_broadcasts
-            }
-        except Exception as e:
-            print(f"Error getting stats: {e}")
-            return {}
-        finally:
-            if conn:
-                await conn.close()
-
-    @staticmethod
-    async def log_broadcast(username, broadcast_type, company, success, failed, message_length, file_count=0):
-        """Логировать рассылку"""
-        conn = None
-        try:
-            conn = await asyncpg.connect(**DB_CONFIG)
-            details = {
-                'type': broadcast_type,
-                'company': company,
-                'success': success,
-                'failed': failed,
-                'message_length': message_length,
-                'file_count': file_count
-            }
-            await conn.execute(f"""
-                INSERT INTO {DB_SCHEMA}.user_logs (user_id, username, action, details)
-                VALUES ($1, $2, $3, $4)
-            """, 0, username, 'broadcast_sent', details)
-            return True
-        except Exception as e:
-            print(f"Error logging broadcast: {e}")
-            return False
-        finally:
-            if conn:
-                await conn.close()
+    return decorator
 
 
 # ============================================
@@ -528,34 +231,29 @@ class TelegramBot:
 # Инициализация Telegram бота
 bot = TelegramBot(os.getenv('TG_BOT_TOKEN', ''))
 
-
 # ============================================
 # МАРШРУТЫ
 # ============================================
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Страница входа"""
+    """Страница входа для менеджеров"""
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
 
-        # Проверяем в таблице admin_users
-        admin = run_async(db.verify_admin(username, password))
+        manager = run_async(db.verify_manager(username, password))
 
-        if admin:
+        if manager:
             session['logged_in'] = True
-            session['username'] = username
-            session['admin_id'] = admin['id']
-            session['role'] = admin['role']
-            session['permissions'] = {
-                'manage_users': admin.get('can_manage_users', False),
-                'broadcast': admin.get('can_broadcast', True),
-                'view_stats': admin.get('can_view_stats', True),
-                'manage_conferences': admin.get('can_manage_conferences', False)
-            }
+            session['username'] = manager['username']
+            session['manager_id'] = manager['id']
+            session['full_name'] = manager['full_name']
+            session['role'] = manager['role']
+            session['groups'] = manager['group_names']  # ['pr', 'event', 'travel']
             session['login_time'] = datetime.now().isoformat()
-            flash('Вы успешно вошли в систему!', 'success')
+
+            flash(f'Добро пожаловать, {manager["full_name"] or manager["username"]}!', 'success')
             return redirect(url_for('dashboard'))
         else:
             flash('Неверное имя пользователя или пароль', 'danger')
@@ -574,36 +272,48 @@ def logout():
 @app.route('/')
 @login_required
 def dashboard():
-    """Главная панель"""
-    # Получаем статистику
-    stats = run_async(Database.get_stats())
-    broadcasts = run_async(Database.get_recent_broadcasts(5))
+    """Главная панель - показывает только доступные разделы"""
+    try:
+        groups = session.get('groups', [])
+        stats = run_async(db.get_stats())
+        broadcasts = run_async(db.get_recent_broadcasts(5))
+        conferences = run_async(db.get_conferences_list())
+        active_conferences = conferences[:5] if conferences else []
+        users = run_async(db.get_all_users_with_details())
+        recent_users = sorted(users,
+                              key=lambda x: x.get('last_active') or datetime.min,
+                              reverse=True)[:5]
 
-    # Получаем активные конференции
-    conferences = run_async(Database.get_conferences())
-    active_conferences = conferences[:5] if conferences else []
-
-    # Получаем недавно активных пользователей
-    users = run_async(Database.get_all_users())
-    recent_users = sorted(users,
-                          key=lambda x: x.get('last_active') or datetime.min,
-                          reverse=True)[:5]
-
-    return render_template('dashboard.html',
-                           stats=stats,
-                           broadcasts=broadcasts,
-                           active_conferences=active_conferences,
-                           recent_users=recent_users,
-                           username=session.get('username'))
-
+        return render_template('dashboard.html',
+                               stats=stats,
+                               groups=groups,
+                               broadcasts=broadcasts,
+                               active_conferences=active_conferences,
+                               recent_users=recent_users,
+                               username=session.get('username'),
+                               full_name=session.get('full_name'))
+    except Exception as e:
+        print(f"Dashboard error: {e}")
+        flash('Ошибка загрузки данных', 'danger')
+        # В случае ошибки передаем пустые значения для всех переменных
+        return render_template('dashboard.html',
+                               stats={'total_users': 0, 'active_today': 0, 'companies_stats': [],
+                                      'banner_requests': 0, 'visa_requests': 0, 'active_conferences': 0,
+                                      'total_broadcasts': 0},
+                               groups=[],
+                               broadcasts=[],
+                               active_conferences=[],
+                               recent_users=[],
+                               username=session.get('username'),
+                               full_name=session.get('full_name'))
 
 @app.route('/broadcast', methods=['GET', 'POST'])
 @login_required
 def broadcast():
     """Страница рассылки"""
-    companies = run_async(Database.get_companies())
-    conferences = run_async(Database.get_conferences())
-    users = run_async(Database.get_all_users())
+    companies = run_async(db.get_companies_list())
+    conferences = run_async(db.get_conferences_list())
+    users = run_async(db.get_all_users_with_details())
 
     if request.method == 'POST':
         message = request.form.get('message')
@@ -633,26 +343,26 @@ def broadcast():
         users_to_send = []
 
         if target_type == 'all':
-            users_to_send = run_async(Database.get_users_by_company())
+            users_to_send = run_async(db.get_users_by_company_list())
         elif target_type == 'company':
             companies_selected = request.form.getlist('companies')
             if not companies_selected:
                 flash('Выберите хотя бы одну компанию', 'danger')
                 return render_template('broadcast.html', companies=companies, conferences=conferences, users=users)
-            users_to_send = run_async(Database.get_users_by_company(companies_selected))
+            users_to_send = run_async(db.get_users_by_company_list(companies_selected))
         elif target_type == 'specific':
             user_ids = request.form.getlist('selected_users')
             if not user_ids:
                 flash('Выберите хотя бы одного пользователя', 'danger')
                 return render_template('broadcast.html', companies=companies, conferences=conferences, users=users)
             user_ids = [int(uid) for uid in user_ids]
-            users_to_send = run_async(Database.get_users_by_ids(user_ids))
+            users_to_send = run_async(db.get_users_by_ids_list(user_ids))
         elif target_type == 'conference':
             conferences_selected = request.form.getlist('conferences')
             if not conferences_selected:
                 flash('Выберите хотя бы одну конференцию', 'danger')
                 return render_template('broadcast.html', companies=companies, conferences=conferences, users=users)
-            users_to_send = run_async(Database.get_users_by_conference(conferences_selected))
+            users_to_send = run_async(db.get_users_by_conference_list(conferences_selected))
 
         if not users_to_send:
             flash('Нет пользователей для рассылки', 'warning')
@@ -670,7 +380,7 @@ def broadcast():
 
         # Логируем рассылку
         company_info = ', '.join(request.form.getlist('companies')) if target_type == 'company' else target_type
-        run_async(Database.log_broadcast(
+        run_async(db.log_broadcast(
             username=session.get('username', 'admin'),
             broadcast_type=target_type,
             company=company_info,
@@ -692,11 +402,11 @@ def broadcast():
 @login_required
 def conferences_page():
     """Страница активных конференций"""
-    conferences = run_async(Database.get_conferences())
+    conferences = run_async(db.get_conferences_list())
     stats = {
         'total_conferences': len(conferences),
         'active_conferences': len([c for c in conferences if c.get('user_count', 0) > 0]),
-        'upcoming_conferences': 0,  # TODO: добавить логику
+        'upcoming_conferences': 0,
         'total_participants': sum(c.get('user_count', 0) for c in conferences)
     }
 
@@ -709,66 +419,107 @@ def conferences_page():
 @app.route('/users')
 @login_required
 def users_page():
-    """Страница активных пользователей"""
-    users = run_async(Database.get_all_users())
-    companies = run_async(Database.get_companies())
-    conferences = run_async(Database.get_conferences())
+    """Страница пользователей - админ может добавлять и изменять"""
+    try:
+        users = run_async(db.get_all_users_with_details())
+        companies = run_async(db.get_companies_list())
+        conferences = run_async(db.get_conferences_list())
 
-    # Статистика
-    stats = {
-        'total': len(users),
-        'online': len([u for u in users if u.get('is_online')]),
-        'active_today': len([u for u in users if u.get('last_active') and
-                             u['last_active'] > datetime.now() - timedelta(days=1)]),
-        'with_requests': len([u for u in users if u.get('requests_count', 0) > 0]),
-        'companies': len(companies),
-        'conferences': len(conferences)
-    }
+        stats = {
+            'total': len(users),
+            'online': len([u for u in users if u.get('is_online')]),
+            'active_today': len([u for u in users if u.get('last_active') and
+                                 u['last_active'] > datetime.now() - timedelta(days=1)]),
+            'with_requests': len([u for u in users if u.get('requests_count', 0) > 0]),
+            'companies': len(companies),
+            'conferences': len(conferences)
+        }
 
-    return render_template('users.html',
-                           users=users,
-                           companies=companies,
-                           conferences=conferences,
-                           stats=stats,
-                           username=session.get('username'))
+        return render_template('users.html',
+                               users=users,
+                               companies=companies,
+                               conferences=conferences,
+                               stats=stats,
+                               username=session.get('username'))
+    except Exception as e:
+        print(f"Users page error: {e}")
+        flash('Ошибка загрузки пользователей', 'danger')
+        return render_template('users.html',
+                               users=[],
+                               companies=[],
+                               conferences=[],
+                               stats={'total': 0, 'online': 0, 'active_today': 0, 'with_requests': 0,
+                                      'companies': 0, 'conferences': 0},
+                               username=session.get('username'))
 
 
 # ============================================
-# API МАРШРУТЫ
+# API МАРШРУТЫ ДЛЯ УПРАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯМИ
 # ============================================
 
-@app.route('/api/users/count')
+@app.route('/api/users/<int:user_id>', methods=['GET'])
 @login_required
-def api_users_count():
-    """API для подсчета пользователей по фильтрам"""
-    companies = request.args.get('companies', '').split(',')
-    conferences = request.args.get('conferences', '').split(',')
-
-    if companies and companies[0]:
-        users = run_async(Database.get_users_by_company(companies))
-    elif conferences and conferences[0]:
-        users = run_async(Database.get_users_by_conference(conferences))
-    else:
-        users = run_async(Database.get_users_by_company())
-
-    return jsonify({'count': len(users)})
-
-
-@app.route('/api/users/<int:user_id>')
-@login_required
-def api_user_details(user_id):
-    """API для получения деталей пользователя"""
-    user = run_async(Database.get_user_details(user_id))
+def api_get_user(user_id):
+    """Получить данные пользователя"""
+    user = run_async(db.get_user_details_by_id(user_id))
     if user:
         return jsonify(user)
     return jsonify({'error': 'User not found'}), 404
 
 
-@app.route('/api/users/export')
+@app.route('/api/users/<int:user_id>', methods=['PUT'])
+@login_required
+def api_update_user(user_id):
+    """Обновить данные пользователя"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    # Обновляем профиль пользователя
+    user_data = {
+        'user_id': user_id,
+        'username': data.get('username'),
+        'full_name': data.get('full_name'),
+        'position': data.get('position'),
+        'company': data.get('company'),
+        'language': data.get('language', 'ru')
+    }
+
+    success = run_async(db.save_user_registration(user_data))
+    if success:
+        return jsonify({'success': True})
+    return jsonify({'error': 'Failed to update user'}), 500
+
+
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+@login_required
+def api_delete_user(user_id):
+    """Удалить пользователя (деактивировать)"""
+    # TODO: реализовать деактивацию пользователя
+    return jsonify({'success': True})
+
+
+@app.route('/api/users/<int:user_id>/block', methods=['POST'])
+@login_required
+def api_block_user(user_id):
+    """Заблокировать пользователя"""
+    # TODO: реализовать блокировку
+    return jsonify({'success': True})
+
+
+@app.route('/api/users/<int:user_id>/unblock', methods=['POST'])
+@login_required
+def api_unblock_user(user_id):
+    """Разблокировать пользователя"""
+    # TODO: реализовать разблокировку
+    return jsonify({'success': True})
+
+
+@app.route('/api/users/export', methods=['GET'])
 @login_required
 def api_export_users():
     """Экспорт пользователей в CSV"""
-    users = run_async(Database.get_all_users())
+    users = run_async(db.get_all_users_with_details())
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -800,60 +551,96 @@ def api_export_users():
     )
 
 
-@app.route('/api/conferences/<path:conference_name>')
+@app.route('/api/users/count')
 @login_required
-def api_conference_details(conference_name):
-    """API для получения деталей конференции"""
-    # TODO: реализовать получение деталей конференции
-    return jsonify({
-        'name': conference_name,
-        'city': 'Москва',
-        'start_date': '2024-11-15',
-        'end_date': '2024-11-17',
-        'user_count': 0,
-        'users': []
-    })
+def api_users_count():
+    """API для подсчета пользователей по фильтрам"""
+    companies = request.args.get('companies', '').split(',')
+    conferences = request.args.get('conferences', '').split(',')
+
+    if companies and companies[0]:
+        users = run_async(db.get_users_by_company_list(companies))
+    elif conferences and conferences[0]:
+        users = run_async(db.get_users_by_conference_list(conferences))
+    else:
+        users = run_async(db.get_users_by_company_list())
+
+    return jsonify({'count': len(users)})
 
 
-@app.route('/api/conferences/add', methods=['POST'])
+# ============================================
+# ПАНЕЛИ МЕНЕДЖЕРОВ
+# ============================================
+
+@app.route('/event')
 @login_required
-def api_add_conference():
-    """API для добавления конференции"""
-    # TODO: реализовать добавление конференции
-    flash('Конференция добавлена', 'success')
-    return redirect(url_for('conferences_page'))
+def event_panel():
+    """Панель Event-менеджера"""
+    certificates = run_async(db.get_all_certificates())
+    conferences = run_async(db.get_conferences_list())
+
+    stats = {
+        'total_certificates': len(certificates),
+        'active_conferences': len([c for c in conferences if c.get('user_count', 0) > 0]),
+        'total_conferences': len(conferences)
+    }
+
+    return render_template('event_panel.html',
+                           certificates=certificates,
+                           conferences=conferences,
+                           stats=stats,
+                           username=session.get('username'))
 
 
-@app.route('/api/conferences/delete/<path:conference_name>', methods=['POST'])
+@app.route('/travel')
 @login_required
-def api_delete_conference(conference_name):
-    """API для удаления конференции"""
-    # TODO: реализовать удаление конференции
-    return jsonify({'success': True})
+def travel_panel():
+    """Панель Travel-менеджера"""
+    visa_requests = run_async(db.get_all_visa_requests())
+    flight_requests = run_async(db.get_all_flight_requests())
+
+    stats = {
+        'total_visa': len(visa_requests),
+        'pending_visa': len([r for r in visa_requests if r.get('status', 'pending') == 'pending']),
+        'total_flights': len(flight_requests),
+    }
+
+    return render_template('travel_panel.html',
+                           visa_requests=visa_requests,
+                           flight_requests=flight_requests,
+                           stats=stats,
+                           username=session.get('username'))
 
 
-@app.route('/api/users/preview')
+@app.route('/pr')
 @login_required
-def api_preview_recipients():
-    """API для предпросмотра получателей"""
-    # TODO: реализовать предпросмотр
-    return jsonify({'count': 0})
+def pr_panel():
+    """Панель PR-менеджера"""
+    banner_requests = run_async(db.get_all_banner_requests())
+    business_cards = run_async(db.get_all_business_cards())
+
+    stats = {
+        'total_banners': len(banner_requests),
+        'pending_banners': len([r for r in banner_requests if r.get('status', 'pending') == 'pending']),
+        'total_cards': len(business_cards),
+        'pending_cards': len([c for c in business_cards if c.get('status', 'pending') == 'pending'])
+    }
+
+    return render_template('pr_panel.html',
+                           banner_requests=banner_requests,
+                           business_cards=business_cards,
+                           stats=stats,
+                           username=session.get('username'))
 
 
 @app.route('/user_groups')
 @login_required
 def user_groups_page():
     """Страница управления группами и функциями"""
-    # Проверка прав администратора
-    if session.get('role') != 'admin':
-        flash('Доступ запрещен', 'danger')
-        return redirect(url_for('dashboard'))
+    groups = run_async(db.get_all_groups())
+    features = run_async(db.get_all_features())
+    all_users = run_async(db.get_all_users_with_groups())
 
-    groups = run_async(Database.get_all_groups())
-    features = run_async(Database.get_all_features())
-    all_users = run_async(Database.get_all_users_with_groups())
-
-    # Статистика
     stats = {
         'total_groups': len(groups),
         'total_users': len(all_users),
@@ -869,13 +656,98 @@ def user_groups_page():
                            username=session.get('username'))
 
 
+@app.route('/admin_users')
+@login_required
+def admin_users_page():
+    """Страница управления администраторами"""
+    admins = run_async(db.get_all_admin_users())
+    return render_template('admin_users.html', admins=admins, username=session.get('username'))
+
+
+@app.route('/change_password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    """Смена пароля"""
+    if request.method == 'POST':
+        old_password = request.form.get('old_password')
+        new_password = request.form.get('new_password')
+
+        admin = run_async(db.verify_admin(session['username'], old_password))
+        if not admin:
+            flash('Неверный текущий пароль', 'danger')
+            return redirect(url_for('change_password'))
+
+        success = run_async(db.update_admin_user(
+            session['admin_id'],
+            {'password': new_password}
+        ))
+
+        if success:
+            flash('Пароль успешно изменен', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Ошибка при смене пароля', 'danger')
+
+    return render_template('change_password.html')
+
+
+@app.context_processor
+def utility_processor():
+    """Добавляет функцию get_text во все шаблоны"""
+    return dict(get_text=get_text)
+
+
+# ============================================
+# API ДЛЯ УПРАВЛЕНИЯ СТАТУСАМИ ЗАЯВОК
+# ============================================
+
+@app.route('/api/visa/<int:request_id>/status', methods=['POST'])
+@login_required
+def update_visa_status(request_id):
+    """Обновить статус визовой заявки"""
+    status = request.form.get('status')
+    success = run_async(db.update_visa_status(request_id, status))
+    if success:
+        flash(f'Статус заявки #{request_id} обновлен на "{status}"', 'success')
+    else:
+        flash('Ошибка при обновлении статуса', 'danger')
+    return redirect(url_for('travel_panel'))
+
+
+@app.route('/api/banner/<int:request_id>/status', methods=['POST'])
+@login_required
+def update_banner_status(request_id):
+    """Обновить статус заявки на баннер"""
+    status = request.form.get('status')
+    success = run_async(db.update_banner_status(request_id, status))
+    if success:
+        flash(f'Статус заявки #{request_id} обновлен', 'success')
+    else:
+        flash('Ошибка при обновлении статуса', 'danger')
+    return redirect(url_for('pr_panel'))
+
+
+@app.route('/api/certificate/<int:request_id>/status', methods=['POST'])
+@login_required
+def update_certificate_status(request_id):
+    """Обновить статус справки"""
+    status = request.form.get('status')
+    success = run_async(db.update_certificate_status(request_id, status))
+    if success:
+        flash(f'Статус заявки #{request_id} обновлен', 'success')
+    else:
+        flash('Ошибка при обновлении статуса', 'danger')
+    return redirect(url_for('event_panel'))
+
+
+# ============================================
+# API ДЛЯ ГРУПП
+# ============================================
+
 @app.route('/api/groups/add', methods=['POST'])
 @login_required
 def api_add_group():
     """API для добавления группы"""
-    if session.get('role') != 'admin':
-        return jsonify({'error': 'Access denied'}), 403
-
     name = request.form.get('name')
     description = request.form.get('description')
     color = request.form.get('color', '#667eea')
@@ -884,7 +756,7 @@ def api_add_group():
         flash('Название группы обязательно', 'danger')
         return redirect(url_for('user_groups_page'))
 
-    success = run_async(Database.add_group(name, description, color))
+    success = run_async(db.add_group(name, description, color))
     if success:
         flash('Группа создана', 'success')
     else:
@@ -897,7 +769,7 @@ def api_add_group():
 @login_required
 def api_get_group(group_id):
     """API для получения информации о группе"""
-    group = run_async(Database.get_group(group_id))
+    group = run_async(db.get_group(group_id))
     return jsonify(group)
 
 
@@ -905,14 +777,11 @@ def api_get_group(group_id):
 @login_required
 def api_edit_group(group_id):
     """API для редактирования группы"""
-    if session.get('role') != 'admin':
-        return jsonify({'error': 'Access denied'}), 403
-
     name = request.form.get('name')
     description = request.form.get('description')
     color = request.form.get('color')
 
-    success = run_async(Database.update_group(group_id, name, description, color))
+    success = run_async(db.update_group(group_id, name, description, color))
     if success:
         flash('Группа обновлена', 'success')
     else:
@@ -925,10 +794,7 @@ def api_edit_group(group_id):
 @login_required
 def api_delete_group(group_id):
     """API для удаления группы"""
-    if session.get('role') != 'admin':
-        return jsonify({'error': 'Access denied'}), 403
-
-    success = run_async(Database.delete_group(group_id))
+    success = run_async(db.delete_group(group_id))
     if success:
         flash('Группа удалена', 'success')
     else:
@@ -941,7 +807,7 @@ def api_delete_group(group_id):
 @login_required
 def api_get_group_users(group_id):
     """API для получения пользователей группы"""
-    users = run_async(Database.get_group_users(group_id))
+    users = run_async(db.get_group_users(group_id))
     return jsonify(users)
 
 
@@ -949,10 +815,7 @@ def api_get_group_users(group_id):
 @login_required
 def api_add_user_to_group(group_id, user_id):
     """API для добавления пользователя в группу"""
-    if session.get('role') != 'admin':
-        return jsonify({'error': 'Access denied'}), 403
-
-    success = run_async(Database.add_user_to_group(user_id, group_id))
+    success = run_async(db.add_user_to_group(user_id, group_id))
     return jsonify({'success': success})
 
 
@@ -960,10 +823,41 @@ def api_add_user_to_group(group_id, user_id):
 @login_required
 def api_remove_user_from_group(group_id, user_id):
     """API для удаления пользователя из группы"""
-    if session.get('role') != 'admin':
-        return jsonify({'error': 'Access denied'}), 403
+    success = run_async(db.remove_user_from_group(user_id, group_id))
+    return jsonify({'success': success})
 
-    success = run_async(Database.remove_user_from_group(user_id, group_id))
+
+@app.route('/api/groups/<int:group_id>/export')
+@login_required
+def export_group_users(group_id):
+    """Экспорт участников группы в CSV"""
+    users = run_async(db.get_group_users(group_id))
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['ID', 'Username', 'Full Name', 'Company'])
+
+    for user in users:
+        writer.writerow([user['user_id'], user['username'], user.get('full_name', ''), user.get('company', '')])
+
+    output.seek(0)
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8-sig')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=f'group_{group_id}_users.csv'
+    )
+
+
+@app.route('/api/groups/features/assign', methods=['POST'])
+@login_required
+def api_assign_features_to_group():
+    """API для назначения функций группе"""
+    data = request.get_json()
+    group_id = data.get('group_id')
+    features = data.get('features', [])
+
+    success = run_async(db.assign_features_to_group(group_id, features))
     return jsonify({'success': success})
 
 
@@ -971,9 +865,6 @@ def api_remove_user_from_group(group_id, user_id):
 @login_required
 def api_add_feature():
     """API для добавления функции"""
-    if session.get('role') != 'admin':
-        return jsonify({'error': 'Access denied'}), 403
-
     name = request.form.get('name')
     code = request.form.get('code')
     description = request.form.get('description')
@@ -983,7 +874,7 @@ def api_add_feature():
         flash('Название и код функции обязательны', 'danger')
         return redirect(url_for('user_groups_page'))
 
-    success = run_async(Database.add_feature(name, code, description, icon))
+    success = run_async(db.add_feature(name, code, description, icon))
     if success:
         flash('Функция добавлена', 'success')
     else:
@@ -996,25 +887,7 @@ def api_add_feature():
 @login_required
 def api_delete_feature(feature_id):
     """API для удаления функции"""
-    if session.get('role') != 'admin':
-        return jsonify({'error': 'Access denied'}), 403
-
-    success = run_async(Database.delete_feature(feature_id))
-    return jsonify({'success': success})
-
-
-@app.route('/api/groups/features/assign', methods=['POST'])
-@login_required
-def api_assign_features_to_group():
-    """API для назначения функций группе"""
-    if session.get('role') != 'admin':
-        return jsonify({'error': 'Access denied'}), 403
-
-    data = request.get_json()
-    group_id = data.get('group_id')
-    features = data.get('features', [])
-
-    success = run_async(Database.assign_features_to_group(group_id, features))
+    success = run_async(db.delete_feature(feature_id))
     return jsonify({'success': success})
 
 
@@ -1022,39 +895,17 @@ def api_assign_features_to_group():
 @login_required
 def api_get_all_users():
     """API для получения всех пользователей"""
-    users = run_async(Database.get_all_users_basic())
+    users = run_async(db.get_all_users_basic())
     return jsonify(users)
-
-
-@app.route('/user_groups/<int:user_id>')
-@login_required
-def user_groups_management(user_id):
-    """Страница управления группами конкретного пользователя"""
-    if session.get('role') != 'admin':
-        flash('Доступ запрещен', 'danger')
-        return redirect(url_for('dashboard'))
-
-    user = run_async(Database.get_user_details(user_id))
-    groups = run_async(Database.get_all_groups())
-    user_groups = run_async(Database.get_user_groups(user_id))
-
-    return render_template('user_groups_edit.html',
-                           user=user,
-                           groups=groups,
-                           user_groups=user_groups)
 
 
 @app.route('/group_features/<int:group_id>')
 @login_required
 def group_features_management(group_id):
     """Страница управления функциями группы"""
-    if session.get('role') != 'admin':
-        flash('Доступ запрещен', 'danger')
-        return redirect(url_for('dashboard'))
-
-    group = run_async(Database.get_group(group_id))
-    features = run_async(Database.get_all_features())
-    group_features = run_async(Database.get_group_features(group_id))
+    group = run_async(db.get_group(group_id))
+    features = run_async(db.get_all_features())
+    group_features = run_async(db.get_group_features(group_id))
 
     return render_template('group_features.html',
                            group=group,
@@ -1062,20 +913,143 @@ def group_features_management(group_id):
                            group_features=group_features)
 
 
-# ============================================
-# МАРШРУТ ДЛЯ ПРОВЕРКИ ДОСТУПА К ФУНКЦИЯМ
-# ============================================
-
-@app.route('/api/user/<int:user_id>/check_feature/<feature_code>')
+@app.route('/user_groups/<int:user_id>')
 @login_required
-def api_check_user_feature(user_id, feature_code):
-    """API для проверки доступа пользователя к функции"""
-    has_access = run_async(Database.user_has_feature(user_id, feature_code))
-    return jsonify({'has_access': has_access})
+def user_groups_management(user_id):
+    """Страница управления группами конкретного пользователя"""
+    user = run_async(db.get_user_details_by_id(user_id))
+    groups = run_async(db.get_all_groups())
+    user_groups = run_async(db.get_user_groups(user_id))
+
+    return render_template('user_groups_edit.html',
+                           user=user,
+                           groups=groups,
+                           user_groups=user_groups)
+
+
+@app.route('/manage_group/<int:group_id>')
+@login_required
+def manage_group_users(group_id):
+    """Управление участниками группы"""
+    group = run_async(db.get_group(group_id))
+    users = run_async(db.get_all_users_basic())
+    group_users = run_async(db.get_group_users(group_id))
+
+    return render_template('manage_group_users.html',
+                           group=group,
+                           users=users,
+                           group_users=group_users)
+
+
+@app.route('/api/visa/<int:request_id>')
+@login_required
+def api_visa_details(request_id):
+    """API для получения деталей визовой заявки"""
+    data = run_async(db.get_visa_request(request_id))
+    return jsonify(data)
+
+
+@app.route('/api/banner/<int:request_id>')
+@login_required
+def api_banner_details(request_id):
+    """API для получения деталей заявки на баннер"""
+    data = run_async(db.get_banner_request(request_id))
+    return jsonify(data)
+
+
+@app.route('/api/business_card/<int:request_id>')
+@login_required
+def api_business_card_details(request_id):
+    """API для получения деталей заявки на визитки"""
+    data = run_async(db.get_business_card_request(request_id))
+    return jsonify(data)
+
+
+@app.route('/api/certificate/<int:request_id>')
+@login_required
+def api_certificate_details(request_id):
+    """API для получения деталей справки"""
+    data = run_async(db.get_certificate_request(request_id))
+    return jsonify(data)
+
+
+@app.route('/api/conferences/<path:conference_name>')
+@login_required
+def api_conference_details(conference_name):
+    """API для получения деталей конференции"""
+    return jsonify({
+        'name': conference_name,
+        'city': 'Москва',
+        'start_date': '2024-11-15',
+        'end_date': '2024-11-17',
+        'user_count': 0,
+        'users': []
+    })
+
+
+@app.route('/admin_managers')
+@login_required
+def admin_managers():
+    """Страница управления менеджерами (только для админа)"""
+    if session.get('role') != 'admin':
+        flash('Доступ запрещен', 'danger')
+        return redirect(url_for('dashboard'))
+
+    managers = run_async(db.get_all_managers())
+    groups = run_async(db.get_manager_groups())
+
+    return render_template('admin_managers.html',
+                           managers=managers,
+                           groups=groups)
+
+
+@app.route('/admin_managers/add', methods=['POST'])
+@login_required
+def add_manager():
+    if session.get('role') != 'admin':
+        return redirect(url_for('dashboard'))
+
+    username = request.form.get('username')
+    password = request.form.get('password')
+    full_name = request.form.get('full_name')
+    groups = request.form.getlist('groups')
+
+    success = run_async(db.add_manager(username, password, full_name, groups))
+
+    if success:
+        flash('Менеджер добавлен', 'success')
+    else:
+        flash('Ошибка при добавлении', 'danger')
+
+    return redirect(url_for('admin_managers'))
+
+
+@app.route('/admin_managers/delete/<int:manager_id>', methods=['POST'])
+@login_required
+def delete_manager(manager_id):
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Access denied'}), 403
+
+    success = run_async(db.delete_manager(manager_id))
+    return jsonify({'success': success})
+
+
+# ============================================
+# ЗАПУСК ПРИЛОЖЕНИЯ
+# ============================================
 
 
 if __name__ == '__main__':
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(db.create_pool())
+    # Инициализируем БД перед запуском Flask
+    print("Initializing database...")
+    try:
+        init_db()
+        print("✅ Database connection established")
+    except Exception as e:
+        print(f"❌ Database connection failed: {e}")
+        print("Check your .env file and make sure PostgreSQL is running")
+        # Не выходим, но предупреждаем
+        print("⚠️ Continuing without database connection...")
+
+    # Запускаем Flask
     app.run(host='0.0.0.0', port=5005, debug=True)

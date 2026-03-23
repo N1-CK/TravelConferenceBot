@@ -190,28 +190,55 @@
 </div>
     <div class="container-fluid">
         <div class="row">
-            <!-- Sidebar -->
             <div class="col-md-3 col-lg-2 px-0 sidebar">
                 <div class="user-info">
                     <h5><i class="bi bi-person-circle"></i> {{ session.username }}</h5>
-                    <p>Администратор</p>
+                    <p>{{ get_text('role_' + session.role) }}</p>
                 </div>
 
                 <nav class="nav flex-column">
                     <a class="nav-link" href="/">
-                        <i class="bi bi-speedometer2"></i> Дашборд
+                        <i class="bi bi-speedometer2"></i> {{ get_text('dashboard') }}
                     </a>
+
+                    {% if session.role == 'admin' or session.role == 'pr' %}
                     <a class="nav-link active" href="/broadcast">
-                        <i class="bi bi-megaphone"></i> Рассылка
+                        <i class="bi bi-megaphone"></i> {{ get_text('broadcast') }}
                     </a>
-                    <a class="nav-link" href="/conferences">
-                        <i class="bi bi-calendar-event"></i> Активные конференции
+                    {% endif %}
+
+                    {% if session.role == 'admin' or session.role == 'event' %}
+                    <a class="nav-link" href="/event">
+                        <i class="bi bi-calendar-event"></i> Event-панель
                     </a>
+                    {% endif %}
+
+                    {% if session.role == 'admin' or session.role == 'travel' %}
+                    <a class="nav-link" href="/travel">
+                        <i class="bi bi-airplane"></i> Travel-панель
+                    </a>
+                    {% endif %}
+
+                    {% if session.role == 'admin' or session.role == 'pr' %}
+                    <a class="nav-link" href="/pr">
+                        <i class="bi bi-megaphone"></i> PR-панель
+                    </a>
+                    {% endif %}
+
+                    {% if session.role == 'admin' %}
                     <a class="nav-link" href="/users">
-                        <i class="bi bi-people"></i> Активные пользователи
+                        <i class="bi bi-people"></i> {{ get_text('users') }}
                     </a>
+                    <a class="nav-link" href="/user_groups">
+                        <i class="bi bi-diagram-3"></i> Управление группами
+                    </a>
+                    <a class="nav-link" href="/admin_users">
+                        <i class="bi bi-shield-lock"></i> Управление админами
+                    </a>
+                    {% endif %}
+
                     <a class="nav-link" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                        <i class="bi bi-box-arrow-right"></i> Выход
+                        <i class="bi bi-box-arrow-right"></i> {{ get_text('logout') }}
                     </a>
                 </nav>
                 <form id="logout-form" action="/logout" method="GET" style="display: none;"></form>

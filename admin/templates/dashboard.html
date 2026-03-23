@@ -147,29 +147,53 @@
 </div>
     <div class="container-fluid">
         <div class="row">
-            <!-- Sidebar -->
             <div class="col-md-3 col-lg-2 px-0 sidebar">
                 <div class="user-info">
-                    <h5><i class="bi bi-person-circle"></i> {{ username }}</h5>
-                    <p>Администратор</p>
+                    <h5><i class="bi bi-person-circle"></i> {{ session.username }}</h5>
+                    <p>{{ get_text('role_' + session.role) }}</p>
                     <p><small>Вход: {{ session.login_time[:10] }}</small></p>
                 </div>
 
                 <nav class="nav flex-column">
-                    <a class="nav-link active" href="/">
-                        <i class="bi bi-speedometer2"></i> Дашборд
+                    <a class="nav-link" href="/">
+                        <i class="bi bi-speedometer2"></i> {{ get_text('dashboard') }}
                     </a>
+
+                    <!-- PR раздел - виден только если менеджер в группе pr -->
+                    {% if 'pr' in session.get('groups', []) or session.role == 'admin' %}
+                    <a class="nav-link" href="/pr">
+                        <i class="bi bi-megaphone"></i> PR-панель
+                    </a>
+                    {% endif %}
+
+                    <!-- Event раздел - виден только если менеджер в группе event -->
+                    {% if 'event' in session.get('groups', []) or session.role == 'admin' %}
+                    <a class="nav-link" href="/event">
+                        <i class="bi bi-calendar-event"></i> Event-панель
+                    </a>
+                    {% endif %}
+
+                    <!-- Travel раздел - виден только если менеджер в группе travel -->
+                    {% if 'travel' in session.get('groups', []) or session.role == 'admin' %}
+                    <a class="nav-link" href="/travel">
+                        <i class="bi bi-airplane"></i> Travel-панель
+                    </a>
+                    {% endif %}
+
+                    <!-- Рассылка - видна всем менеджерам (но можно ограничить) -->
                     <a class="nav-link" href="/broadcast">
                         <i class="bi bi-megaphone"></i> Рассылка
                     </a>
-                    <a class="nav-link" href="/conferences">
-                        <i class="bi bi-calendar-event"></i> Активные конференции
+
+                    <!-- Управление менеджерами - только админ -->
+                    {% if session.role == 'admin' %}
+                    <a class="nav-link" href="/admin_managers">
+                        <i class="bi bi-shield-lock"></i> Управление менеджерами
                     </a>
-                    <a class="nav-link" href="/users">
-                        <i class="bi bi-people"></i> Активные пользователи
-                    </a>
+                    {% endif %}
+
                     <a class="nav-link" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                        <i class="bi bi-box-arrow-right"></i> Выход
+                        <i class="bi bi-box-arrow-right"></i> {{ get_text('logout') }}
                     </a>
                 </nav>
                 <form id="logout-form" action="/logout" method="GET" style="display: none;"></form>
@@ -336,21 +360,23 @@
                     <div class="col-md-6">
                         <div class="stat-card">
                             <h5 class="mb-3"><i class="bi bi-calendar-event"></i> Активные конференции</h5>
-                            {% for conference in active_conferences[:5] %}
-                            <div class="conference-card p-2 border-bottom">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>{{ conference.name }}</strong><br>
-                                        <small class="text-muted">{{ conference.city }} | {{ conference.start_date }} - {{ conference.end_date }}</small>
-                                    </div>
-                                    <div>
-                                        <span class="badge bg-primary">{{ conference.user_count }} уч.</span>
+                            {% if active_conferences %}
+                                {% for conference in active_conferences[:5] %}
+                                <div class="conference-card p-2 border-bottom">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>{{ conference.name }}</strong><br>
+                                            <small class="text-muted">{{ conference.city }} | {{ conference.start_date }} - {{ conference.end_date }}</small>
+                                        </div>
+                                        <div>
+                                            <span class="badge bg-primary">{{ conference.user_count }} уч.</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                                {% endfor %}
                             {% else %}
-                            <p class="text-muted">Нет активных конференций</p>
-                            {% endfor %}
+                                <p class="text-muted">Нет активных конференций</p>
+                            {% endif %}
                             <div class="text-center mt-3">
                                 <a href="/conferences" class="btn btn-sm btn-outline-primary">Все конференции</a>
                             </div>
@@ -361,28 +387,30 @@
                     <div class="col-md-6">
                         <div class="stat-card">
                             <h5 class="mb-3"><i class="bi bi-people"></i> Недавно активные</h5>
-                            {% for user in recent_users[:5] %}
-                            <div class="d-flex align-items-center mb-2">
-                                <div class="user-avatar me-2">
-                                    {{ user.username[0]|upper if user.username else '?' }}
+                            {% if recent_users %}
+                                {% for user in recent_users[:5] %}
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="user-avatar me-2">
+                                        {{ user.username[0]|upper if user.username else '?' }}
+                                    </div>
+                                    <div>
+                                        <strong>@{{ user.username }}</strong><br>
+                                        <small class="text-muted">
+                                            {% if user.last_active %}
+                                                {{ user.last_active.strftime('%H:%M %d.%m') }}
+                                            {% else %}
+                                                никогда
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                    <div class="ms-auto">
+                                        <span class="badge bg-info">{{ user.company|default('-') }}</span>
+                                    </div>
                                 </div>
-                                <div>
-                                    <strong>@{{ user.username }}</strong><br>
-                                    <small class="text-muted">
-                                        {% if user.last_active %}
-                                            {{ user.last_active.strftime('%H:%M %d.%m') }}
-                                        {% else %}
-                                            никогда
-                                        {% endif %}
-                                    </small>
-                                </div>
-                                <div class="ms-auto">
-                                    <span class="badge bg-info">{{ user.company|default('-') }}</span>
-                                </div>
-                            </div>
+                                {% endfor %}
                             {% else %}
-                            <p class="text-muted">Нет активных пользователей</p>
-                            {% endfor %}
+                                <p class="text-muted">Нет активных пользователей</p>
+                            {% endif %}
                             <div class="text-center mt-3">
                                 <a href="/users" class="btn btn-sm btn-outline-primary">Все пользователи</a>
                             </div>

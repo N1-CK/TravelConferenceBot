@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import pandas as pd
 from database import db
+import asyncio
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")

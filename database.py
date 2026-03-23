@@ -1466,7 +1466,18 @@ class Database:
                         WHERE id = $1
                     """, admin['id'])
 
-                    return dict(admin)
+                    # Возвращаем словарь со всеми полями
+                    return {
+                        'id': admin['id'],
+                        'username': admin['username'],
+                        'full_name': admin['full_name'],
+                        'role': admin['role'],
+                        'can_manage_users': admin['can_manage_users'],
+                        'can_broadcast': admin['can_broadcast'],
+                        'can_view_stats': admin['can_view_stats'],
+                        'can_manage_conferences': admin['can_manage_conferences'],
+                        'is_active': admin['is_active']
+                    }
                 return {}
         except Exception as e:
             logger.error(f"Error verifying admin: {e}")
@@ -1621,6 +1632,47 @@ class Database:
             return False
 
     # ===== МЕТОДЫ ДЛЯ УПРАВЛЕНИЯ ГРУППАМИ И ФУНКЦИЯМИ =====
+
+    # Добавить в класс Database:
+
+    async def get_all_visa_requests(self) -> list:
+        """Получить все визовые заявки"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT * FROM {self.db_schema}.travel_visa_requests 
+                    ORDER BY created_at DESC
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting visa requests: {e}")
+            return []
+
+    async def get_all_banner_requests(self) -> list:
+        """Получить все заявки на баннеры"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT * FROM {self.db_schema}.pr_banner_requests 
+                    ORDER BY created_at DESC
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting banner requests: {e}")
+            return []
+
+    async def get_all_certificates(self) -> list:
+        """Получить все заявки на справки"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT * FROM {self.db_schema}.event_certificates 
+                    ORDER BY created_at DESC
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting certificates: {e}")
+            return []
 
     async def create_groups_tables(self):
         """Создание таблиц для групп и функций"""
@@ -2020,7 +2072,622 @@ class Database:
             logger.error(f"Error checking user feature: {e}")
             return False
 
+    # Добавить в класс Database после метода get_all_certificates():
 
+    async def get_all_business_cards(self) -> list:
+        """Получить все заявки на визитки"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT * FROM {self.db_schema}.pr_business_cards 
+                    ORDER BY created_at DESC
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting business cards: {e}")
+            return []
+
+    async def get_all_flight_requests(self) -> list:
+        """Получить все заявки на авиабилеты"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Если есть таблица flight_requests
+                try:
+                    rows = await conn.fetch(f"""
+                        SELECT * FROM {self.db_schema}.user_flights 
+                        ORDER BY created_at DESC
+                    """)
+                    return [dict(row) for row in rows]
+                except:
+                    # Если таблицы нет, возвращаем пустой список
+                    return []
+        except Exception as e:
+            logger.error(f"Error getting flight requests: {e}")
+            return []
+
+    async def update_visa_status(self, request_id: int, status: str, comment: str = None) -> bool:
+        """Обновить статус визовой заявки"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    UPDATE {self.db_schema}.travel_visa_requests 
+                    SET status = $1, updated_at = NOW()
+                    WHERE id = $2
+                """, status, request_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error updating visa status: {e}")
+            return False
+
+    async def update_banner_status(self, request_id: int, status: str) -> bool:
+        """Обновить статус заявки на баннер"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    UPDATE {self.db_schema}.pr_banner_requests 
+                    SET status = $1, updated_at = NOW()
+                    WHERE id = $2
+                """, status, request_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error updating banner status: {e}")
+            return False
+
+    async def update_certificate_status(self, request_id: int, status: str) -> bool:
+        """Обновить статус справки"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    UPDATE {self.db_schema}.event_certificates 
+                    SET status = $1, updated_at = NOW()
+                    WHERE id = $2
+                """, status, request_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error updating certificate status: {e}")
+            return False
+
+    async def get_recent_broadcasts(self, limit=10) -> list:
+        """Получить последние рассылки"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT 
+                        details->>'type' as broadcast_type,
+                        details->>'company' as company,
+                        (details->>'success')::int as success_count,
+                        (details->>'failed')::int as failed_count,
+                        timestamp
+                    FROM {self.db_schema}.user_logs
+                    WHERE action = 'broadcast_sent'
+                    ORDER BY timestamp DESC
+                    LIMIT $1
+                """, limit)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting broadcasts: {e}")
+            return []
+
+    async def get_stats(self) -> dict:
+        """Получить статистику"""
+        try:
+            async with self.pool.acquire() as conn:
+                total_users = await conn.fetchval(f"""
+                    SELECT COUNT(DISTINCT user_id) FROM {self.db_schema}.user_profiles
+                """) or 0
+
+                active_today = await conn.fetchval(f"""
+                    SELECT COUNT(DISTINCT user_id)
+                    FROM {self.db_schema}.user_logs
+                    WHERE timestamp > NOW() - INTERVAL '1 day'
+                """) or 0
+
+                companies_stats = await conn.fetch(f"""
+                    SELECT company, COUNT(DISTINCT user_id) as user_count
+                    FROM {self.db_schema}.user_profiles
+                    WHERE company IS NOT NULL AND company != ''
+                    GROUP BY company
+                    ORDER BY user_count DESC
+                    LIMIT 5
+                """)
+
+                banner_requests = await conn.fetchval(f"""
+                    SELECT COUNT(*) FROM {self.db_schema}.pr_banner_requests
+                """) or 0
+
+                visa_requests = await conn.fetchval(f"""
+                    SELECT COUNT(*) FROM {self.db_schema}.travel_visa_requests
+                """) or 0
+
+                active_conferences = await conn.fetchval(f"""
+                    SELECT COUNT(DISTINCT conference_name)
+                    FROM {self.db_schema}.user_conferences
+                """) or 0
+
+                total_broadcasts = await conn.fetchval(f"""
+                    SELECT COUNT(*) FROM {self.db_schema}.user_logs
+                    WHERE action = 'broadcast_sent'
+                """) or 0
+
+                return {
+                    'total_users': total_users,
+                    'active_today': active_today,
+                    'companies_stats': [dict(row) for row in companies_stats],
+                    'banner_requests': banner_requests,
+                    'visa_requests': visa_requests,
+                    'active_conferences': active_conferences,
+                    'total_broadcasts': total_broadcasts
+                }
+        except Exception as e:
+            logger.error(f"Error getting stats: {e}")
+            return {}
+
+    async def log_broadcast(self, username: str, broadcast_type: str, company: str,
+                            success: int, failed: int, message_length: int, file_count: int = 0) -> bool:
+        """Логировать рассылку"""
+        try:
+            async with self.pool.acquire() as conn:
+                details = {
+                    'type': broadcast_type,
+                    'company': company,
+                    'success': success,
+                    'failed': failed,
+                    'message_length': message_length,
+                    'file_count': file_count
+                }
+                await conn.execute(f"""
+                    INSERT INTO {self.db_schema}.user_logs (user_id, username, action, details)
+                    VALUES (0, $1, 'broadcast_sent', $2)
+                """, username, details)
+                return True
+        except Exception as e:
+            logger.error(f"Error logging broadcast: {e}")
+            return False
+
+    async def get_users_by_company_list(self, companies: list = None) -> list:
+        """Получить пользователей по списку компаний"""
+        try:
+            async with self.pool.acquire() as conn:
+                if companies:
+                    query = f"""
+                        SELECT user_id, username, company
+                        FROM {self.db_schema}.user_company
+                        WHERE company = ANY($1::text[])
+                    """
+                    rows = await conn.fetch(query, companies)
+                else:
+                    query = f"""
+                        SELECT user_id, username, company
+                        FROM {self.db_schema}.user_company
+                    """
+                    rows = await conn.fetch(query)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting users by company: {e}")
+            return []
+
+    async def get_users_by_ids_list(self, user_ids: list) -> list:
+        """Получить пользователей по списку ID"""
+        try:
+            async with self.pool.acquire() as conn:
+                query = f"""
+                    SELECT user_id, username, company
+                    FROM {self.db_schema}.user_company
+                    WHERE user_id = ANY($1::bigint[])
+                """
+                rows = await conn.fetch(query, user_ids)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting users by ids: {e}")
+            return []
+
+    async def get_users_by_conference_list(self, conferences: list) -> list:
+        """Получить пользователей по списку конференций"""
+        try:
+            async with self.pool.acquire() as conn:
+                query = f"""
+                    SELECT DISTINCT uc.user_id, uc.username, uc.company
+                    FROM {self.db_schema}.user_company uc
+                    JOIN {self.db_schema}.user_conferences uconf ON uc.username = uconf.username
+                    WHERE uconf.conference_name = ANY($1::text[])
+                """
+                rows = await conn.fetch(query, conferences)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting users by conference: {e}")
+            return []
+
+    async def get_companies_list(self) -> list:
+        """Получить список компаний"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT DISTINCT company
+                    FROM {self.db_schema}.user_profiles
+                    WHERE company IS NOT NULL AND company != ''
+                    ORDER BY company
+                """)
+                return [row['company'] for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting companies: {e}")
+            return []
+
+    async def get_conferences_list(self) -> list:
+        """Получить список конференций с количеством участников"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT DISTINCT conference_name as name,
+                           COUNT(DISTINCT username) as user_count
+                    FROM {self.db_schema}.user_conferences
+                    GROUP BY conference_name
+                    ORDER BY conference_name
+                """)
+                if rows:
+                    return [dict(row) for row in rows]
+
+                # Fallback: из company
+                companies = await self.get_companies_list()
+                return [{'name': c, 'user_count': 0} for c in companies]
+        except Exception as e:
+            logger.error(f"Error getting conferences: {e}")
+            return []
+
+    async def get_all_users_with_details(self) -> list:
+        """Получить всех пользователей с деталями"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT 
+                        up.user_id,
+                        up.username,
+                        up.full_name,
+                        up.company,
+                        up.position,
+                        up.language,
+                        up.registered_at,
+                        (SELECT MAX(timestamp) FROM {self.db_schema}.user_logs WHERE user_id = up.user_id) as last_active,
+                        (SELECT COUNT(*) FROM {self.db_schema}.user_logs WHERE user_id = up.user_id AND timestamp > NOW() - INTERVAL '5 minutes') > 0 as is_online
+                    FROM {self.db_schema}.user_profiles up
+                    ORDER BY up.registered_at DESC
+                """)
+                users = [dict(row) for row in rows]
+
+                for user in users:
+                    confs = await conn.fetch(f"""
+                        SELECT conference_name
+                        FROM {self.db_schema}.user_conferences
+                        WHERE username = $1
+                    """, user['username'])
+                    user['conferences'] = [c['conference_name'] for c in confs]
+
+                    requests_count = 0
+                    for table in ['pr_banner_requests', 'pr_business_cards', 'event_certificates',
+                                  'travel_visa_requests']:
+                        try:
+                            cnt = await conn.fetchval(f"""
+                                SELECT COUNT(*) FROM {self.db_schema}.{table} WHERE username = $1
+                            """, user['username'])
+                            requests_count += cnt
+                        except:
+                            pass
+                    user['requests_count'] = requests_count
+
+                return users
+        except Exception as e:
+            logger.error(f"Error getting all users: {e}")
+            return []
+
+    async def get_user_details_by_id(self, user_id: int) -> dict:
+        """Получить детальную информацию о пользователе"""
+        try:
+            async with self.pool.acquire() as conn:
+                user = await conn.fetchrow(f"""
+                    SELECT 
+                        up.*,
+                        (SELECT MAX(timestamp) FROM {self.db_schema}.user_logs WHERE user_id = up.user_id) as last_active
+                    FROM {self.db_schema}.user_profiles up
+                    WHERE up.user_id = $1
+                """, user_id)
+
+                if not user:
+                    return None
+
+                result = dict(user)
+
+                confs = await conn.fetch(f"""
+                    SELECT conference_name
+                    FROM {self.db_schema}.user_conferences
+                    WHERE username = $1
+                """, result['username'])
+                result['conferences'] = [c['conference_name'] for c in confs]
+
+                result['requests'] = []
+                request_tables = [
+                    ('pr_banner_requests', 'Баннер'),
+                    ('pr_business_cards', 'Визитки'),
+                    ('event_certificates', 'Справка'),
+                    ('travel_visa_requests', 'Виза')
+                ]
+                for table, type_name in request_tables:
+                    try:
+                        rows = await conn.fetch(f"""
+                            SELECT id, created_at, 'pending' as status
+                            FROM {self.db_schema}.{table}
+                            WHERE username = $1
+                            ORDER BY created_at DESC
+                            LIMIT 5
+                        """, result['username'])
+                        for row in rows:
+                            result['requests'].append({
+                                'type': type_name,
+                                'created_at': row['created_at'].strftime('%d.%m.%Y %H:%M'),
+                                'status': 'pending'
+                            })
+                    except:
+                        pass
+
+                return result
+        except Exception as e:
+            logger.error(f"Error getting user details: {e}")
+            return None
+
+    # database.py - добавьте эти методы в класс Database
+
+    async def create_managers_tables(self):
+        """Создание таблиц для менеджеров и групп"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Таблица менеджеров
+                await conn.execute(f"""
+                                   CREATE TABLE IF NOT EXISTS {self.db_schema}.managers
+                                   (
+                                       id            SERIAL PRIMARY KEY,
+                                       username      TEXT UNIQUE NOT NULL,
+                                       password_hash TEXT        NOT NULL,
+                                       full_name     TEXT,
+                                       role          TEXT        NOT NULL DEFAULT 'manager',
+                                       is_active     BOOLEAN              DEFAULT TRUE,
+                                       created_at    TIMESTAMP            DEFAULT NOW(),
+                                       last_login    TIMESTAMP
+                                   )
+                                   """)
+
+                # Таблица групп
+                await conn.execute(f"""
+                                   CREATE TABLE IF NOT EXISTS {self.db_schema}.manager_groups
+                                   (
+                                       id          SERIAL PRIMARY KEY,
+                                       name        TEXT UNIQUE NOT NULL,
+                                       description TEXT,
+                                       created_at  TIMESTAMP DEFAULT NOW()
+                                   )
+                                   """)
+
+                # Связь менеджеров с группами
+                await conn.execute(f"""
+                                   CREATE TABLE IF NOT EXISTS {self.db_schema}.manager_group_membership
+                                   (
+                                       manager_id  INTEGER REFERENCES {self.db_schema}.managers (id) ON DELETE CASCADE,
+                                       group_id    INTEGER REFERENCES {self.db_schema}.manager_groups (id) ON DELETE CASCADE,
+                                       assigned_at TIMESTAMP DEFAULT NOW(),
+                                       PRIMARY KEY (manager_id, group_id)
+                                   )
+                                   """)
+
+                # Добавляем базовые группы
+                base_groups = [
+                    ('admin', 'Администраторы - полный доступ'),
+                    ('pr', 'PR отдел - управление баннерами и визитками'),
+                    ('event', 'Event отдел - управление справками и мероприятиями'),
+                    ('travel', 'Travel отдел - управление визами и билетами')
+                ]
+
+                for name, desc in base_groups:
+                    await conn.execute(f"""
+                                       INSERT INTO {self.db_schema}.manager_groups (name, description)
+                                       VALUES ($1, $2)
+                                       ON CONFLICT (name) DO NOTHING
+                                       """, name, desc)
+
+                # Создаем админа по умолчанию, если нет
+                from hashlib import sha256
+                admin_pass = os.getenv('ADMIN_PASSWORD', 'admin123')
+                admin_hash = sha256(admin_pass.encode()).hexdigest()
+
+                # Добавляем админа
+                admin_id = await conn.fetchval(f"""
+                                               INSERT INTO {self.db_schema}.managers (username, password_hash, full_name, role)
+                                               VALUES ($1, $2, $3, $4)
+                                               ON CONFLICT (username) DO NOTHING
+                                               RETURNING id
+                                               """, 'admin', admin_hash, 'Главный администратор', 'admin')
+
+                # Если админ создан, добавляем его в группу admin
+                if admin_id:
+                    admin_group_id = await conn.fetchval(f"""
+                                                         SELECT id
+                                                         FROM {self.db_schema}.manager_groups
+                                                         WHERE name = 'admin'
+                                                         """)
+                    if admin_group_id:
+                        await conn.execute(f"""
+                                           INSERT INTO {self.db_schema}.manager_group_membership (manager_id, group_id)
+                                           VALUES ($1, $2)
+                                           ON CONFLICT DO NOTHING
+                                           """, admin_id, admin_group_id)
+
+                print("✅ Managers tables created")
+                return True
+
+        except Exception as e:
+            print(f"Error creating managers tables: {e}")
+            return False
+
+    async def verify_manager(self, username: str, password: str) -> dict:
+        """Проверка учетных данных менеджера"""
+        try:
+            from hashlib import sha256
+            password_hash = sha256(password.encode()).hexdigest()
+
+            async with self.pool.acquire() as conn:
+                manager = await conn.fetchrow(f"""
+                                              SELECT id, username, full_name, role, is_active
+                                              FROM {self.db_schema}.managers
+                                              WHERE username = $1
+                                                AND password_hash = $2
+                                                AND is_active = TRUE
+                                              """, username, password_hash)
+
+                if manager:
+                    # Получаем группы менеджера
+                    groups = await conn.fetch(f"""
+                                              SELECT g.name, g.description
+                                              FROM {self.db_schema}.manager_groups g
+                                                       JOIN {self.db_schema}.manager_group_membership mgm ON g.id = mgm.group_id
+                                              WHERE mgm.manager_id = $1
+                                              """, manager['id'])
+
+                    # Обновляем время последнего входа
+                    await conn.execute(f"""
+                                       UPDATE {self.db_schema}.managers
+                                       SET last_login = NOW()
+                                       WHERE id = $1
+                                       """, manager['id'])
+
+                    return {
+                        'id': manager['id'],
+                        'username': manager['username'],
+                        'full_name': manager['full_name'],
+                        'role': manager['role'],
+                        'groups': [dict(g) for g in groups],
+                        'group_names': [g['name'] for g in groups]
+                    }
+                return {}
+        except Exception as e:
+            print(f"Error verifying manager: {e}")
+            return {}
+
+    async def get_all_managers(self) -> list:
+        """Получить всех менеджеров"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                                        SELECT m.*,
+                                               array_agg(g.name) as groups
+                                        FROM {self.db_schema}.managers m
+                                                 LEFT JOIN {self.db_schema}.manager_group_membership mgm ON m.id = mgm.manager_id
+                                                 LEFT JOIN {self.db_schema}.manager_groups g ON mgm.group_id = g.id
+                                        GROUP BY m.id
+                                        ORDER BY m.id
+                                        """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            print(f"Error getting managers: {e}")
+            return []
+
+    async def add_manager(self, username: str, password: str, full_name: str = None, groups: list = None) -> bool:
+        """Добавить нового менеджера"""
+        try:
+            from hashlib import sha256
+            password_hash = sha256(password.encode()).hexdigest()
+
+            async with self.pool.acquire() as conn:
+                # Добавляем менеджера
+                manager_id = await conn.fetchval(f"""
+                                                 INSERT INTO {self.db_schema}.managers (username, password_hash, full_name, role)
+                                                 VALUES ($1, $2, $3, 'manager')
+                                                 RETURNING id
+                                                 """, username, password_hash, full_name)
+
+                if manager_id and groups:
+                    # Добавляем в группы
+                    for group_name in groups:
+                        group_id = await conn.fetchval(f"""
+                                                       SELECT id
+                                                       FROM {self.db_schema}.manager_groups
+                                                       WHERE name = $1
+                                                       """, group_name)
+                        if group_id:
+                            await conn.execute(f"""
+                                               INSERT INTO {self.db_schema}.manager_group_membership (manager_id, group_id)
+                                               VALUES ($1, $2)
+                                               ON CONFLICT DO NOTHING
+                                               """, manager_id, group_id)
+
+                return bool(manager_id)
+        except Exception as e:
+            print(f"Error adding manager: {e}")
+            return False
+
+    async def delete_manager(self, manager_id: int) -> bool:
+        """Удалить менеджера"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Не даем удалить последнего админа
+                admin_count = await conn.fetchval(f"""
+                                                  SELECT COUNT(*)
+                                                  FROM {self.db_schema}.managers
+                                                  WHERE role = 'admin'
+                                                  """)
+
+                if admin_count <= 1:
+                    manager = await conn.fetchval(f"""
+                                                  SELECT role
+                                                  FROM {self.db_schema}.managers
+                                                  WHERE id = $1
+                                                  """, manager_id)
+                    if manager == 'admin':
+                        return False
+
+                await conn.execute(f"DELETE FROM {self.db_schema}.managers WHERE id = $1", manager_id)
+                return True
+        except Exception as e:
+            print(f"Error deleting manager: {e}")
+            return False
+
+    async def get_manager_groups(self) -> list:
+        """Получить все доступные группы"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                                        SELECT *
+                                        FROM {self.db_schema}.manager_groups
+                                        ORDER BY id
+                                        """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            print(f"Error getting manager groups: {e}")
+            return []
+
+    async def update_manager_groups(self, manager_id: int, groups: list) -> bool:
+        """Обновить группы менеджера"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Удаляем старые связи
+                await conn.execute(f"""
+                                   DELETE
+                                   FROM {self.db_schema}.manager_group_membership
+                                   WHERE manager_id = $1
+                                   """, manager_id)
+
+                # Добавляем новые
+                for group_name in groups:
+                    group_id = await conn.fetchval(f"""
+                                                   SELECT id
+                                                   FROM {self.db_schema}.manager_groups
+                                                   WHERE name = $1
+                                                   """, group_name)
+                    if group_id:
+                        await conn.execute(f"""
+                                           INSERT INTO {self.db_schema}.manager_group_membership (manager_id, group_id)
+                                           VALUES ($1, $2)
+                                           """, manager_id, group_id)
+
+                return True
+        except Exception as e:
+            print(f"Error updating manager groups: {e}")
+            return False
 
 
 # Глобальный экземпляр
