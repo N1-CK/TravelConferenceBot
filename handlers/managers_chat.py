@@ -1,4 +1,4 @@
-# handlers/managers_chat.py
+import asyncio
 import json
 import os
 from aiogram import Router, F, Bot
@@ -8,6 +8,9 @@ from aiogram.fsm.state import State, StatesGroup
 from database import db
 
 router = Router()
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 class ManagerReplyForm(StatesGroup):
@@ -22,6 +25,19 @@ PR_MANAGER_CHAT_ID = int(os.getenv("TG_PR_MANAGER_CHAT_ID", 0))
 EVENT_MANAGER_CHAT_ID = int(os.getenv("TG_EVENT_MANAGER_CHAT_ID", 0))
 TRAVEL_MANAGER_CHAT_ID = int(os.getenv("TG_TRAVEL_MANAGER_CHAT_ID", 0))
 ADMIN_CHAT_ID = int(os.getenv("TG_ADMIN_CHAT_ID", 0))
+
+
+def run_async_safe(coro):
+    """Безопасное выполнение асинхронной функции с созданием нового loop"""
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(coro)
+        loop.close()
+        return result
+    except Exception as e:
+        logger.error(f"Error in run_async_safe: {e}")
+        return None
 
 
 async def send_question_to_manager(bot: Bot, manager_chat_id: int, user_data: dict,
@@ -47,11 +63,11 @@ async def send_question_to_manager(bot: Bot, manager_chat_id: int, user_data: di
     )
 
     try:
-        message = await bot.send_message(
+        message = run_async_safe(await bot.send_message(
             chat_id=manager_chat_id,
             text=message_text,
             reply_markup=keyboard
-        )
+        ))
 
         # Сохраняем соответствие
         key = f"{manager_chat_id}_{message.message_id}"
@@ -103,11 +119,11 @@ async def send_reply_to_user(message: Message, state: FSMContext):
         bot = message.bot
 
         # Отправляем пользователю
-        await bot.send_message(
+        run_async_safe(await bot.send_message(
             chat_id=user_id,
             text=f"📨 Ответ от менеджера:\n\n{reply_text}",
             parse_mode="Markdown"
-        )
+        ))
 
         # Уведомляем менеджера
         await message.answer(f"✅ Ответ отправлен пользователю {user_id}")
@@ -117,11 +133,11 @@ async def send_reply_to_user(message: Message, state: FSMContext):
             user_id=message.from_user.id,
             username=message.from_user.username,
             action="manager_reply_sent",
-            details=json.dumps({
+            details={
                 "to_user_id": user_id,
                 "question_type": data['question_type'],
                 "reply_length": len(reply_text)
-            })
+            }
         )
 
     except Exception as e:

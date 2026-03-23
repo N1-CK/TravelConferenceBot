@@ -74,7 +74,7 @@ async def main():
         from handlers import (
             start_router, menu_router, pr_router,
             event_router, admin_router,
-            navigation_router
+            navigation_router, messages_router
         )
 
         from handlers.travel_module import router as travel_router
@@ -90,6 +90,7 @@ async def main():
         dp.include_router(navigation_router)
         dp.include_router(affiliate_router)
         dp.include_router(managers_chat_router)
+        dp.include_router(messages_router)
 
         logger.info("✅ All routers registered")
 

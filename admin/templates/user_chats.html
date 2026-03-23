@@ -1,0 +1,449 @@
+<!-- templates/user_chats.html -->
+<!DOCTYPE html>
+<html lang="{{ session.get('lang', 'ru') }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Чаты с пользователями</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        body { background: #f8f9fa; }
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 12px 20px;
+            margin: 5px 0;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+        .sidebar .nav-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            transform: translateX(5px);
+        }
+        .sidebar .nav-link.active {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        .sidebar .nav-link i { margin-right: 10px; width: 20px; }
+        .main-content { padding: 30px; }
+        .user-info {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            margin-bottom: 20px;
+        }
+        .chat-container {
+            display: flex;
+            height: calc(100vh - 100px);
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        .chat-sidebar {
+            width: 320px;
+            border-right: 1px solid #dee2e6;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #dee2e6;
+            background: white;
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .chat-input {
+            padding: 15px 20px;
+            border-top: 1px solid #dee2e6;
+            background: white;
+        }
+        .conversation-item {
+            padding: 15px;
+            border-bottom: 1px solid #dee2e6;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .conversation-item:hover {
+            background: #e9ecef;
+        }
+        .conversation-item.active {
+            background: #e7f1ff;
+            border-left: 3px solid #667eea;
+        }
+        .conversation-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        .unread-badge {
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 0.7rem;
+            min-width: 20px;
+            text-align: center;
+        }
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+        }
+        .message.incoming {
+            justify-content: flex-start;
+        }
+        .message.outgoing {
+            justify-content: flex-end;
+        }
+        .message-bubble {
+            max-width: 70%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            position: relative;
+        }
+        .message.incoming .message-bubble {
+            background: white;
+            border: 1px solid #dee2e6;
+        }
+        .message.outgoing .message-bubble {
+            background: #667eea;
+            color: white;
+        }
+        .message-time {
+            font-size: 0.7rem;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .message.outgoing .message-time {
+            color: rgba(255,255,255,0.7);
+            text-align: right;
+        }
+        .file-message {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            color: #495057;
+            text-decoration: none;
+        }
+        .lang-switch {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+        }
+        .lang-btn {
+            background: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+<div class="lang-switch">
+    <a href="/set_language/ru" class="lang-btn">🇷🇺</a>
+    <a href="/set_language/en" class="lang-btn">🇬🇧</a>
+</div>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 col-lg-2 px-0 sidebar">
+            <div class="user-info">
+                <h5><i class="bi bi-person-circle"></i> {{ session.username }}</h5>
+                <p>{{ session.role|capitalize }}</p>
+            </div>
+
+            <nav class="nav flex-column">
+                <a class="nav-link" href="/">
+                    <i class="bi bi-speedometer2"></i> Дашборд
+                </a>
+                <a class="nav-link" href="/broadcast">
+                    <i class="bi bi-megaphone"></i> Рассылка
+                </a>
+                {% if 'pr' in session.get('groups', []) or session.role == 'admin' %}
+                <a class="nav-link" href="/pr">
+                    <i class="bi bi-megaphone"></i> PR-панель
+                </a>
+                {% endif %}
+                {% if 'event' in session.get('groups', []) or session.role == 'admin' %}
+                <a class="nav-link" href="/event">
+                    <i class="bi bi-calendar-event"></i> Event-панель
+                </a>
+                {% endif %}
+                {% if 'travel' in session.get('groups', []) or session.role == 'admin' %}
+                <a class="nav-link" href="/travel">
+                    <i class="bi bi-airplane"></i> Travel-панель
+                </a>
+                {% endif %}
+                <a class="nav-link active" href="/user_chats">
+                    <i class="bi bi-chat-dots"></i> Чаты с пользователями
+                </a>
+                {% if session.role == 'admin' %}
+                <a class="nav-link" href="/admin_managers">
+                    <i class="bi bi-shield-lock"></i> Управление менеджерами
+                </a>
+                {% endif %}
+                <a class="nav-link" href="/change_password">
+                    <i class="bi bi-key"></i> Сменить пароль
+                </a>
+                <a class="nav-link" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                    <i class="bi bi-box-arrow-right"></i> Выход
+                </a>
+            </nav>
+            <form id="logout-form" action="/logout" method="GET" style="display: none;"></form>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-9 col-lg-10 main-content p-0">
+            <div class="chat-container">
+                <!-- Sidebar with conversations -->
+                <div class="chat-sidebar" id="chatSidebar">
+                    <div class="p-3 border-bottom">
+                        <h6 class="mb-0"><i class="bi bi-chat-dots"></i> Чаты</h6>
+                        <small class="text-muted">{{ conversations|length }} чатов</small>
+                    </div>
+                    <div id="conversationsList">
+                        {% for conv in conversations %}
+                        <div class="conversation-item" data-user-id="{{ conv.user_id }}" onclick="loadChat({{ conv.user_id }})">
+                            <div class="d-flex align-items-center">
+                                <div class="conversation-avatar me-3">
+                                    {{ conv.username[0]|upper }}
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <strong>{{ conv.username }}</strong>
+                                        {% if conv.unread_count > 0 %}
+                                        <span class="unread-badge">{{ conv.unread_count }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-muted d-block text-truncate" style="max-width: 180px;">
+                                        {{ (conv.last_message or '...')|truncate(40) }}
+                                    </small>
+                                    <small class="text-muted">
+                                        {{ conv.last_message_time.strftime('%d.%m %H:%M') if conv.last_message_time else '' }}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Chat Main Area -->
+                <div class="chat-main" id="chatMain">
+                    <div class="chat-header" id="chatHeader">
+                        <div class="d-flex align-items-center">
+                            <div class="conversation-avatar me-3" style="width: 40px; height: 40px; font-size: 1rem;">
+                                ?
+                            </div>
+                            <div>
+                                <h6 class="mb-0" id="currentUserName">Выберите чат</h6>
+                                <small class="text-muted" id="currentUserInfo">Нажмите на чат слева</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-chat-dots" style="font-size: 3rem;"></i>
+                            <p class="mt-3">Выберите чат для начала общения</p>
+                        </div>
+                    </div>
+
+                    <div class="chat-input" id="chatInput" style="display: none;">
+                        <form id="replyForm" onsubmit="sendMessage(event)">
+                            <div class="input-group">
+                                <textarea class="form-control" id="replyMessage" rows="2"
+                                          placeholder="Введите сообщение..."></textarea>
+                                <button class="btn btn-primary" type="submit">
+                                    <i class="bi bi-send"></i> Отправить
+                                </button>
+                            </div>
+                            <div class="mt-2">
+                                <label class="btn btn-outline-secondary btn-sm">
+                                    <i class="bi bi-paperclip"></i> Файл
+                                    <input type="file" id="replyFile" style="display: none;" onchange="uploadFile(this)">
+                                </label>
+                                <small class="text-muted ms-2">Можно прикрепить фото, документ</small>
+                            </div>
+                            <div id="filePreview" class="mt-2" style="display: none;">
+                                <div class="alert alert-info alert-dismissible fade show">
+                                    <i class="bi bi-paperclip"></i>
+                                    <span id="fileName"></span>
+                                    <button type="button" class="btn-close" onclick="clearFile()"></button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    let currentUserId = null;
+    let currentFile = null;
+
+    function loadChat(userId) {
+        currentUserId = userId;
+
+        // Активируем пункт в списке
+        document.querySelectorAll('.conversation-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.dataset.userId == userId) {
+                item.classList.add('active');
+            }
+        });
+
+        // Загружаем сообщения
+        fetch(`/api/user_messages/${userId}`)
+            .then(response => response.json())
+            .then(data => {
+                const messagesDiv = document.getElementById('chatMessages');
+                messagesDiv.innerHTML = '';
+
+                data.messages.reverse().forEach(msg => {
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = `message ${msg.direction === 'incoming' ? 'incoming' : 'outgoing'}`;
+
+                    let content = '';
+                    if (msg.message_text) {
+                        content += `<div class="message-bubble">${escapeHtml(msg.message_text)}</div>`;
+                    }
+                    if (msg.file_id) {
+                        const fileIcon = msg.file_type === 'photo' ? 'bi-image' : 'bi-file-earmark';
+                        content += `<div class="message-bubble">
+                            <i class="bi ${fileIcon}"></i>
+                            <a href="/api/file/${msg.file_id}" target="_blank" class="text-decoration-none">
+                                ${msg.file_type || 'Файл'}
+                            </a>
+                        </div>`;
+                    }
+
+                    const time = new Date(msg.created_at).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
+                    content += `<div class="message-time">${time}</div>`;
+
+                    messageDiv.innerHTML = content;
+                    messagesDiv.appendChild(messageDiv);
+                });
+
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+                // Обновляем заголовок
+                document.getElementById('currentUserName').textContent = data.username;
+                document.getElementById('currentUserInfo').textContent = `ID: ${userId}`;
+
+                // Показываем поле ввода
+                document.getElementById('chatInput').style.display = 'block';
+            });
+
+        // Отмечаем сообщения как прочитанные
+        fetch(`/api/user_messages/${userId}/read`, {method: 'POST'})
+            .then(() => {
+                // Обновляем счетчик непрочитанных в списке
+                const convItem = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
+                const badge = convItem?.querySelector('.unread-badge');
+                if (badge) badge.remove();
+            });
+    }
+
+    function sendMessage(event) {
+        event.preventDefault();
+
+        const message = document.getElementById('replyMessage').value.trim();
+
+        if (!message && !currentFile) {
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('user_id', currentUserId);
+        if (message) formData.append('message', message);
+        if (currentFile) formData.append('file', currentFile);
+
+        fetch('/api/send_message', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('replyMessage').value = '';
+                clearFile();
+                loadChat(currentUserId);
+            } else {
+                alert('Ошибка отправки: ' + (data.error || 'Неизвестная ошибка'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Ошибка отправки сообщения');
+        });
+    }
+
+    function uploadFile(input) {
+        if (input.files && input.files[0]) {
+            currentFile = input.files[0];
+            document.getElementById('fileName').textContent = currentFile.name;
+            document.getElementById('filePreview').style.display = 'block';
+        }
+    }
+
+    function clearFile() {
+        currentFile = null;
+        document.getElementById('replyFile').value = '';
+        document.getElementById('filePreview').style.display = 'none';
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Auto-refresh каждые 30 секунд
+    setInterval(() => {
+        if (currentUserId) {
+            loadChat(currentUserId);
+        }
+    }, 30000);
+</script>
+</body>
+</html>

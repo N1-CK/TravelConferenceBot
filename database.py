@@ -380,6 +380,32 @@ class Database:
                                 )
                             """)
 
+                await conn.execute(f"""
+                    CREATE TABLE IF NOT EXISTS {self.db_schema}.user_messages (
+                        id SERIAL PRIMARY KEY,
+                        user_id BIGINT NOT NULL,
+                        username TEXT NOT NULL,
+                        manager_id INTEGER,
+                        direction TEXT NOT NULL, -- 'incoming' or 'outgoing'
+                        message_text TEXT,
+                        file_type TEXT,
+                        file_id TEXT,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        read_at TIMESTAMP,
+                        replied_at TIMESTAMP
+                    )
+                """)
+
+                # Индексы для быстрого поиска
+                await conn.execute(f"""
+                    CREATE INDEX IF NOT EXISTS idx_user_messages_user_id 
+                    ON {self.db_schema}.user_messages(user_id)
+                """)
+                await conn.execute(f"""
+                    CREATE INDEX IF NOT EXISTS idx_user_messages_created_at 
+                    ON {self.db_schema}.user_messages(created_at)
+                """)
+
                 # Создаем первого админа если нет
                 from hashlib import sha256
                 default_admin = os.getenv('ADMIN_USERNAME', 'admin')
@@ -952,14 +978,18 @@ class Database:
             return False
 
     # database.py
-    async def log_user_action(self, user_id: int, username: str, action: str, details: str = None) -> bool:
+    async def log_user_action(self, user_id: int, username: str, action: str, details: dict = None) -> bool:
         """Логирование действий пользователя"""
         try:
+            import json
             async with self.pool.acquire() as conn:
+                # Преобразуем details в JSON строку если это словарь
+                details_json = json.dumps(details, default=str) if details else None
+
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.user_logs (user_id, username, action, details)
-                    VALUES ($1, $2, $3, $4)
-                """, user_id, username, action, details)  # details уже должна быть строкой
+                    INSERT INTO {self.db_schema}.user_logs (user_id, username, action, details, timestamp)
+                    VALUES ($1, $2, $3, $4, NOW())
+                """, user_id, username, action, details_json)
                 return True
         except Exception as e:
             logger.error(f"Error logging user action: {e}")
@@ -2226,6 +2256,7 @@ class Database:
                             success: int, failed: int, message_length: int, file_count: int = 0) -> bool:
         """Логировать рассылку"""
         try:
+            import json
             async with self.pool.acquire() as conn:
                 details = {
                     'type': broadcast_type,
@@ -2235,10 +2266,12 @@ class Database:
                     'message_length': message_length,
                     'file_count': file_count
                 }
+                details_json = json.dumps(details, default=str)
+
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.user_logs (user_id, username, action, details)
-                    VALUES (0, $1, 'broadcast_sent', $2)
-                """, username, details)
+                    INSERT INTO {self.db_schema}.user_logs (user_id, username, action, details, timestamp)
+                    VALUES (0, $1, 'broadcast_sent', $2, NOW())
+                """, username, details_json)
                 return True
         except Exception as e:
             logger.error(f"Error logging broadcast: {e}")
@@ -2568,23 +2601,6 @@ class Database:
             print(f"Error verifying manager: {e}")
             return {}
 
-    async def get_all_managers(self) -> list:
-        """Получить всех менеджеров"""
-        try:
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(f"""
-                                        SELECT m.*,
-                                               array_agg(g.name) as groups
-                                        FROM {self.db_schema}.managers m
-                                                 LEFT JOIN {self.db_schema}.manager_group_membership mgm ON m.id = mgm.manager_id
-                                                 LEFT JOIN {self.db_schema}.manager_groups g ON mgm.group_id = g.id
-                                        GROUP BY m.id
-                                        ORDER BY m.id
-                                        """)
-                return [dict(row) for row in rows]
-        except Exception as e:
-            print(f"Error getting managers: {e}")
-            return []
 
     async def add_manager(self, username: str, password: str, full_name: str = None, groups: list = None) -> bool:
         """Добавить нового менеджера"""
@@ -2687,6 +2703,210 @@ class Database:
                 return True
         except Exception as e:
             print(f"Error updating manager groups: {e}")
+            return False
+
+    async def update_manager(self, manager_id: int, full_name: str = None,
+                             is_active: bool = None, groups: list = None) -> bool:
+        """Обновление данных менеджера"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Обновляем основные данные
+                if full_name is not None:
+                    await conn.execute(f"""
+                        UPDATE {self.db_schema}.managers 
+                        SET full_name = $1
+                        WHERE id = $2
+                    """, full_name, manager_id)
+
+                if is_active is not None:
+                    await conn.execute(f"""
+                        UPDATE {self.db_schema}.managers 
+                        SET is_active = $1
+                        WHERE id = $2
+                    """, is_active, manager_id)
+
+                # Обновляем группы
+                if groups is not None:
+                    # Удаляем старые связи
+                    await conn.execute(f"""
+                        DELETE FROM {self.db_schema}.manager_group_membership
+                        WHERE manager_id = $1
+                    """, manager_id)
+
+                    # Добавляем новые
+                    for group_name in groups:
+                        group_id = await conn.fetchval(f"""
+                            SELECT id FROM {self.db_schema}.manager_groups 
+                            WHERE name = $1
+                        """, group_name)
+                        if group_id:
+                            await conn.execute(f"""
+                                INSERT INTO {self.db_schema}.manager_group_membership (manager_id, group_id)
+                                VALUES ($1, $2)
+                            """, manager_id, group_id)
+
+                return True
+        except Exception as e:
+            logger.error(f"Error updating manager: {e}")
+            return False
+
+    async def update_manager_password(self, manager_id: int, new_password: str) -> bool:
+        """Обновление пароля менеджера"""
+        try:
+            from hashlib import sha256
+            password_hash = sha256(new_password.encode()).hexdigest()
+
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    UPDATE {self.db_schema}.managers 
+                    SET password_hash = $1
+                    WHERE id = $2
+                """, password_hash, manager_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error updating manager password: {e}")
+            return False
+
+    async def get_all_managers(self) -> list:
+        """Получить всех менеджеров с группами"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT m.*, array_agg(g.name) as groups
+                    FROM {self.db_schema}.managers m
+                    LEFT JOIN {self.db_schema}.manager_group_membership mgm ON m.id = mgm.manager_id
+                    LEFT JOIN {self.db_schema}.manager_groups g ON mgm.group_id = g.id
+                    GROUP BY m.id
+                    ORDER BY m.id
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting managers: {e}")
+            return []
+
+    # database.py - добавить в класс Database
+
+    async def save_user_message(self, user_id: int, username: str,
+                                message_text: str = None, file_type: str = None,
+                                file_id: str = None, direction: str = 'incoming') -> int:
+        """Сохранить сообщение пользователя"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Проверяем, существует ли таблица
+                try:
+                    msg_id = await conn.fetchval(f"""
+                        INSERT INTO {self.db_schema}.user_messages 
+                        (user_id, username, direction, message_text, file_type, file_id, created_at)
+                        VALUES ($1, $2, $3, $4, $5, $6, NOW())
+                        RETURNING id
+                    """, user_id, username, direction, message_text, file_type, file_id)
+                    return msg_id
+                except Exception as e:
+                    # Если таблицы нет, создаем
+                    if 'relation' in str(e) and 'does not exist' in str(e):
+                        await conn.execute(f"""
+                            CREATE TABLE IF NOT EXISTS {self.db_schema}.user_messages (
+                                id SERIAL PRIMARY KEY,
+                                user_id BIGINT NOT NULL,
+                                username TEXT NOT NULL,
+                                manager_id INTEGER,
+                                direction TEXT NOT NULL,
+                                message_text TEXT,
+                                file_type TEXT,
+                                file_id TEXT,
+                                created_at TIMESTAMP DEFAULT NOW(),
+                                read_at TIMESTAMP,
+                                replied_at TIMESTAMP
+                            )
+                        """)
+                        await conn.execute(f"""
+                            CREATE INDEX IF NOT EXISTS idx_user_messages_user_id 
+                            ON {self.db_schema}.user_messages(user_id)
+                        """)
+                        await conn.execute(f"""
+                            CREATE INDEX IF NOT EXISTS idx_user_messages_created_at 
+                            ON {self.db_schema}.user_messages(created_at)
+                        """)
+                        # Повторная вставка
+                        msg_id = await conn.fetchval(f"""
+                            INSERT INTO {self.db_schema}.user_messages 
+                            (user_id, username, direction, message_text, file_type, file_id, created_at)
+                            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+                            RETURNING id
+                        """, user_id, username, direction, message_text, file_type, file_id)
+                        return msg_id
+                    else:
+                        raise
+        except Exception as e:
+            logger.error(f"Error saving user message: {e}")
+            return 0
+
+    async def get_user_conversations(self) -> list:
+        """Получить список всех активных чатов"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Сначала получаем последнее сообщение для каждого пользователя
+                rows = await conn.fetch(f"""
+                    SELECT 
+                        user_id,
+                        username,
+                        last_message,
+                        last_message_time,
+                        unread_count
+                    FROM (
+                        SELECT 
+                            user_id,
+                            username,
+                            FIRST_VALUE(message_text) OVER (
+                                PARTITION BY user_id 
+                                ORDER BY created_at DESC
+                            ) as last_message,
+                            FIRST_VALUE(created_at) OVER (
+                                PARTITION BY user_id 
+                                ORDER BY created_at DESC
+                            ) as last_message_time,
+                            COUNT(*) FILTER (WHERE direction = 'incoming' AND read_at IS NULL) 
+                                OVER (PARTITION BY user_id) as unread_count,
+                            ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC) as rn
+                        FROM {self.db_schema}.user_messages
+                    ) t
+                    WHERE rn = 1
+                    ORDER BY last_message_time DESC NULLS LAST
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting conversations: {e}")
+            return []
+
+    async def get_user_messages(self, user_id: int, limit: int = 50) -> list:
+        """Получить историю сообщений пользователя"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT id, user_id, username, manager_id, direction, 
+                           message_text, file_type, file_id, created_at, read_at
+                    FROM {self.db_schema}.user_messages
+                    WHERE user_id = $1
+                    ORDER BY created_at DESC
+                    LIMIT $2
+                """, user_id, limit)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting messages: {e}")
+            return []
+
+    async def mark_messages_read(self, user_id: int, manager_id: int) -> bool:
+        """Отметить сообщения как прочитанные"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    UPDATE {self.db_schema}.user_messages
+                    SET read_at = NOW(), manager_id = $1
+                    WHERE user_id = $2 AND direction = 'incoming' AND read_at IS NULL
+                """, manager_id, user_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error marking messages read: {e}")
             return False
 
 

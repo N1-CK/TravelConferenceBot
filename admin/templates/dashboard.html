@@ -159,30 +159,35 @@
                         <i class="bi bi-speedometer2"></i> {{ get_text('dashboard') }}
                     </a>
 
-                    <!-- PR раздел - виден только если менеджер в группе pr -->
+                    <!-- Рассылка - доступна всем менеджерам -->
+                    <a class="nav-link" href="/broadcast">
+                        <i class="bi bi-megaphone"></i> Рассылка
+                    </a>
+
+                    <!-- PR раздел - только для группы pr -->
                     {% if 'pr' in session.get('groups', []) or session.role == 'admin' %}
                     <a class="nav-link" href="/pr">
                         <i class="bi bi-megaphone"></i> PR-панель
                     </a>
                     {% endif %}
 
-                    <!-- Event раздел - виден только если менеджер в группе event -->
+                    <!-- Event раздел - только для группы event -->
                     {% if 'event' in session.get('groups', []) or session.role == 'admin' %}
                     <a class="nav-link" href="/event">
                         <i class="bi bi-calendar-event"></i> Event-панель
                     </a>
                     {% endif %}
 
-                    <!-- Travel раздел - виден только если менеджер в группе travel -->
+                    <!-- Travel раздел - только для группы travel -->
                     {% if 'travel' in session.get('groups', []) or session.role == 'admin' %}
                     <a class="nav-link" href="/travel">
                         <i class="bi bi-airplane"></i> Travel-панель
                     </a>
                     {% endif %}
 
-                    <!-- Рассылка - видна всем менеджерам (но можно ограничить) -->
-                    <a class="nav-link" href="/broadcast">
-                        <i class="bi bi-megaphone"></i> Рассылка
+                    <!-- ЧАТЫ С ПОЛЬЗОВАТЕЛЯМИ - новая вкладка -->
+                    <a class="nav-link" href="/user_chats">
+                        <i class="bi bi-chat-dots"></i> Чаты с пользователями
                     </a>
 
                     <!-- Управление менеджерами - только админ -->
@@ -191,6 +196,10 @@
                         <i class="bi bi-shield-lock"></i> Управление менеджерами
                     </a>
                     {% endif %}
+
+                    <a class="nav-link" href="/change_password">
+                        <i class="bi bi-key"></i> Сменить пароль
+                    </a>
 
                     <a class="nav-link" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                         <i class="bi bi-box-arrow-right"></i> {{ get_text('logout') }}

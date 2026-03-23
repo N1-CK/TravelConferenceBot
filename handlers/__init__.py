@@ -1,4 +1,4 @@
-from aiogram import Router
+# handlers/__init__.py
 from .start import router as start_router
 from .menu import router as menu_router
 from .pr import router as pr_router
@@ -8,6 +8,7 @@ from .admin import router as admin_router
 from .dinner.affiliate_integrated import router as affiliate_router
 from .navigation import router as navigation_router
 from .managers_chat import router as managers_chat_router
+from .messages import router as messages_router
 
 __all__ = [
     'start_router',
@@ -19,5 +20,5 @@ __all__ = [
     'navigation_router',
     'affiliate_router',
     'managers_chat_router',
-    'menu_router'
+    'messages_router',
 ]

@@ -21,6 +21,11 @@ from database import db
 
 from locales import get_text
 
+import logging
+logger = logging.getLogger(__name__)
+
+from aiogram import Bot
+
 # Загружаем переменные окружения
 load_dotenv()
 
@@ -28,6 +33,7 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 app.config['UPLOAD_FOLDER'] = '/tmp'
+
 
 # ============================================
 # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: ОДИН EVENT LOOP
@@ -44,6 +50,18 @@ def get_event_loop():
         _loop = asyncio.new_event_loop()
         asyncio.set_event_loop(_loop)
     return _loop
+
+def run_async_safe(coro):
+    """Безопасное выполнение асинхронной функции с созданием нового loop"""
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(coro)
+        loop.close()
+        return result
+    except Exception as e:
+        logger.error(f"Error in run_async_safe: {e}")
+        return None
 
 def run_async(coro):
     """Выполнить асинхронную функцию в единственном event loop"""
@@ -114,6 +132,37 @@ def login_required(f):
         return f(*args, **kwargs)
 
     return decorated_function
+
+
+def group_required(allowed_groups=None):
+    """Декоратор для проверки доступа по группам менеджера"""
+
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'logged_in' not in session:
+                return redirect(url_for('login'))
+
+            # Админ имеет доступ ко всему
+            if session.get('role') == 'admin':
+                return f(*args, **kwargs)
+
+            user_groups = session.get('groups', [])
+
+            # Если allowed_groups не указаны - доступ есть у всех
+            if allowed_groups is None:
+                return f(*args, **kwargs)
+
+            # Проверяем, есть ли у менеджера нужная группа
+            if any(group in user_groups for group in allowed_groups):
+                return f(*args, **kwargs)
+
+            flash('У вас нет доступа к этой странице', 'danger')
+            return redirect(url_for('dashboard'))
+
+        return decorated_function
+
+    return decorator
 
 def role_required(allowed_roles=None, permissions=None):
     """Декоратор для проверки роли и прав"""
@@ -574,6 +623,7 @@ def api_users_count():
 
 @app.route('/event')
 @login_required
+@group_required(['event', 'admin'])
 def event_panel():
     """Панель Event-менеджера"""
     certificates = run_async(db.get_all_certificates())
@@ -594,6 +644,7 @@ def event_panel():
 
 @app.route('/travel')
 @login_required
+@group_required(['travel', 'admin'])
 def travel_panel():
     """Панель Travel-менеджера"""
     visa_requests = run_async(db.get_all_visa_requests())
@@ -614,6 +665,7 @@ def travel_panel():
 
 @app.route('/pr')
 @login_required
+@group_required(['pr', 'admin'])
 def pr_panel():
     """Панель PR-менеджера"""
     banner_requests = run_async(db.get_all_banner_requests())
@@ -629,29 +681,6 @@ def pr_panel():
     return render_template('pr_panel.html',
                            banner_requests=banner_requests,
                            business_cards=business_cards,
-                           stats=stats,
-                           username=session.get('username'))
-
-
-@app.route('/user_groups')
-@login_required
-def user_groups_page():
-    """Страница управления группами и функциями"""
-    groups = run_async(db.get_all_groups())
-    features = run_async(db.get_all_features())
-    all_users = run_async(db.get_all_users_with_groups())
-
-    stats = {
-        'total_groups': len(groups),
-        'total_users': len(all_users),
-        'users_in_groups': sum(1 for u in all_users if u.get('groups')),
-        'total_features': len(features)
-    }
-
-    return render_template('user_groups.html',
-                           groups=groups,
-                           features=features,
-                           all_users=all_users,
                            stats=stats,
                            username=session.get('username'))
 
@@ -899,48 +928,6 @@ def api_get_all_users():
     return jsonify(users)
 
 
-@app.route('/group_features/<int:group_id>')
-@login_required
-def group_features_management(group_id):
-    """Страница управления функциями группы"""
-    group = run_async(db.get_group(group_id))
-    features = run_async(db.get_all_features())
-    group_features = run_async(db.get_group_features(group_id))
-
-    return render_template('group_features.html',
-                           group=group,
-                           features=features,
-                           group_features=group_features)
-
-
-@app.route('/user_groups/<int:user_id>')
-@login_required
-def user_groups_management(user_id):
-    """Страница управления группами конкретного пользователя"""
-    user = run_async(db.get_user_details_by_id(user_id))
-    groups = run_async(db.get_all_groups())
-    user_groups = run_async(db.get_user_groups(user_id))
-
-    return render_template('user_groups_edit.html',
-                           user=user,
-                           groups=groups,
-                           user_groups=user_groups)
-
-
-@app.route('/manage_group/<int:group_id>')
-@login_required
-def manage_group_users(group_id):
-    """Управление участниками группы"""
-    group = run_async(db.get_group(group_id))
-    users = run_async(db.get_all_users_basic())
-    group_users = run_async(db.get_group_users(group_id))
-
-    return render_template('manage_group_users.html',
-                           group=group,
-                           users=users,
-                           group_users=group_users)
-
-
 @app.route('/api/visa/<int:request_id>')
 @login_required
 def api_visa_details(request_id):
@@ -989,6 +976,7 @@ def api_conference_details(conference_name):
 
 @app.route('/admin_managers')
 @login_required
+@group_required(['admin'])
 def admin_managers():
     """Страница управления менеджерами (только для админа)"""
     if session.get('role') != 'admin':
@@ -1032,6 +1020,213 @@ def delete_manager(manager_id):
 
     success = run_async(db.delete_manager(manager_id))
     return jsonify({'success': success})
+
+
+# app.py - добавить маршруты для управления менеджерами
+
+@app.route('/admin_managers/<int:manager_id>')
+@login_required
+@group_required(['admin'])
+def get_manager_json(manager_id):
+    """API для получения данных менеджера"""
+    managers = run_async(db.get_all_managers())
+    manager = next((m for m in managers if m['id'] == manager_id), None)
+    if manager:
+        return jsonify(manager)
+    return jsonify({'error': 'Not found'}), 404
+
+
+@app.route('/admin_managers/edit/<int:manager_id>', methods=['POST'])
+@login_required
+@group_required(['admin'])
+def edit_manager(manager_id):
+    """Редактирование менеджера"""
+    full_name = request.form.get('full_name')
+    is_active = request.form.get('is_active') == 'true'
+    groups = request.form.getlist('groups')
+
+    # Обновляем данные менеджера
+    success = run_async(db.update_manager(manager_id, full_name, is_active, groups))
+
+    if success:
+        flash('Данные менеджера обновлены', 'success')
+    else:
+        flash('Ошибка при обновлении', 'danger')
+
+    return redirect(url_for('admin_managers'))
+
+
+@app.route('/admin_managers/reset_password/<int:manager_id>', methods=['POST'])
+@login_required
+@group_required(['admin'])
+def reset_manager_password(manager_id):
+    """Сброс пароля менеджера"""
+    new_password = request.form.get('new_password')
+    confirm_password = request.form.get('confirm_password')
+
+    if new_password != confirm_password:
+        flash('Пароли не совпадают', 'danger')
+        return redirect(url_for('admin_managers'))
+
+    if len(new_password) < 6:
+        flash('Пароль должен содержать минимум 6 символов', 'danger')
+        return redirect(url_for('admin_managers'))
+
+    success = run_async(db.update_manager_password(manager_id, new_password))
+
+    if success:
+        flash('Пароль успешно изменен', 'success')
+    else:
+        flash('Ошибка при смене пароля', 'danger')
+
+    return redirect(url_for('admin_managers'))
+
+
+@app.route('/user_chats')
+@login_required
+def user_chats():
+    """Страница чатов с пользователями"""
+    conversations = run_async(db.get_user_conversations())
+    return render_template('user_chats.html', conversations=conversations)
+
+
+@app.route('/api/user_messages/<int:user_id>')
+@login_required
+def api_get_user_messages(user_id):
+    """API для получения сообщений пользователя"""
+    messages = run_async(db.get_user_messages(user_id, limit=100))
+    # Получаем username
+    user_data = run_async(db.get_user_data(user_id))
+
+    # Форматируем сообщения для отображения
+    formatted_messages = []
+    for msg in messages:
+        formatted_messages.append({
+            'id': msg['id'],
+            'direction': msg['direction'],
+            'message_text': msg['message_text'],
+            'file_type': msg['file_type'],
+            'file_id': msg['file_id'],
+            'created_at': msg['created_at'].isoformat()
+        })
+
+    return jsonify({
+        'user_id': user_id,
+        'username': user_data.get('username') if user_data else str(user_id),
+        'messages': formatted_messages
+    })
+
+
+@app.route('/api/user_messages/<int:user_id>/read', methods=['POST'])
+@login_required
+def api_mark_messages_read(user_id):
+    """Отметить сообщения как прочитанные"""
+    success = run_async(db.mark_messages_read(user_id, session.get('manager_id')))
+    return jsonify({'success': success})
+
+
+@app.route('/api/send_message', methods=['POST'])
+@login_required
+def api_send_message():
+    """Отправить сообщение пользователю"""
+    user_id = request.form.get('user_id', type=int)
+    message = request.form.get('message')
+    file = request.files.get('file')
+
+    if not user_id:
+        return jsonify({'error': 'User ID required'}), 400
+
+    if not message and not file:
+        return jsonify({'error': 'Message or file required'}), 400
+
+    # Сохраняем сообщение в БД
+    file_id = None
+    file_type = None
+    filepath = None
+
+    if file:
+        file_id = file.filename
+        file_type = file.content_type
+        # Сохраняем файл временно
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+
+    # Сохраняем исходящее сообщение
+    msg_id = run_async(db.save_user_message(
+        user_id=user_id,
+        username=session.get('username', 'admin'),
+        message_text=message,
+        file_type=file_type,
+        file_id=file_id,
+        direction='outgoing'
+    ))
+
+    if not msg_id:
+        return jsonify({'error': 'Failed to save message'}), 500
+
+    # Отправляем сообщение через Telegram бота
+    try:
+        import asyncio
+        from aiogram import Bot
+        from aiogram.types import FSInputFile
+
+        # Получаем токен бота
+        bot_token = os.getenv('TG_BOT_TOKEN')
+        bot = Bot(token=bot_token)
+
+        # Создаем НОВЫЙ event loop для этой операции
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        async def send():
+            try:
+                if file and filepath and os.path.exists(filepath):
+                    # Отправка файла
+                    input_file = FSInputFile(filepath)
+                    await bot.send_document(
+                        chat_id=user_id,
+                        document=input_file,
+                        caption=message
+                    )
+                else:
+                    # Отправка только текста
+                    run_async_safe(await bot.send_message(
+                        chat_id=user_id,
+                        text=message,
+                        parse_mode="HTML"
+                    ))
+            except Exception as e:
+                logger.error(f"Error in send function: {e}")
+                raise
+            finally:
+                # Закрываем сессию бота
+                await bot.session.close()
+
+        # Запускаем асинхронную отправку
+        loop.run_until_complete(send())
+        loop.close()
+
+        # Удаляем временный файл
+        if filepath and os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+            except:
+                pass
+
+    except Exception as e:
+        logger.error(f"Error sending message to user {user_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+    return jsonify({'success': True, 'message_id': msg_id})
+
+@app.route('/api/file/<file_id>')
+@login_required
+def api_get_file(file_id):
+    """Получить файл по ID (из Telegram)"""
+    # Реализация получения файла из Telegram
+    # Для простоты пока возвращаем 404
+    return jsonify({'error': 'Not implemented'}), 404
 
 
 # ============================================
