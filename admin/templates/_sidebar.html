@@ -1,66 +1,62 @@
-<!-- templates/_sidebar.html -->
-<div class="col-md-3 col-lg-2 px-0 sidebar">
-    <div class="user-info">
-        <h5><i class="bi bi-person-circle"></i> {{ session.username }}</h5>
-        <p>{{ get_text('role_' + session.role) }}</p>
+<div class="col-md-3 col-lg-2 px-0 sidebar d-flex flex-column h-100" style="min-height: 100vh; background-color: #f8f9fa;">
+    <div class="user-info p-3 border-bottom">
+        <h5><i class="bi bi-person-circle"></i> {{ session.full_name or session.username }}</h5>
+        <p class="mb-1 text-muted">{{ get_text('role_' + session.role) }}</p>
         {% if session.login_time %}
-        <p><small>Вход: {{ session.login_time[:10] }}</small></p>
+        <p class="mb-0"><small>{{ get_text('login_time') }} {{ session.login_time[:10] }}</small></p>
         {% endif %}
     </div>
 
-    <nav class="nav flex-column">
-        <!-- Дашборд - доступен всем -->
+    <nav class="nav flex-column p-2 flex-grow-1">
         <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="/">
             <i class="bi bi-speedometer2"></i> {{ get_text('dashboard') }}
         </a>
 
-        <!-- Рассылка - доступна всем менеджерам -->
         <a class="nav-link {% if request.endpoint == 'broadcast' %}active{% endif %}" href="/broadcast">
             <i class="bi bi-megaphone"></i> {{ get_text('broadcast') }}
         </a>
 
-        <!-- PR-панель - для админа и группы pr -->
         {% if 'pr' in session.get('groups', []) or session.role == 'admin' %}
         <a class="nav-link {% if request.endpoint == 'pr_panel' %}active{% endif %}" href="/pr">
-            <i class="bi bi-megaphone"></i> PR-панель
+            <i class="bi bi-megaphone"></i> {{ get_text('pr_panel') }}
         </a>
         {% endif %}
 
-        <!-- Event-панель - для админа и группы event -->
         {% if 'event' in session.get('groups', []) or session.role == 'admin' %}
         <a class="nav-link {% if request.endpoint == 'event_panel' %}active{% endif %}" href="/event">
-            <i class="bi bi-calendar-event"></i> Event-панель
+            <i class="bi bi-calendar-event"></i> {{ get_text('event_panel') }}
         </a>
         {% endif %}
 
-        <!-- Travel-панель - для админа и группы travel -->
         {% if 'travel' in session.get('groups', []) or session.role == 'admin' %}
         <a class="nav-link {% if request.endpoint == 'travel_panel' %}active{% endif %}" href="/travel">
-            <i class="bi bi-airplane"></i> Travel-панель
+            <i class="bi bi-airplane"></i> {{ get_text('travel_panel') }}
         </a>
         {% endif %}
 
-        <!-- Чаты с пользователями - доступны всем -->
         <a class="nav-link {% if request.endpoint == 'user_chats' %}active{% endif %}" href="/user_chats">
-            <i class="bi bi-chat-dots"></i> Чаты с пользователями
+            <i class="bi bi-chat-dots"></i> {{ get_text('user_chats') }}
         </a>
 
-        <!-- Управление менеджерами - только для админа -->
         {% if session.role == 'admin' %}
         <a class="nav-link {% if request.endpoint == 'admin_managers' %}active{% endif %}" href="/admin_managers">
-            <i class="bi bi-shield-lock"></i> Управление менеджерами
+            <i class="bi bi-shield-lock"></i> {{ get_text('manage_managers') }}
         </a>
         {% endif %}
 
-        <!-- Смена пароля - для всех -->
         <a class="nav-link {% if request.endpoint == 'change_password' %}active{% endif %}" href="/change_password">
-            <i class="bi bi-key"></i> Сменить пароль
+            <i class="bi bi-key"></i> {{ get_text('change_password') }}
         </a>
 
-        <!-- Выход - для всех -->
-        <a class="nav-link" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+        <a class="nav-link text-danger mt-3" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
             <i class="bi bi-box-arrow-right"></i> {{ get_text('logout') }}
         </a>
     </nav>
+
+    <div class="p-3 border-top d-flex justify-content-center gap-2">
+        <a href="/set_language/ru" class="btn btn-sm {% if session.get('lang', 'ru') == 'ru' %}btn-primary{% else %}btn-outline-secondary{% endif %}">RU</a>
+        <a href="/set_language/en" class="btn btn-sm {% if session.get('lang') == 'en' %}btn-primary{% else %}btn-outline-secondary{% endif %}">EN</a>
+    </div>
+
     <form id="logout-form" action="/logout" method="GET" style="display: none;"></form>
 </div>

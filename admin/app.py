@@ -730,29 +730,44 @@ def change_password():
         old_password = request.form.get('old_password')
         new_password = request.form.get('new_password')
 
-        admin = run_async(db.verify_admin(session['username'], old_password))
-        if not admin:
-            flash('Неверный текущий пароль', 'danger')
+        # ИСПРАВЛЕНИЕ: Используем verify_manager вместо старого verify_admin
+        manager = run_async(db.verify_manager(session['username'], old_password))
+        if not manager:
+            flash(get_text('invalid_current_password', session.get('lang', 'ru')), 'danger')
             return redirect(url_for('change_password'))
 
-        success = run_async(db.update_admin_user(
-            session['admin_id'],
-            {'password': new_password}
+        # ИСПРАВЛЕНИЕ: Используем manager_id из сессии и правильный метод БД
+        success = run_async(db.update_manager_password(
+            session['manager_id'],
+            new_password
         ))
 
         if success:
-            flash('Пароль успешно изменен', 'success')
+            flash(get_text('password_changed_success', session.get('lang', 'ru')), 'success')
             return redirect(url_for('dashboard'))
         else:
-            flash('Ошибка при смене пароля', 'danger')
+            flash(get_text('error', session.get('lang', 'ru')), 'danger')
 
     return render_template('change_password.html')
 
 
+@app.route('/set_language/<lang>')
+def set_language(lang):
+    """Смена языка интерфейса"""
+    if lang in ['ru', 'en']:
+        session['lang'] = lang
+    return redirect(request.referrer or url_for('dashboard'))
+
+
 @app.context_processor
 def utility_processor():
-    """Добавляет функцию get_text во все шаблоны"""
-    return dict(get_text=get_text)
+    """Добавляет функцию get_text во все шаблоны с учетом выбранного языка"""
+
+    def _get_text(key):
+        lang = session.get('lang', 'ru')
+        return get_text(key, lang)
+
+    return dict(get_text=_get_text)
 
 
 # ============================================
