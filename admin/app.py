@@ -43,6 +43,19 @@ app.config['UPLOAD_FOLDER'] = '/tmp'
 _loop = None
 _db_initialized = False
 
+def get_or_create_event_loop():
+    """Получить или создать event loop, не вызывая ошибки"""
+    global _loop
+    try:
+        loop = asyncio.get_running_loop()
+        return loop
+    except RuntimeError:
+        # Нет запущенного loop
+        if _loop is None or _loop.is_closed():
+            _loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(_loop)
+        return _loop
+
 def get_event_loop():
     """Получить или создать единственный event loop"""
     global _loop
@@ -51,17 +64,33 @@ def get_event_loop():
         asyncio.set_event_loop(_loop)
     return _loop
 
+
 def run_async_safe(coro):
-    """Безопасное выполнение асинхронной функции с созданием нового loop"""
+    """
+    Безопасное выполнение асинхронной функции.
+    Всегда использует существующий event loop, никогда не создаёт новый внутри другого.
+    """
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(coro)
-        loop.close()
-        return result
-    except Exception as e:
-        logger.error(f"Error in run_async_safe: {e}")
-        return None
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = get_or_create_event_loop()
+
+    if loop.is_running():
+        # Если loop уже запущен, запускаем как таск и ждём
+        import concurrent.futures
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
+        try:
+            return future.result(timeout=30)
+        except concurrent.futures.TimeoutError:
+            logger.error("Async operation timeout")
+            return None
+    else:
+        # Loop не запущен - запускаем
+        try:
+            return loop.run_until_complete(coro)
+        except Exception as e:
+            logger.error(f"Error in run_async_safe: {e}")
+            return None
 
 def run_async(coro):
     """Выполнить асинхронную функцию в единственном event loop"""
@@ -1147,13 +1176,12 @@ def api_send_message():
     if file:
         file_id = file.filename
         file_type = file.content_type
-        # Сохраняем файл временно
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
 
-    # Сохраняем исходящее сообщение
-    msg_id = run_async(db.save_user_message(
+    # Сохраняем исходящее сообщение - используем run_async_safe
+    msg_id = run_async_safe(db.save_user_message(
         user_id=user_id,
         username=session.get('username', 'admin'),
         message_text=message,
@@ -1171,18 +1199,12 @@ def api_send_message():
         from aiogram import Bot
         from aiogram.types import FSInputFile
 
-        # Получаем токен бота
         bot_token = os.getenv('TG_BOT_TOKEN')
-        bot = Bot(token=bot_token)
-
-        # Создаем НОВЫЙ event loop для этой операции
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
 
         async def send():
+            bot = Bot(token=bot_token)
             try:
                 if file and filepath and os.path.exists(filepath):
-                    # Отправка файла
                     input_file = FSInputFile(filepath)
                     await bot.send_document(
                         chat_id=user_id,
@@ -1190,22 +1212,16 @@ def api_send_message():
                         caption=message
                     )
                 else:
-                    # Отправка только текста
-                    run_async_safe(await bot.send_message(
+                    await bot.send_message(
                         chat_id=user_id,
                         text=message,
                         parse_mode="HTML"
-                    ))
-            except Exception as e:
-                logger.error(f"Error in send function: {e}")
-                raise
+                    )
             finally:
-                # Закрываем сессию бота
                 await bot.session.close()
 
-        # Запускаем асинхронную отправку
-        loop.run_until_complete(send())
-        loop.close()
+        # Используем run_async_safe с нашим исправленным методом
+        run_async_safe(send())
 
         # Удаляем временный файл
         if filepath and os.path.exists(filepath):
@@ -1219,6 +1235,7 @@ def api_send_message():
         return jsonify({'error': str(e)}), 500
 
     return jsonify({'success': True, 'message_id': msg_id})
+
 
 @app.route('/api/file/<file_id>')
 @login_required

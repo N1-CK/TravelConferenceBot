@@ -1,3 +1,4 @@
+# handlers/managers_chat.py
 import asyncio
 import json
 import os
@@ -6,10 +7,9 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from database import db
+import logging
 
 router = Router()
-
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -27,24 +27,11 @@ TRAVEL_MANAGER_CHAT_ID = int(os.getenv("TG_TRAVEL_MANAGER_CHAT_ID", 0))
 ADMIN_CHAT_ID = int(os.getenv("TG_ADMIN_CHAT_ID", 0))
 
 
-def run_async_safe(coro):
-    """Безопасное выполнение асинхронной функции с созданием нового loop"""
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(coro)
-        loop.close()
-        return result
-    except Exception as e:
-        logger.error(f"Error in run_async_safe: {e}")
-        return None
-
-
 async def send_question_to_manager(bot: Bot, manager_chat_id: int, user_data: dict,
                                   question_text: str, question_type: str):
     """Отправка вопроса в чат менеджера"""
     if not manager_chat_id:
-        print(f"⚠️ Chat ID для менеджера {question_type} не настроен")
+        logger.warning(f"⚠️ Chat ID для менеджера {question_type} не настроен")
         return
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -63,11 +50,11 @@ async def send_question_to_manager(bot: Bot, manager_chat_id: int, user_data: di
     )
 
     try:
-        message = run_async_safe(await bot.send_message(
+        message = await bot.send_message(
             chat_id=manager_chat_id,
             text=message_text,
             reply_markup=keyboard
-        ))
+        )
 
         # Сохраняем соответствие
         key = f"{manager_chat_id}_{message.message_id}"
@@ -77,11 +64,11 @@ async def send_question_to_manager(bot: Bot, manager_chat_id: int, user_data: di
             'question_type': question_type
         }
     except Exception as e:
-        print(f"❌ Ошибка отправки в чат менеджера {question_type}: {e}")
+        logger.error(f"❌ Ошибка отправки в чат менеджера {question_type}: {e}")
 
 
 @router.callback_query(F.data.startswith("reply_to_"))
-async def start_reply_to_user(callback: CallbackQuery, state: FSMContext, bot: Bot):  # ← добавьте bot
+async def start_reply_to_user(callback: CallbackQuery, state: FSMContext, bot: Bot):
     """Начало ответа пользователю"""
     data_parts = callback.data.split("_")
     user_id = int(data_parts[2])
@@ -99,7 +86,10 @@ async def start_reply_to_user(callback: CallbackQuery, state: FSMContext, bot: B
         f"Можно использовать форматирование Markdown.\n"
         f"Для отмены отправьте /cancel"
     )
+    await callback.answer()
 
+
+# handlers/managers_chat.py - исправленная функция send_reply_to_user
 
 @router.message(ManagerReplyForm.waiting_for_reply)
 async def send_reply_to_user(message: Message, state: FSMContext):
@@ -119,16 +109,16 @@ async def send_reply_to_user(message: Message, state: FSMContext):
         bot = message.bot
 
         # Отправляем пользователю
-        run_async_safe(await bot.send_message(
+        await bot.send_message(
             chat_id=user_id,
             text=f"📨 Ответ от менеджера:\n\n{reply_text}",
             parse_mode="Markdown"
-        ))
+        )
 
         # Уведомляем менеджера
         await message.answer(f"✅ Ответ отправлен пользователю {user_id}")
 
-        # Логируем с преобразованием в JSON
+        # Логируем - используем await напрямую
         await db.log_user_action(
             user_id=message.from_user.id,
             username=message.from_user.username,

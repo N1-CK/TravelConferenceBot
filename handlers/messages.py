@@ -1,4 +1,5 @@
 # handlers/messages.py
+import asyncio
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 @router.message(Command("start"))
 async def cmd_start(message: Message):
     """Обработчик /start - сохраняем сообщение"""
+    # Используем await напрямую, так как мы в асинхронной функции
     await db.save_user_message(
         user_id=message.from_user.id,
         username=message.from_user.username or message.from_user.first_name,
@@ -52,7 +54,7 @@ async def handle_user_message(message: Message):
         file_type = 'video_note'
         file_id = message.video_note.file_id
 
-    # Сохраняем сообщение в БД
+    # Сохраняем сообщение в БД - используем await
     try:
         msg_id = await db.save_user_message(
             user_id=user_id,

@@ -2,6 +2,67 @@
 from typing import Dict, Any
 
 
+TEXTS = {
+    'ru': {
+        'dashboard': 'Дашборд',
+        'broadcast': 'Рассылка',
+        'users': 'Пользователи',
+        'conferences': 'Конференции',
+        'logout': 'Выход',
+        'role_admin': 'Администратор',
+        'role_user': 'Пользователь',
+        'role_manager': 'Менеджер',
+        'user_management': 'Управление пользователями',
+        'username': 'Логин',
+        'full_name': 'Полное имя',
+        'role': 'Роль',
+        'permissions': 'Права',
+        'last_active': 'Последняя активность',
+        'status': 'Статус',
+        'actions': 'Действия',
+        'active': 'Активен',
+        'blocked': 'Заблокирован',
+        'add_user': 'Добавить пользователя',
+        'edit_user': 'Редактировать пользователя',
+        'password': 'Пароль',
+        'leave_empty': 'оставьте пустым, чтобы не менять',
+        'save': 'Сохранить',
+        'cancel': 'Отмена',
+        'confirm_delete': 'Вы уверены, что хотите удалить этого пользователя?'
+    },
+    'en': {
+        'dashboard': 'Dashboard',
+        'broadcast': 'Broadcast',
+        'users': 'Users',
+        'conferences': 'Conferences',
+        'logout': 'Logout',
+        'role_admin': 'Administrator',
+        'role_user': 'User',
+        'role_manager': 'Manager',
+        'user_management': 'User Management',
+        'username': 'Username',
+        'full_name': 'Full Name',
+        'role': 'Role',
+        'permissions': 'Permissions',
+        'last_active': 'Last Active',
+        'status': 'Status',
+        'actions': 'Actions',
+        'active': 'Active',
+        'blocked': 'Blocked',
+        'add_user': 'Add User',
+        'edit_user': 'Edit User',
+        'password': 'Password',
+        'leave_empty': 'leave empty to keep current',
+        'save': 'Save',
+        'cancel': 'Cancel',
+        'confirm_delete': 'Are you sure you want to delete this user?'
+    }
+}
+
+def get_text(key, lang='ru'):
+    """Получить текст на нужном языке"""
+    return TEXTS.get(lang, TEXTS['ru']).get(key, key)
+
 class I18n:
     """Класс для интернационализации"""
 
@@ -234,8 +295,3 @@ class I18n:
 
 # Глобальный экземпляр
 i18n = I18n()
-
-
-def get_text(key: str) -> str:
-    """Вспомогательная функция для шаблонов"""
-    return i18n.t(key)
