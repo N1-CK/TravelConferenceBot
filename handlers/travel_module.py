@@ -1,5 +1,7 @@
 import logging
+import re
 from datetime import datetime
+from typing import List, Dict, Any, Union
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import StateFilter
@@ -9,11 +11,10 @@ from aiogram.enums import ParseMode
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from database import db
-from typing import List, Dict, Any
-import re
-
 import os
 from handlers.managers_chat import send_question_to_manager
+from keyboards import get_travel_menu_keyboard
+from utility.lang_utils import *
 
 TRAVEL_MANAGER_CHAT_ID = int(os.getenv("TG_TRAVEL_MANAGER_CHAT_ID", 0))
 
@@ -21,20 +22,28 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 
-# Состояния для Travel
+# ============================================
+# СОСТОЯНИЯ
+# ============================================
+
 class TravelStates(StatesGroup):
-    english = State()  # Основное состояние для англоязычного интерфейса
-    # Состояния для форм
+    english = State()
+
+    # Для Flight Request
+    waiting_for_visa_status = State()
+    waiting_for_passport_consent = State()
     waiting_for_passport = State()
     waiting_for_city_from = State()
     waiting_for_city_to = State()
     waiting_for_baggage = State()
     waiting_for_preferences = State()
-    waiting_for_visa_status = State()
+    waiting_for_hotel_needed = State()
+    waiting_for_flight_choice = State()
 
+    # Для вопросов
     waiting_for_travel_question = State()
 
-    waiting_for_flight_request = State()
+    # Для полной формы
     waiting_for_first_name = State()
     waiting_for_last_name = State()
     waiting_for_phone = State()
@@ -48,89 +57,91 @@ class TravelStates(StatesGroup):
     waiting_for_visa_needed = State()
     waiting_for_visa_dates = State()
 
-    waiting_for_per_diem_payment = State()
-    waiting_for_per_diem_currency = State()
-    waiting_for_per_diem_comments = State()
+    # Для Daily allowance
+    waiting_for_per_diem_payment_type = State()
+    waiting_for_per_diem_card = State()
+    waiting_for_per_diem_crypto_network = State()
+    waiting_for_per_diem_crypto_address = State()
     waiting_for_per_diem_consent = State()
 
 
-def escape_markdown(text: str) -> str:
-    """Экранирует специальные символы Markdown"""
-    escape_chars = r'_*[]()~`>#+-=|{}.!'
-    return ''.join(f'\\{char}' if char in escape_chars else char for char in text)
-
-
 # ============================================
-# КЛАВИАТУРЫ (ТОЛЬКО АНГЛИЙСКИЕ)
+# КЛАВИАТУРЫ
 # ============================================
 
-def get_travel_menu_keyboard() -> InlineKeyboardMarkup:
+async def get_selected_conference_text(user_id: int) -> str:
+    """Получить текст с выбранной конференцией"""
+    selected_conf = await db.get_selected_conference(user_id)
+    if selected_conf:
+        return f"\n\n📌 *Текущая конференция:* {selected_conf}"
+    return ""
+
+
+# def get_travel_menu_keyboard() -> InlineKeyboardMarkup:
+#     """Главное меню Travel"""
+#     builder = InlineKeyboardBuilder()
+#     builder.row(
+#         InlineKeyboardButton(text="✈️ Flight Request", callback_data="travel_flight_request")
+#     )
+#     builder.row(
+#         InlineKeyboardButton(text="🛂 Visa Support", callback_data="travel_visa_support"),
+#         InlineKeyboardButton(text="ℹ️ Flight Info", callback_data="travel_flight_info")
+#     )
+#     builder.row(
+#         InlineKeyboardButton(text="🏨 Hotel", callback_data="travel_hotel_info"),
+#         InlineKeyboardButton(text="💰 Daily allowance", callback_data="travel_per_diem")
+#     )
+#     builder.row(
+#         InlineKeyboardButton(text="📋 My requests", callback_data="travel_my_requests"),
+#         InlineKeyboardButton(text="❓ Question", callback_data="travel_question")
+#     )
+#     builder.row(
+#         InlineKeyboardButton(text="◀️ Back", callback_data="menu_main")
+#     )
+#     return builder.as_markup()
+
+
+def get_flight_choice_keyboard(flights: List[Dict]) -> InlineKeyboardMarkup:
+    """Клавиатура выбора рейса"""
     builder = InlineKeyboardBuilder()
-    # 1. Самая большая кнопка
+
+    for flight in flights:
+        # Форматируем: 12.02.2026 13:50 DME - 12.02.2026 16:50 IST
+        text = f"{flight.get('departure_date')} {flight.get('departure_time')} {flight.get('departure_from')} → {flight.get('arrival_time')} {flight.get('arrival_city')}"
+        builder.row(InlineKeyboardButton(
+            text=text,
+            callback_data=f"flight_choose_{flight.get('id')}"
+        ))
+
+    builder.row(InlineKeyboardButton(
+        text="❌ Ни один из рейсов не подходит. Свяжитесь со мной",
+        callback_data="flight_no_suitable"
+    ))
     builder.row(
-        InlineKeyboardButton(text="✈️ Flight Request", callback_data="travel_flight_request")
-    )
-    # 2. Ряд из двух
-    builder.row(
-        InlineKeyboardButton(text="🛂 Visa Support", callback_data="travel_visa_support"),
-        InlineKeyboardButton(text="ℹ️ Flight Info", callback_data="travel_flight_info")
-    )
-    # 3. Ряд из двух
-    builder.row(
-        InlineKeyboardButton(text="🏨 Hotel", callback_data="travel_hotel_info"),
-        InlineKeyboardButton(text="💰 Daily allowance", callback_data="travel_per_diem")
-    )
-    # 4. Ряд из двух
-    builder.row(
-        InlineKeyboardButton(text="📋 My requests", callback_data="travel_my_requests"),
-        InlineKeyboardButton(text="❓ Question", callback_data="travel_question")
-    )
-    builder.row(
-        InlineKeyboardButton(text="◀️ Back", callback_data="menu_main")
+        InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu")
     )
     return builder.as_markup()
 
 
-async def get_conference_keyboard(conferences: List[str], has_data: bool = True) -> InlineKeyboardMarkup:
-    """Клавиатура выбора конференции"""
+def get_form_back_keyboard(back_to: str) -> InlineKeyboardMarkup:
+    """Универсальная клавиатура для форм"""
     builder = InlineKeyboardBuilder()
-
-    for conf in conferences:
-        builder.row(InlineKeyboardButton(text=f"{conf}", callback_data=f"travel_conf_{conf}"))
-
     builder.row(
-        InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu"),
+        InlineKeyboardButton(text="◀️ Back", callback_data=back_to),
         InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")
     )
     return builder.as_markup()
 
 
-def get_conference_back_keyboard(conference: str) -> InlineKeyboardMarkup:
-    """Клавиатура после выбора конференции (только для рейсов)"""
+def get_baggage_keyboard(back_callback: str = "visa_back_step3") -> InlineKeyboardMarkup:
+    """Клавиатура выбора багажа"""
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="◀️ Back", callback_data="travel_flight_info"),
-        InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")
+        InlineKeyboardButton(text="✅ Yes", callback_data="baggage_yes"),
+        InlineKeyboardButton(text="❌ No", callback_data="baggage_no")
     )
-    return builder.as_markup()
-
-
-def get_hotel_menu_keyboard() -> InlineKeyboardMarkup:
-    """Меню выбора отеля"""
-    builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu"),
-        InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")
-    )
-    return builder.as_markup()
-
-
-def get_hotel_back_keyboard(conference: str) -> InlineKeyboardMarkup:
-    """Клавиатура для возврата из информации об отеле"""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text="◀️ Back", callback_data="travel_hotel_info"),
-        InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")
+        InlineKeyboardButton(text="◀️ Back", callback_data=back_callback)
     )
     return builder.as_markup()
 
@@ -153,38 +164,38 @@ def get_visa_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def get_baggage_keyboard(back_callback: str = "visa_back_step3") -> InlineKeyboardMarkup:
-    """Клавиатура выбора багажа"""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text="✅ Yes", callback_data="baggage_yes"),
-        InlineKeyboardButton(text="❌ No", callback_data="baggage_no")
-    )
-    builder.row(
-        InlineKeyboardButton(text="◀️ Back", callback_data=back_callback)
-    )
-    return builder.as_markup()
-
-
-def get_form_back_keyboard(back_to: str) -> InlineKeyboardMarkup:
-    """Универсальная клавиатура для форм"""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text="◀️ Back", callback_data=back_to),
-        InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")
-    )
-    return builder.as_markup()
-
-
 # ============================================
-# ТЕКСТОВЫЕ ШАБЛОНЫ (ТОЛЬКО АНГЛИЙСКИЕ)
+# ТЕКСТЫ
 # ============================================
 
 TEXTS = {
     'welcome': "✈️ TRAVEL Section\n\nChoose an option:",
-    'flight_choose': "Select the event you are going to:",
-    'flight_no_data': "It seems that no information has been found about you 👀\n\nPlease contact travel manager for assistance.",
-    'hotel_no_data': "Accommodation information not found for this conference.",
+    'visa_support': "🛂 Visa Support\n\nChoose your status:",
+    'visa_instructions': '''📋 *Visa Application Instructions* ...''',
+    'flight_form': "✈️ Flight Ticket Request\n\nStep {step}\n{question}",
+    'passport_consent': "📋 **Data Storage Consent**\n\nDo you allow us to store your passport data for future bookings within 6 months?",
+    'hotel_question': "🏨 **Hotel needed?**\n\nWill you need a hotel for this conference?\n\n*Note:* Company does not reimburse independent bookings or +1 accompanying persons.",
+    'flight_choice': "✈️ **Choose your flight**\n\nPlease select the most convenient flight:",
+    'form_complete': '''✅ **Request submitted successfully!**
+
+📋 *Next steps:*
+• Check Telegram notifications for updates
+• If visa needed: start document collection
+• Monitor email for ticket confirmations
+• Click 'My Requests' to check status
+
+⏰ *Expected timeline:*
+• Flight tickets: 1-3 business days
+• Visa processing: 5-10 business days
+• Hotel booking: 2-4 business days
+
+_Our travel team will contact you soon._''',
+    'per_diem_consent': "📝 Confirmation\n\nI consent to the processing of personal data",
+    'per_diem_success': '''✅ **Daily allowance request submitted!**
+
+Thank you for your request. Our finance team will process your payment details and contact you if additional information is needed.
+
+For questions, contact our travel team via bot.''',
     'hotel_info': '''🏨 *{hotel_name}*
 
 📍 _{hotel_address}_
@@ -212,976 +223,374 @@ Checked: {luggage} kg
 🛩️ Airline: *{airline}*
 
 ''',
-    'registration_info': '''📌 *Check-in*
-
-You can check in for your flight *24 hours before departure* using this link:''',
-    'registration_airline': '''*{airline}*: {checkin_url}
-''',
-    'final_text': '''If an *email* is requested: travel@conference.com
-
-_I wish you a great flight and productive business trip!_ 🔥''',
-    'visa_support': '''🛂 Visa Support
-
-Choose your status:''',
-    'visa_instructions': '''📋 Visa Application Instructions:
-
-1. Prepare documents:
-   • Passport (valid for at least 6 months)
-   • 2 passport photos
-   • Conference invitation
-   • Employment certificate
-   • Bank statement
-
-2. Recommended agencies:
-   • VisaMaster: +7 (999) 111-11-11
-   • TravelDocs: +7 (999) 222-22-22
-
-⚠️ Conference organizers are not responsible for agency services.
-
-3. After receiving visa, update your status below:''',
-    'per_diem': '''💰 Per Diem
-
-Information about per diem payments will be available closer to the conference date.
-
-For questions, contact: finance@conference.com''',
-    'question': '''❓ Question to Travel Manager
-
-✉️ Email: travel@conference.com
-📱 Telegram: @travel_manager
-
-We respond within 24 hours.''',
-    'useful_info': '''🛩️ Useful Information
-
-• Arrive at airport 3 hours before check-in
-• Keep your passport and booking reference handy
-• Download airline's mobile app for updates
-
-Popular taxi services:
-• Asia: Grab, Bolt, Gojek
-• Europe: Uber, Bolt, Free Now
-• USA: Uber, Lyft''',
-    'flight_form': '''✈️ Flight Ticket Request
-
-Step {step} of 5
-{question}''',
-    'form_complete': '''✅ Flight request submitted!
-
-Thank you for your request. Our travel team will contact you within 24 hours to discuss details.''',
-    'hotel_booking': '''🏨 Hotel Information
-
-Hotel booking is managed by our travel team. You will receive confirmation 2 weeks before the conference.
-
-For urgent inquiries, contact: hotels@conference.com'''
+    'registration_info': "📌 *Check-in*\n\nYou can check in for your flight *24 hours before departure* using this link:\n",
+    'registration_airline': "*{airline}*: {checkin_url}\n",
+    'final_text': "\n_Wish you a great flight!_ 🔥",
 }
 
 
 # ============================================
-# ОСНОВНЫЕ ОБРАБОТЧИКИ МЕНЮ
+# ГЛАВНОЕ МЕНЮ
 # ============================================
 
 @router.callback_query(F.data == "menu_travel")
 async def show_travel_menu(callback: CallbackQuery, state: FSMContext):
-    """Показать главное меню Travel"""
     await state.set_state(TravelStates.english)
-    keyboard = get_travel_menu_keyboard()
     await callback.message.edit_text(
-        TEXTS['welcome'],
-        reply_markup=keyboard
+        await t(callback.from_user.id, 'travel_welcome'),
+        reply_markup=await get_travel_menu_keyboard(callback.from_user.id)
     )
 
 
 @router.callback_query(F.data == "travel_back_to_menu")
 async def back_to_travel_menu(callback: CallbackQuery, state: FSMContext):
-    """Вернуться в главное меню Travel"""
     await state.set_state(TravelStates.english)
-    keyboard = get_travel_menu_keyboard()
     await callback.message.edit_text(
-        TEXTS['welcome'],
-        reply_markup=keyboard
+        await t(callback.from_user.id, 'travel_welcome'),
+        reply_markup=await get_travel_menu_keyboard(callback.from_user.id)
     )
 
 
 # ============================================
-# FLIGHT INFORMATION (информация о рейсах)
+# FLIGHT INFO (Информация о рейсах)
 # ============================================
 
 @router.callback_query(F.data == "travel_flight_info")
 async def show_flight_info(callback: CallbackQuery):
-    """Показать информацию о рейсах"""
     username = callback.from_user.username
 
     if not username:
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu")]
-        ])
         await callback.message.edit_text(
-            "Please set up your Telegram username first in Settings → Username",
-            reply_markup=keyboard
+            "Please set your Telegram username first.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu")]
+            ])
         )
         return
 
-    try:
-        print(f"Fetching conferences for username: {username}")
+    conferences = await db.get_user_active_conferences(username)
 
-        # Получаем конференции пользователя из whitelist
-        conferences = await db.get_user_active_conferences(username)
-
-        if not conferences:
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu"),
-                 InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")]
+    if not conferences:
+        await callback.message.edit_text(
+            "No conferences found for your account.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu")]
             ])
-            await callback.message.edit_text(
-                "No conferences found for your account. Please contact your manager.",
-                reply_markup=keyboard
-            )
-            return
-
-        # Создаем клавиатуру с конференциями пользователя
-        builder = InlineKeyboardBuilder()
-        for conf in conferences:
-            builder.row(InlineKeyboardButton(text=f"📅 {conf}", callback_data=f"travel_conf_{conf}"))
-
-        builder.row(
-            InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu"),
-            InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")
         )
+        return
 
-        await callback.message.edit_text(
-            "Select the conference you are attending:",
-            reply_markup=builder.as_markup(),
-            parse_mode=ParseMode.MARKDOWN
-        )
+    builder = InlineKeyboardBuilder()
+    for conf in conferences:
+        conf_name = conf.get('conference_name', '')
+        safe_conf_name = conf_name.replace(' ', '_').replace('-', '_')
+        display_text = f"📅 {conf_name}"
+        if conf.get('city'):
+            display_text += f" ({conf['city']})"
+        builder.row(InlineKeyboardButton(
+            text=display_text,
+            callback_data=f"travel_conf_info_{safe_conf_name}"
+        ))
+    builder.row(
+        InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu"),
+        InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")
+    )
 
-    except Exception as e:
-        logger.error(f"Error getting flight info: {e}")
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu"),
-             InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")]
-        ])
-        await callback.message.edit_text(
-            "Error fetching conference data. Please try again later.",
-            reply_markup=keyboard
-        )
+    await callback.message.edit_text("Select the conference:", reply_markup=builder.as_markup())
 
 
-@router.callback_query(F.data.startswith("travel_conf_"))
-async def show_conference_details(callback: CallbackQuery, state: FSMContext):
-    """Показать детали рейсов для выбранной конференции"""
-    conference = callback.data.split('travel_conf_')[1]
+@router.callback_query(F.data.startswith("travel_conf_info_"))
+async def show_conference_flights(callback: CallbackQuery):
+    # Декодируем название конференции
+    encoded_conf = callback.data.replace("travel_conf_info_", "")
+    conference = encoded_conf.replace('_', ' ')
     username = callback.from_user.username
 
-    try:
-        # Получаем рейсы для конференции из схемы travel_bot
-        flights = await db.get_flight_details_travel(username, conference)
+    flights = await db.get_flight_details_travel(username, conference)
 
-        if not flights:
-            text = TEXTS['flight_no_data']
-        else:
-            # Формируем текст с информацией о рейсах
-            text = ""
-            for i, flight in enumerate(flights, 1):
-                text += TEXTS['flight_info'].format(
-                    fl_num=i,
-                    flight_number=flight.get('flight_number', 'N/A'),
-                    book_number=flight.get('book_number', 'N/A'),
-                    departure_from=flight.get('departure_from', 'N/A'),
-                    arrival_city=flight.get('arrival_city', 'N/A'),
-                    departure_date=flight.get('departure_date', 'N/A'),
-                    departure_time=flight.get('departure_time', 'N/A'),
-                    arrival_time=flight.get('arrival_time', 'N/A'),
-                    airline=flight.get('airline', 'N/A'),
-                    carry_luggage=flight.get('carry_luggage', 'N/A'),
-                    luggage=flight.get('luggage', 'N/A')
-                )
+    if not flights:
+        text = "No flight information found for this conference."
+    else:
+        text = ""
+        for i, flight in enumerate(flights, 1):
+            text += TEXTS['flight_info'].format(
+                fl_num=i,
+                flight_number=flight.get('flight_number', 'N/A'),
+                book_number=flight.get('book_number', 'N/A'),
+                departure_from=flight.get('departure_from', 'N/A'),
+                arrival_city=flight.get('arrival_city', 'N/A'),
+                departure_date=flight.get('departure_date', 'N/A'),
+                departure_time=flight.get('departure_time', 'N/A'),
+                arrival_time=flight.get('arrival_time', 'N/A'),
+                airline=flight.get('airline', 'N/A'),
+                carry_luggage=flight.get('carry_luggage', 'N/A'),
+                luggage=flight.get('luggage', 'N/A')
+            )
 
-            # Добавляем информацию о регистрации
-            text += "\n" + TEXTS['registration_info'] + "\n\n"
+        text += "\n" + TEXTS['registration_info'] + "\n"
+        airlines = set([f.get('airline') for f in flights if f.get('airline')])
+        for airline in airlines:
+            checkin_url = await db.get_airline_url_travel(airline) or "https://checkin.airline.com"
+            text += TEXTS['registration_airline'].format(airline=airline, checkin_url=checkin_url)
+        text += TEXTS['final_text']
 
-            # Добавляем ссылки на авиакомпании
-            airlines = set([f.get('airline') for f in flights if f.get('airline')])
-            for airline in airlines:
-                checkin_url = await db.get_airline_url_travel(airline)
-                if not checkin_url:
-                    checkin_url = "https://checkin.airline.com"
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Back", callback_data="travel_flight_info")],
+        [InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")]
+    ])
 
-                airline_escaped = escape_markdown(airline or "Airline")
-                url_escaped = escape_markdown(checkin_url)
-
-                text += TEXTS['registration_airline'].format(
-                    airline=airline_escaped,
-                    checkin_url=url_escaped
-                )
-
-            text += "\n" + TEXTS['final_text']
-
-        # Получаем клавиатуру
-        keyboard = get_conference_back_keyboard(conference)
-
-        await callback.message.edit_text(
-            text,
-            reply_markup=keyboard,
-            parse_mode=ParseMode.MARKDOWN
-        )
-
-        # Сохраняем конференцию в состоянии для кнопки "Отель"
-        await state.update_data(selected_conference=conference)
-
-    except Exception as e:
-        logger.error(f"Error showing conference flights: {e}")
-        await callback.message.edit_text(
-            "Error loading flight details. Please try again.",
-            reply_markup=get_conference_back_keyboard(conference)
-        )
-
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
 
 # ============================================
-# HOTEL INFORMATION (информация об отеле)
+# HOTEL INFO (Информация об отеле)
 # ============================================
 
-async def get_hotel_conference_keyboard(conferences: List[str]) -> InlineKeyboardMarkup:
-    """Клавиатура выбора конференции для отеля"""
+@router.callback_query(F.data == "travel_hotel_info")
+async def show_hotel_menu(callback: CallbackQuery):
+    username = callback.from_user.username
+
+    if not username:
+        await callback.message.edit_text(
+            "Please set your Telegram username first.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu")]
+            ])
+        )
+        return
+
+    conferences = await db.get_user_active_conferences(username)
+
+    if not conferences:
+        await callback.message.edit_text(
+            "No conferences found.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu")]
+            ])
+        )
+        return
+
     builder = InlineKeyboardBuilder()
-
     for conf in conferences:
-        builder.row(InlineKeyboardButton(text=f"{conf}", callback_data=f"travel_hotel_{conf}"))
+        # Используем conference_name для отображения, но для callback используем ID или кодируем название
+        conf_name = conf.get('conference_name', '')
+        if conf.get('city'):
+            display_text = f"🏨 {conf_name} ({conf['city']})"
+        else:
+            display_text = f"🏨 {conf_name}"
+
+        # Кодируем название для callback (заменяем пробелы и спецсимволы)
+        safe_conf_name = conf_name.replace(' ', '_').replace('-', '_')
+        builder.row(InlineKeyboardButton(
+            text=display_text,
+            callback_data=f"travel_hotel_{safe_conf_name}"
+        ))
 
     builder.row(
         InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu"),
         InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")
     )
-    return builder.as_markup()
 
-
-@router.callback_query(F.data == "travel_hotel_info")
-async def show_hotel_menu(callback: CallbackQuery):
-    """Показать меню выбора конференции для отеля"""
-    username = callback.from_user.username
-
-    if not username:
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu")]
-        ])
-        await callback.message.edit_text(
-            "Please set up your Telegram username first in Settings → Username",
-            reply_markup=keyboard
-        )
-        return
-
-    try:
-        # Получаем конференции пользователя из whitelist
-        conferences = await db.get_user_active_conferences(username)
-
-        if not conferences:
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu"),
-                 InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")]
-            ])
-            await callback.message.edit_text(
-                "No conferences found for your account.",
-                reply_markup=keyboard
-            )
-            return
-
-        # Создаем клавиатуру с конференциями
-        builder = InlineKeyboardBuilder()
-        for conf in conferences:
-            builder.row(InlineKeyboardButton(text=f"🏨 {conf}", callback_data=f"travel_hotel_{conf}"))
-
-        builder.row(
-            InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu"),
-            InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")
-        )
-
-        await callback.message.edit_text(
-            "🏨 Hotel Information\n\nSelect the conference:",
-            reply_markup=builder.as_markup(),
-            parse_mode=ParseMode.MARKDOWN
-        )
-
-    except Exception as e:
-        logger.error(f"Error getting hotel conferences: {e}")
-        await callback.message.edit_text(
-            "Error loading hotel information.",
-            reply_markup=get_hotel_menu_keyboard()
-        )
+    await callback.message.edit_text("🏨 Hotel Information\n\nSelect the conference:", reply_markup=builder.as_markup())
 
 
 @router.callback_query(F.data.startswith("travel_hotel_"))
 async def show_hotel_details(callback: CallbackQuery):
-    """Показать детали отеля для конференции"""
-    conference = callback.data.split('travel_hotel_')[1]
+    # Декодируем название конференции
+    encoded_conf = callback.data.replace("travel_hotel_", "")
+    conference = encoded_conf.replace('_', ' ')
 
-    try:
-        # Получаем информацию об отеле из схемы travel_bot
-        hotel_data = await db.get_hotel_info_travel(conference)
+    hotel_data = await db.get_hotel_info_travel(conference)
 
-        if hotel_data and hotel_data.get('hotel'):
-            text = TEXTS['hotel_info'].format(
-                hotel_name=hotel_data.get('hotel', 'Hotel'),
-                hotel_address=hotel_data.get('address', 'Address not specified'),
-                hotel_link=hotel_data.get('site', ''),
-                conference=conference
-            )
-        else:
-            text = TEXTS['hotel_no_data']
-
-        keyboard = get_hotel_back_keyboard(conference)
-
-        await callback.message.edit_text(
-            text,
-            reply_markup=keyboard,
-            parse_mode=ParseMode.MARKDOWN
+    if hotel_data and hotel_data.get('hotel'):
+        text = TEXTS['hotel_info'].format(
+            hotel_name=hotel_data.get('hotel', 'Hotel'),
+            hotel_address=hotel_data.get('address', 'Address not specified'),
+            hotel_link=hotel_data.get('site', ''),
+            conference=conference
         )
+    else:
+        text = "Accommodation information not found for this conference."
 
-    except Exception as e:
-        logger.error(f"Error showing hotel info: {e}")
-        await callback.message.edit_text(
-            "Error loading hotel information.",
-            reply_markup=get_hotel_back_keyboard(conference)
-        )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Back", callback_data="travel_hotel_info")],
+        [InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")]
+    ])
 
+    await callback.message.edit_text(text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
 
 # ============================================
-# VISA SUPPORT (визовая поддержка)
+# VISA SUPPORT (Визовая поддержка)
 # ============================================
 
 @router.callback_query(F.data == "travel_visa_support")
 async def show_visa_support(callback: CallbackQuery):
-    """Показать меню визовой поддержки"""
-    keyboard = get_visa_keyboard()
-
+    user_id = callback.from_user.id
     await callback.message.edit_text(
-        TEXTS['visa_support'],
-        reply_markup=keyboard
+        await t(user_id, 'visa_support_title'),
+        reply_markup=get_visa_keyboard()
     )
 
 
 @router.callback_query(F.data.startswith("visa_"))
 async def process_visa_status(callback: CallbackQuery, state: FSMContext):
-    """Обработать выбор статуса визы"""
     visa_status = callback.data.replace("visa_", "")
 
     if visa_status == "not_have":
-        # ИНСТРУКЦИИ ПО ПОЛУЧЕНИЮ ВИЗЫ (ПОЛНАЯ ВЕРСИЯ)
+        # Вопрос о помощи с билетами
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔄 Обновить статус визы", callback_data="visa_update_status")],
+            [InlineKeyboardButton(text="✅ Да, нужна помощь", callback_data="visa_need_help")],
+            [InlineKeyboardButton(text="🛒 Я купил всё сам", callback_data="visa_bought_myself")],
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="travel_visa_support")]
+        ])
+
+        await callback.message.edit_text(
+            "🛂 Visa Support\n\nDo you need help from travel manager with ticket purchase or hotel booking?",
+            reply_markup=keyboard
+        )
+    elif visa_status == "have":
+        await state.update_data(visa_status="have")
+        await state.set_state(TravelStates.waiting_for_passport_consent)
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Confirm data storage", callback_data="passport_consent_yes")],
+            [InlineKeyboardButton(text="❌ Don't store", callback_data="passport_consent_no")],
             [InlineKeyboardButton(text="◀️ Back", callback_data="travel_visa_support")]
         ])
 
-        visa_instructions = '''📋 *Visa Application Instructions*
-
-    1️⃣ *Required documents:*
-       • Passport (valid at least 6 months)
-       • 2 passport-size photos (3.5x4.5 cm, white background)
-       • Conference invitation (we'll provide)
-       • Employment certificate with salary
-       • Bank statement (last 3 months, min $1000 balance)
-       • Hotel booking confirmation
-       • Flight itinerary
-       • Medical insurance ($50,000+ coverage)
-       • Visa application form
-
-    2️⃣ *Checklist before submission:*
-       ☐ All documents translated to English
-       ☐ Copies of passport pages (1-3, last page)
-       ☐ Photos meet requirements
-       ☐ Bank statement stamped
-       ☐ Hotel booking matches conference dates
-
-    3️⃣ *Recommended agencies:*
-       • VisaMaster: +7 (999) 111-11-11 (5-7 business days)
-       • TravelDocs: +7 (999) 222-22-22 (express service available)
-       • QuickVisa: +7 (999) 333-33-33 (premium service)
-
-    ⚠️ *Disclaimer:*
-    Conference organizers are not responsible for:
-    • Agency service quality/timing
-    • Visa approval/rejection decisions
-    • Additional fees charged by agencies
-
-    4️⃣ *After receiving visa:*
-    • Check visa dates match your travel
-    • Ensure name spelling is correct
-    • Click "Update visa status" below'''
-
         await callback.message.edit_text(
-            visa_instructions,
+            TEXTS['passport_consent'],
             reply_markup=keyboard,
             parse_mode=ParseMode.MARKDOWN
         )
     else:
-        # Начинаем форму запроса билета
-        await state.set_state(TravelStates.waiting_for_passport)
-        await state.update_data(visa_status=visa_status)
+        await callback.message.edit_text("Special case processing...",
+                                         reply_markup=get_form_back_keyboard("travel_visa_support"))
 
-        keyboard = get_form_back_keyboard("travel_visa_support")
 
-        await callback.message.edit_text(
-            TEXTS['flight_form'].format(
-                step=1,
-                question="Please provide passport details for ticket booking:"
-            ),
-            reply_markup=keyboard
-        )
+@router.callback_query(F.data == "visa_need_help")
+async def visa_need_help(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(visa_status="not_have", needs_help=True)
+    await state.set_state(TravelStates.waiting_for_passport_consent)
 
-@router.callback_query(F.data == "visa_update_status")
-async def update_visa_status_form(callback: CallbackQuery, state: FSMContext):
-    """Форма обновления статуса визы"""
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Visa received", callback_data="visa_received")],
-        [InlineKeyboardButton(text="⏳ Still waiting", callback_data="visa_waiting")],
-        [InlineKeyboardButton(text="❌ Visa rejected", callback_data="visa_rejected")],
+        [InlineKeyboardButton(text="✅ Confirm data storage", callback_data="passport_consent_yes")],
+        [InlineKeyboardButton(text="❌ Don't store", callback_data="passport_consent_no")],
         [InlineKeyboardButton(text="◀️ Back", callback_data="travel_visa_support")]
     ])
 
     await callback.message.edit_text(
-        "🔄 *Update Visa Status*\n\n"
-        "Please select your current visa status:",
+        TEXTS['passport_consent'],
         reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
 
 
-@router.callback_query(F.data.startswith("visa_"))
-async def process_visa_update(callback: CallbackQuery):
-    """Обработка обновления статуса визы"""
-    status_map = {
-        "visa_received": "✅ Visa received",
-        "visa_waiting": "⏳ Still waiting",
-        "visa_rejected": "❌ Visa rejected"
+@router.callback_query(F.data == "visa_bought_myself")
+async def visa_bought_myself(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(visa_status="not_have", needs_help=False)
+
+    visa_data = {
+        'username': callback.from_user.username,
+        'user_id': callback.from_user.id,
+        'visa_status': "not_have",
+        'needs_help': False,
+        'passport_data': '-',
+        'city_from': '-',
+        'city_to': '-',
+        'needs_baggage': False,
+        'preferences': 'User booked independently'
     }
-
-    status_text = status_map.get(callback.data, "Unknown")
-
-    # Сохраняем в БД
-    await db.log_user_action(
-        user_id=callback.from_user.id,
-        username=callback.from_user.username,
-        action="visa_status_updated",
-        details={"new_status": callback.data.replace("visa_", "")}
-    )
+    await db.save_visa_request(visa_data)
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✈️ Continue with flight request", callback_data="travel_visa_support")],
         [InlineKeyboardButton(text="◀️ Back to Travel", callback_data="travel_back_to_menu")]
     ])
 
     await callback.message.edit_text(
-        f"✅ *Status updated:* {status_text}\n\n"
-        f"Thank you for updating your visa status. "
-        f"This information helps our travel team assist you better.",
-        reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
+        "✅ Thank you for the information!\n\n"
+        "Great that you've organized your travel independently.\n"
+        "If you have questions, contact travel team.",
+        reply_markup=keyboard
     )
+    await state.clear()
 
 
-@router.callback_query(F.data == "travel_my_requests")
-async def show_my_travel_requests(callback: CallbackQuery):
-    """Показать статусы заявок пользователя"""
-    username = callback.from_user.username
+@router.callback_query(F.data.startswith("passport_consent_"))
+async def process_passport_consent(callback: CallbackQuery, state: FSMContext):
+    consent = callback.data == "passport_consent_yes"
+    await state.update_data(store_passport_data=consent)
 
-    try:
-        # Получаем статусы
-        visa_status = await db.get_travel_request_status(username, "visa")
-        flight_status = await db.get_travel_request_status(username, "flight")
+    # Проверяем, есть ли сохраненные данные пользователя
+    user_id = callback.from_user.id
+    stored_data = await db.get_stored_passport_data(user_id) if consent else None
 
-        status_text = "📋 *Your Travel Requests*\n\n"
-
-        # Visa request
-        if visa_status["status"] == "pending":
-            status_text += f"🛂 *Visa Support:* ⏳ Processing\n"
-            status_text += f"   Submitted: {visa_status['submitted']}\n\n"
-        elif visa_status["status"] == "no_requests":
-            status_text += f"🛂 *Visa Support:* 📝 No requests yet\n\n"
-
-        # Flight request
-        if flight_status["status"] == "pending":
-            status_text += f"✈️ *Flight Request:* ⏳ Processing\n"
-            status_text += f"   Submitted: {flight_status['submitted']}\n\n"
-        elif flight_status["status"] == "no_requests":
-            status_text += f"✈️ *Flight Request:* 📝 No requests yet\n\n"
-
-        status_text += "\n_You will receive notifications when status changes._"
-
+    if stored_data and consent:
+        # Предлагаем использовать сохраненные данные
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔄 Check again", callback_data="travel_my_requests")],
-            [InlineKeyboardButton(text="📝 New request", callback_data="travel_visa_support")],
-            [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu")]
+            [InlineKeyboardButton(text="✅ Use saved data", callback_data="use_saved_passport")],
+            [InlineKeyboardButton(text="✏️ Enter new data", callback_data="enter_new_passport")],
+            [InlineKeyboardButton(text="◀️ Back", callback_data="travel_visa_support")]
         ])
 
         await callback.message.edit_text(
-            status_text,
+            "📋 **Saved passport data found**\n\n"
+            f"Name: {stored_data.get('first_name')} {stored_data.get('last_name')}\n"
+            f"Passport: {stored_data.get('passport_number')}\n\n"
+            "Use saved data?",
             reply_markup=keyboard,
             parse_mode=ParseMode.MARKDOWN
         )
-
-    except Exception as e:
-        logger.error(f"Error showing travel requests: {e}")
+    else:
+        await state.set_state(TravelStates.waiting_for_first_name)
+        keyboard = get_form_back_keyboard("travel_visa_support")
         await callback.message.edit_text(
-            "❌ Error loading your requests. Please try again.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu")]
-            ])
-        )
-
-# ============================================
-# FLIGHT REQUEST FORM (форма запроса билета)
-# ============================================
-
-@router.message(TravelStates.waiting_for_passport)
-async def process_passport(message: Message, state: FSMContext):
-    """Обработать паспортные данные"""
-    await state.update_data(passport_data=message.text)
-    await state.set_state(TravelStates.waiting_for_city_from)
-
-    keyboard = get_form_back_keyboard("travel_visa_support")
-
-    await message.answer(
-        TEXTS['flight_form'].format(
-            step=2,
-            question="Departure city:"
-        ),
-        reply_markup=keyboard
-    )
-
-
-@router.message(TravelStates.waiting_for_city_from)
-async def process_city_from(message: Message, state: FSMContext):
-    """Обработать город отправления"""
-    await state.update_data(city_from=message.text)
-    await state.set_state(TravelStates.waiting_for_city_to)
-
-    keyboard = get_form_back_keyboard("visa_back_step2")
-
-    await message.answer(
-        TEXTS['flight_form'].format(
-            step=3,
-            question="Destination city:"
-        ),
-        reply_markup=keyboard
-    )
-
-
-@router.message(TravelStates.waiting_for_city_to)
-async def process_city_to(message: Message, state: FSMContext):
-    """Обработать город назначения"""
-    await state.update_data(city_to=message.text)
-    await state.set_state(TravelStates.waiting_for_baggage)
-
-    keyboard = get_baggage_keyboard("visa_back_step3")
-
-    await message.answer(
-        TEXTS['flight_form'].format(
-            step=4,
-            question="Do you need checked baggage?"
-        ),
-        reply_markup=keyboard
-    )
-
-
-@router.callback_query(F.data.startswith("baggage_"), TravelStates.waiting_for_baggage)
-async def process_baggage(callback: CallbackQuery, state: FSMContext):
-    """Обработать выбор багажа"""
-    needs_baggage = callback.data == "baggage_yes"
-    await state.update_data(needs_baggage=needs_baggage)
-    await state.set_state(TravelStates.waiting_for_preferences)
-
-    keyboard = get_form_back_keyboard("visa_back_step4")
-
-    await callback.message.edit_text(
-        TEXTS['flight_form'].format(
-            step=5,
-            question="Any preferences (dates, times, airlines, etc.):"
-        ),
-        reply_markup=keyboard
-    )
-
-
-@router.message(TravelStates.waiting_for_preferences)
-async def process_preferences(message: Message, state: FSMContext):
-    """Обработка предпочтений и сохранение заявки"""
-    await state.update_data(preferences=message.text)
-    data = await state.get_data()
-
-    # Сохраняем в БД
-    flight_data = {
-        'username': message.from_user.username,
-        'user_id': message.from_user.id,
-        'visa_status': data.get('visa_status'),
-        'passport_data': data.get('passport_data'),
-        'city_from': data.get('city_from'),
-        'city_to': data.get('city_to'),
-        'needs_baggage': data.get('needs_baggage', False),
-        'preferences': data.get('preferences')
-    }
-
-    if await db.save_visa_request(flight_data):
-        # ОТПРАВЛЯЕМ ЧЕК-ЛИСТ ПОСЛЕ ОТПРАВКИ
-        checklist = (
-            "✅ *Request submitted successfully!*\n\n"
-            "📋 *Next steps checklist:*\n"
-            "1. Check your Telegram notifications for updates\n"
-            "2. If you need visa: start document collection\n"
-            "3. Monitor email for ticket confirmations\n"
-            "4. Click 'My Requests' to check status\n\n"
-            "⏰ *Expected timeline:*\n"
-            "• Flight tickets: 1-3 business days\n"
-            "• Visa processing: 5-10 business days\n"
-            "• Hotel booking: 2-4 business days\n\n"
-            "_Our travel team will contact you soon._"
-        )
-
-        await message.answer(
-            checklist,
-            parse_mode=ParseMode.MARKDOWN
-        )
-
-        # Логируем действие
-        await db.log_user_action(
-            user_id=message.from_user.id,
-            username=message.from_user.username,
-            action="flight_request_submitted",
-            details={"conference": "flight_request"}
-        )
-    else:
-        await message.answer("❌ Error saving request. Please try again later.")
-
-    await state.clear()
-
-
-# ============================================
-# PER DIEM (суточные)
-# ============================================
-
-@router.callback_query(F.data == "travel_per_diem")
-async def start_per_diem_form(callback: CallbackQuery, state: FSMContext):
-    """Начало формы суточных по ТЗ"""
-    await state.set_state(TravelStates.waiting_for_per_diem_payment)
-    keyboard = get_form_back_keyboard("travel_back_to_menu")
-
-    await callback.message.edit_text(
-        "💰 Per Diem Form\n\n"
-        "Step 1 of 4\n"
-        "Specify payment details (IBAN/card number/method) / "
-        "Укажи реквизиты для выплаты (IBAN/номер карты/способ):",
-        reply_markup=keyboard
-    )
-
-
-@router.message(TravelStates.waiting_for_per_diem_payment)
-async def process_per_diem_payment(message: Message, state: FSMContext):
-    """Шаг 1: Реквизиты для выплаты"""
-    await state.update_data(payment_details=message.text)
-    await state.set_state(TravelStates.waiting_for_per_diem_currency)
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="USD", callback_data="currency_usd")],
-        [InlineKeyboardButton(text="EUR", callback_data="currency_eur")],
-        [InlineKeyboardButton(text="RUB", callback_data="currency_rub")],
-        [InlineKeyboardButton(text="AED", callback_data="currency_aed")],
-        [InlineKeyboardButton(text="◀️ Back", callback_data="back_to_per_diem_start")]
-    ])
-
-    await message.answer(
-        "Step 2 of 4\n"
-        "Specify required currency / Укажи необходимую валюту:",
-        reply_markup=keyboard
-    )
-
-
-@router.callback_query(F.data.startswith("currency_"), TravelStates.waiting_for_per_diem_currency)
-async def process_per_diem_currency(callback: CallbackQuery, state: FSMContext):
-    """Шаг 2: Выбор валюты"""
-    currency = callback.data.replace("currency_", "").upper()
-    await state.update_data(currency=currency)
-    await state.set_state(TravelStates.waiting_for_per_diem_comments)
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Skip / Пропустить", callback_data="skip_comments")],
-        [InlineKeyboardButton(text="◀️ Back", callback_data="back_to_per_diem_payment")]
-    ])
-
-    await callback.message.edit_text(
-        "Step 3 of 4\n"
-        "Additional comments / Дополнительные комментарии "
-        "(or click 'Skip'):",
-        reply_markup=keyboard
-    )
-
-
-@router.message(TravelStates.waiting_for_per_diem_comments)
-async def process_per_diem_comments(message: Message, state: FSMContext):
-    """Шаг 3: Комментарии"""
-    await state.update_data(comments=message.text)
-    await state.set_state(TravelStates.waiting_for_per_diem_consent)
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ I consent / Даю согласие", callback_data="per_diem_consent")],
-        [InlineKeyboardButton(text="◀️ Back", callback_data="back_to_per_diem_currency")]
-    ])
-
-    await message.answer(
-        "Step 4 of 4\n\n"
-        "✅ I consent to the processing of personal data / "
-        "✅ Даю согласие на обработку персональных данных\n\n"
-        "Please confirm your consent:",
-        reply_markup=keyboard
-    )
-
-
-@router.callback_query(F.data == "skip_comments")
-async def skip_per_diem_comments(callback: CallbackQuery, state: FSMContext):
-    """Пропустить комментарии"""
-    await state.update_data(comments="-")
-    await state.set_state(TravelStates.waiting_for_per_diem_consent)
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ I consent / Даю согласие", callback_data="per_diem_consent")],
-        [InlineKeyboardButton(text="◀️ Back", callback_data="back_to_per_diem_currency")]
-    ])
-
-    await callback.message.edit_text(
-        "Step 4 of 4\n\n"
-        "✅ I consent to the processing of personal data / "
-        "✅ Даю согласие на обработку персональных данных\n\n"
-        "Please confirm your consent:",
-        reply_markup=keyboard
-    )
-
-
-@router.callback_query(F.data == "per_diem_consent")
-async def process_per_diem_consent(callback: CallbackQuery, state: FSMContext):
-    """Шаг 4: Подтверждение согласия и сохранение"""
-    data = await state.get_data()
-
-    # Сохраняем в БД
-    per_diem_data = {
-        'username': callback.from_user.username,
-        'user_id': callback.from_user.id,
-        'payment_details': data.get('payment_details'),
-        'currency': data.get('currency'),
-        'comments': data.get('comments', '-'),
-        'consent_given': True
-    }
-
-    # TODO: Вызов метода save_per_diem_request (нужно создать в database.py)
-    # if await db.save_per_diem_request(per_diem_data):
-
-    await callback.message.edit_text(
-        "✅ Per diem request submitted!\n\n"
-        "Thank you for your request. Our finance team will process your payment details "
-        "and contact you if additional information is needed.\n\n"
-        "For questions, contact: finance@conference.com"
-    )
-
-    # Логируем действие
-    await db.log_user_action(
-        user_id=callback.from_user.id,
-        username=callback.from_user.username,
-        action="per_diem_request_submitted",
-        details={"currency": data.get('currency')}
-    )
-
-    await state.clear()
-
-
-@router.callback_query(F.data == "back_to_per_diem_start")
-async def back_to_per_diem_start(callback: CallbackQuery, state: FSMContext):
-    """Назад к началу формы"""
-    await start_per_diem_form(callback, state)
-
-
-@router.callback_query(F.data == "back_to_per_diem_payment")
-async def back_to_per_diem_payment(callback: CallbackQuery, state: FSMContext):
-    """Назад к шагу 1 (реквизиты)"""
-    await state.set_state(TravelStates.waiting_for_per_diem_payment)
-    keyboard = get_form_back_keyboard("travel_back_to_menu")
-
-    await callback.message.edit_text(
-        "Step 1 of 4\n"
-        "Specify payment details (IBAN/card number/method) / "
-        "Укажи реквизиты для выплаты (IBAN/номер карты/способ):",
-        reply_markup=keyboard
-    )
-
-
-@router.callback_query(F.data == "back_to_per_diem_currency")
-async def back_to_per_diem_currency(callback: CallbackQuery, state: FSMContext):
-    """Назад к шагу 2 (валюта)"""
-    data = await state.get_data()
-    await state.set_state(TravelStates.waiting_for_per_diem_currency)
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="USD", callback_data="currency_usd")],
-        [InlineKeyboardButton(text="EUR", callback_data="currency_eur")],
-        [InlineKeyboardButton(text="RUB", callback_data="currency_rub")],
-        [InlineKeyboardButton(text="AED", callback_data="currency_aed")],
-        [InlineKeyboardButton(text="◀️ Back", callback_data="back_to_per_diem_payment")]
-    ])
-
-    await callback.message.edit_text(
-        "Step 2 of 4\n"
-        f"Current selection: {data.get('currency', 'Not selected')}\n"
-        "Specify required currency / Укажи необходимую валюту:",
-        reply_markup=keyboard
-    )
-
-
-# ============================================
-# QUESTION TO MANAGER (вопрос менеджеру)
-# ============================================
-
-@router.callback_query(F.data == "travel_question")
-async def show_question(callback: CallbackQuery, state: FSMContext):
-    """Показать форму вопроса к travel-менеджеру"""
-    await state.set_state(TravelStates.waiting_for_travel_question)
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu")]
-    ])
-
-    await callback.message.edit_text(
-        "❓ Question to Travel Manager\n\n"
-        "Please write your question (max 500 characters):",
-        reply_markup=keyboard
-    )
-
-
-@router.message(TravelStates.waiting_for_travel_question, F.text.len() <= 500)
-async def process_travel_question(message: Message, state: FSMContext):
-    """Обработка вопроса к travel-менеджеру"""
-    question_text = message.text
-    username = message.from_user.username
-    user_id = message.from_user.id
-
-    travel_question_data = {
-        'username': username,
-        'user_id': user_id,
-        'category': 'travel_general',
-        'question': question_text
-    }
-
-    # Сохраняем в БД
-    if await db.save_travel_question(travel_question_data):
-        # Отправляем в чат travel-менеджера
-        await send_question_to_manager(
-            bot=message.bot,  # Используем message.bot
-            manager_chat_id=TRAVEL_MANAGER_CHAT_ID,
-            user_data=travel_question_data,
-            question_text=question_text,
-            question_type="travel"
-        )
-
-        await db.log_user_action(
-            user_id=user_id,
-            username=username,
-            action="travel_question_submitted",
-            details={"data": travel_question_data}
-        )
-
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="◀️ Back to Travel Menu", callback_data="travel_back_to_menu")]
-        ])
-
-        await message.answer(
-            "✅ Question sent!\n\n"
-            "Thank you for your question. Our travel team will contact you soon.",
-            reply_markup=keyboard
-        )
-    else:
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="◀️ Back to Travel Menu", callback_data="travel_back_to_menu")]
-        ])
-        await message.answer(
-            "❌ Error saving question. Please try again later.",
+            "Step 1 of 12\nYour first name as in passport:",
             reply_markup=keyboard
         )
 
-    await state.clear()
+
+@router.callback_query(F.data == "use_saved_passport")
+async def use_saved_passport(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    stored_data = await db.get_stored_passport_data(user_id)
+
+    if stored_data:
+        await state.update_data(**stored_data)
+        await ask_departure_city(callback.message, state)
+    else:
+        await state.set_state(TravelStates.waiting_for_first_name)
+        await callback.message.edit_text("Step 1 of 12\nYour first name as in passport:")
 
 
-@router.message(TravelStates.waiting_for_travel_question, F.text.len() > 500)
-async def process_travel_question_too_long(message: Message):
-    """Вопрос слишком длинный"""
-    await message.answer("❌ Question is too long. Maximum 500 characters.")
-
-
-# ============================================
-# BACK BUTTON HANDLERS (обработчики кнопок назад)
-# ============================================
-
-@router.callback_query(F.data == "visa_back_step2")
-async def back_to_step2(callback: CallbackQuery, state: FSMContext):
-    """Назад к шагу 2"""
-    await state.set_state(TravelStates.waiting_for_passport)
-    keyboard = get_form_back_keyboard("travel_visa_support")
-
-    await callback.message.edit_text(
-        TEXTS['flight_form'].format(
-            step=1,
-            question="Please provide passport details for ticket booking:"
-        ),
-        reply_markup=keyboard
-    )
-
-
-@router.callback_query(F.data == "visa_back_step3")
-async def back_to_step3(callback: CallbackQuery, state: FSMContext):
-    """Назад к шагу 3"""
-    await state.set_state(TravelStates.waiting_for_city_from)
-    keyboard = get_form_back_keyboard("travel_visa_support")
-
-    await callback.message.edit_text(
-        TEXTS['flight_form'].format(
-            step=2,
-            question="Departure city:"
-        ),
-        reply_markup=keyboard
-    )
-
-
-@router.callback_query(F.data == "visa_back_step4")
-async def back_to_step4(callback: CallbackQuery, state: FSMContext):
-    """Назад к шагу 4"""
-    await state.set_state(TravelStates.waiting_for_city_to)
-    keyboard = get_form_back_keyboard("visa_back_step2")
-
-    await callback.message.edit_text(
-        TEXTS['flight_form'].format(
-            step=3,
-            question="Destination city:"
-        ),
-        reply_markup=keyboard
-    )
-
-
-# ============================================
-# FLIGHT REQUEST FORM (полная форма)
-# ============================================
-
-@router.callback_query(F.data == "travel_flight_request")
-async def start_flight_request(callback: CallbackQuery, state: FSMContext):
-    """Начало формы запроса билета"""
+@router.callback_query(F.data == "enter_new_passport")
+async def enter_new_passport(callback: CallbackQuery, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_first_name)
-    keyboard = get_form_back_keyboard("travel_back_to_menu")
+    await callback.message.edit_text("Step 1 of 12\nYour first name as in passport:")
 
-    await callback.message.edit_text(
-        "✈️ Flight Request Form\n\n"
-        "Step 1 of 13\n"
-        "Your first name as in your passport / Ваше имя как в загранпаспорте:",
-        reply_markup=keyboard
-    )
 
+async def ask_departure_city(update: Union[Message, CallbackQuery], state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_departure_from)
+    keyboard = get_form_back_keyboard("travel_visa_support")
+
+    if isinstance(update, Message):
+        await update.answer("Where are you planning to fly from?", reply_markup=keyboard)
+    else:
+        await update.message.edit_text(
+            "Where are you planning to fly from? / Откуда планируете вылетать?",
+            reply_markup=keyboard
+        )
+
+
+# ============================================
+# FLIGHT REQUEST FORM (сбор данных паспорта)
+# ============================================
 
 @router.message(TravelStates.waiting_for_first_name)
 async def process_first_name(message: Message, state: FSMContext):
     await state.update_data(first_name=message.text)
     await state.set_state(TravelStates.waiting_for_last_name)
     await message.answer(
-        "Step 2 of 13\n"
-        "Your last name as in your passport / Ваша фамилия как в загранпаспорте:",
-        reply_markup=get_form_back_keyboard("travel_flight_request")
+        "Step 2 of 12\nYour last name as in passport:",
+        reply_markup=get_form_back_keyboard("travel_visa_support")
     )
 
 
@@ -1190,8 +599,7 @@ async def process_last_name(message: Message, state: FSMContext):
     await state.update_data(last_name=message.text)
     await state.set_state(TravelStates.waiting_for_phone)
     await message.answer(
-        "Step 3 of 13\n"
-        "Your phone number / Ваш номер телефона:",
+        "Step 3 of 12\nYour phone number:",
         reply_markup=get_form_back_keyboard("back_to_first_name")
     )
 
@@ -1201,8 +609,7 @@ async def process_phone(message: Message, state: FSMContext):
     await state.update_data(phone=message.text)
     await state.set_state(TravelStates.waiting_for_passport_number)
     await message.answer(
-        "Step 4 of 13\n"
-        "Passport number / Номер загранпаспорта:",
+        "Step 4 of 12\nPassport number:",
         reply_markup=get_form_back_keyboard("back_to_last_name")
     )
 
@@ -1212,8 +619,7 @@ async def process_passport_number(message: Message, state: FSMContext):
     await state.update_data(passport_number=message.text)
     await state.set_state(TravelStates.waiting_for_birth_date)
     await message.answer(
-        "Step 5 of 13\n"
-        "Date of birth / Дата рождения (DD.MM.YYYY):",
+        "Step 5 of 12\nDate of birth (DD.MM.YYYY):",
         reply_markup=get_form_back_keyboard("back_to_phone")
     )
 
@@ -1223,8 +629,7 @@ async def process_birth_date(message: Message, state: FSMContext):
     await state.update_data(birth_date=message.text)
     await state.set_state(TravelStates.waiting_for_passport_country)
     await message.answer(
-        "Step 6 of 13\n"
-        "Country of passport issuance / Страна выдачи загранпаспорта:",
+        "Step 6 of 12\nCountry of passport issuance:",
         reply_markup=get_form_back_keyboard("back_to_passport_number")
     )
 
@@ -1234,8 +639,7 @@ async def process_passport_country(message: Message, state: FSMContext):
     await state.update_data(passport_country=message.text)
     await state.set_state(TravelStates.waiting_for_issue_date)
     await message.answer(
-        "Step 7 of 13\n"
-        "Passport issue date / Дата выдачи загранпаспорта (DD.MM.YYYY):",
+        "Step 7 of 12\nPassport issue date (DD.MM.YYYY):",
         reply_markup=get_form_back_keyboard("back_to_birth_date")
     )
 
@@ -1245,8 +649,7 @@ async def process_issue_date(message: Message, state: FSMContext):
     await state.update_data(issue_date=message.text)
     await state.set_state(TravelStates.waiting_for_expiry_date)
     await message.answer(
-        "Step 8 of 13\n"
-        "Passport expiration date / Дата окончания срока действия загранпаспорта (DD.MM.YYYY):",
+        "Step 8 of 12\nPassport expiration date (DD.MM.YYYY):",
         reply_markup=get_form_back_keyboard("back_to_passport_country")
     )
 
@@ -1254,12 +657,7 @@ async def process_issue_date(message: Message, state: FSMContext):
 @router.message(TravelStates.waiting_for_expiry_date)
 async def process_expiry_date(message: Message, state: FSMContext):
     await state.update_data(expiry_date=message.text)
-    await state.set_state(TravelStates.waiting_for_departure_from)
-    await message.answer(
-        "Step 9 of 13\n"
-        "Where are you planning to fly to Dubai from? / Откуда планируете вылетать в Дубай?:",
-        reply_markup=get_form_back_keyboard("back_to_issue_date")
-    )
+    await ask_departure_city(message, state)
 
 
 @router.message(TravelStates.waiting_for_departure_from)
@@ -1267,57 +665,91 @@ async def process_departure_from(message: Message, state: FSMContext):
     await state.update_data(departure_from=message.text)
     await state.set_state(TravelStates.waiting_for_return_to)
     await message.answer(
-        "Step 10 of 13\n"
-        "Where are you planning to return from Dubai? / Куда планируете возвращаться из Дубай?:",
-        reply_markup=get_form_back_keyboard("back_to_expiry_date")
+        "Step 10 of 12\nWhere are you planning to return to?",
+        reply_markup=get_form_back_keyboard("back_to_departure_from")
     )
 
 
 @router.message(TravelStates.waiting_for_return_to)
 async def process_return_to(message: Message, state: FSMContext):
     await state.update_data(return_to=message.text)
-    await state.set_state(TravelStates.waiting_for_visa_needed)
+    await state.set_state(TravelStates.waiting_for_baggage)
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Yes", callback_data="visa_yes")],
-        [InlineKeyboardButton(text="❌ No", callback_data="visa_no")],
-        [InlineKeyboardButton(text="◀️ Back", callback_data="back_to_departure_from")]
-    ])
-
+    keyboard = get_baggage_keyboard("back_to_return_to")
     await message.answer(
-        "Step 11 of 13\n"
-        "Do you need a visa to visit UAE? / Нужна ли вам виза для посещения ОАЭ?",
+        "Step 11 of 12\nDo you need checked baggage?",
         reply_markup=keyboard
     )
 
 
-@router.callback_query(F.data.startswith("visa_"), TravelStates.waiting_for_visa_needed)
-async def process_visa_needed(callback: CallbackQuery, state: FSMContext):
-    needs_visa = callback.data == "visa_yes"
-    await state.update_data(needs_visa=needs_visa)
+@router.callback_query(F.data.startswith("baggage_"), TravelStates.waiting_for_baggage)
+async def process_baggage(callback: CallbackQuery, state: FSMContext):
+    needs_baggage = callback.data == "baggage_yes"
+    await state.update_data(needs_baggage=needs_baggage)
+    await state.set_state(TravelStates.waiting_for_hotel_needed)
 
-    await state.set_state(TravelStates.waiting_for_visa_dates)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Yes", callback_data="hotel_needed_yes")],
+        [InlineKeyboardButton(text="❌ No", callback_data="hotel_needed_no")],
+        [InlineKeyboardButton(text="◀️ Back", callback_data="back_to_baggage")]
+    ])
+
     await callback.message.edit_text(
-        "Step 12 of 13\n"
-        "If you have already received a visa, please indicate its start and end dates / "
-        "Если вы уже получили визу, пожалуйста, напишите дату ее начала и окончания "
-        "(или '-' если не применимо):",
-        reply_markup=get_form_back_keyboard("back_to_visa_question")
+        TEXTS['hotel_question'],
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN
     )
-    # else:
-    #     # Пропускаем вопрос о датах визы
-    #     await state.update_data(visa_dates="-")
-    #     await save_flight_request_data(callback.message, state)
 
 
-async def save_flight_request_data(message: Message, state: FSMContext):
-    """Сохранение данных формы Flight Request"""
+@router.callback_query(F.data.startswith("hotel_needed_"), TravelStates.waiting_for_hotel_needed)
+async def process_hotel_needed(callback: CallbackQuery, state: FSMContext):
+    hotel_needed = callback.data == "hotel_needed_yes"
+    await state.update_data(hotel_needed=hotel_needed)
+
+    # Сохраняем паспортные данные, если пользователь дал согласие
     data = await state.get_data()
+    if data.get('store_passport_data'):
+        await db.save_passport_data(
+            user_id=callback.from_user.id,
+            username=callback.from_user.username,
+            passport_data=data
+        )
 
-    # Сохраняем в БД
-    flight_request_data = {
-        'username': message.from_user.username,
-        'user_id': message.from_user.id,
+    # Показываем выбор рейсов
+    await show_flight_choice(callback.message, state, callback.from_user.username)
+
+
+async def show_flight_choice(update: Union[Message, CallbackQuery], state: FSMContext, username: str):
+    """Показать выбор рейсов"""
+    data = await state.get_data()
+    conference = data.get('selected_conference')
+
+    # Получаем доступные рейсы для пользователя
+    flights = await db.get_available_flights(username, data.get('departure_from'), data.get('return_to'))
+
+    if flights:
+        await state.set_state(TravelStates.waiting_for_flight_choice)
+        keyboard = get_flight_choice_keyboard(flights)
+
+        if isinstance(update, Message):
+            await update.answer(TEXTS['flight_choice'], reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+        else:
+            await update.message.edit_text(TEXTS['flight_choice'], reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+    else:
+        # Нет доступных рейсов - отправляем запрос менеджеру
+        await send_request_to_manager(update, state)
+
+
+async def send_request_to_manager(update: Union[Message, CallbackQuery], state: FSMContext):
+    """Отправить запрос менеджеру на подбор рейсов"""
+    data = await state.get_data()
+    username = update.from_user.username if hasattr(update, 'from_user') else update.message.from_user.username
+
+    # Сохраняем заявку
+    flight_data = {
+        'username': username,
+        'user_id': update.from_user.id if hasattr(update, 'from_user') else update.message.from_user.id,
+        'visa_status': data.get('visa_status'),
         'first_name': data.get('first_name'),
         'last_name': data.get('last_name'),
         'phone': data.get('phone'),
@@ -1328,60 +760,446 @@ async def save_flight_request_data(message: Message, state: FSMContext):
         'expiry_date': data.get('expiry_date'),
         'departure_from': data.get('departure_from'),
         'return_to': data.get('return_to'),
-        'needs_visa': data.get('needs_visa', False),
-        'visa_dates': data.get('visa_dates', '-')
+        'needs_baggage': data.get('needs_baggage', False),
+        'hotel_needed': data.get('hotel_needed', False),
+        'preferences': data.get('preferences', '')
     }
 
-    # TODO: Создать метод save_flight_request в database.py
-    # if await db.save_flight_request(flight_request_data):
+    await db.save_flight_request(flight_data)
 
-    await message.answer(
-        "✅ Flight request submitted!\n\n"
-        "Thank you for your detailed information. "
-        "Our travel team will contact you within 24 hours to discuss flight options."
+    # Отправляем менеджеру
+    await send_question_to_manager(
+        bot=update.bot if hasattr(update, 'bot') else update.message.bot,
+        manager_chat_id=TRAVEL_MANAGER_CHAT_ID,
+        user_data=flight_data,
+        question_text=f"New flight request from {username}\nFrom: {data.get('departure_from')}\nTo: {data.get('return_to')}",
+        question_type="travel_flight"
     )
 
-    # Логируем действие
-    await db.log_user_action(
-        user_id=message.from_user.id,
-        username=message.from_user.username,
-        action="flight_request_submitted",
-        details={"form": "full_flight_request"}
-    )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Back to Travel", callback_data="travel_back_to_menu")]
+    ])
+
+    if isinstance(update, Message):
+        await update.answer(TEXTS['form_complete'], reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+    else:
+        await update.message.edit_text(TEXTS['form_complete'], reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
 
     await state.clear()
 
 
-@router.message(TravelStates.waiting_for_visa_dates)
-async def process_visa_dates(message: Message, state: FSMContext):
-    await state.update_data(visa_dates=message.text)
-    await save_flight_request_data(message, state)
+@router.callback_query(F.data.startswith("flight_choose_"), TravelStates.waiting_for_flight_choice)
+async def process_flight_choice(callback: CallbackQuery, state: FSMContext):
+    """Пользователь выбрал рейс - спрашиваем про отель"""
+    flight_id = int(callback.data.replace("flight_choose_", ""))
+    await state.update_data(selected_flight_id=flight_id)
+
+    # Спрашиваем про отель
+    user_id = callback.from_user.id
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Yes", callback_data="hotel_after_flight_yes"),
+         InlineKeyboardButton(text="❌ No", callback_data="hotel_after_flight_no")]
+    ])
+
+    await callback.message.edit_text(
+        "🏨 **Will you need a hotel for this conference?**\n\n"
+        "The company does not reimburse expenses for independently booked hotels or bookings for accompanying persons.",
+        reply_markup=keyboard
+    )
+    await state.set_state(TravelStates.waiting_for_hotel_needed)
+
+@router.callback_query(F.data.startswith("hotel_after_flight_"), TravelStates.waiting_for_hotel_needed)
+async def process_hotel_after_flight(callback: CallbackQuery, state: FSMContext):
+    """Обработка ответа об отеле после выбора рейса"""
+    hotel_needed = callback.data == "hotel_after_flight_yes"
+    await state.update_data(hotel_needed=hotel_needed)
+    await send_request_to_manager(callback, state)
+
+
+@router.callback_query(F.data == "flight_no_suitable", TravelStates.waiting_for_flight_choice)
+async def process_no_suitable_flight(callback: CallbackQuery, state: FSMContext):
+    """Ни один рейс не подходит"""
+    await state.update_data(no_suitable_flight=True)
+    await send_request_to_manager(callback, state)
 
 
 # ============================================
-# BACK BUTTONS FOR FLIGHT REQUEST
+# FLIGHT REQUEST (основная кнопка)
+# ============================================
+
+@router.callback_query(F.data == "travel_flight_request")
+async def start_flight_request(callback: CallbackQuery, state: FSMContext):
+    """Начало формы запроса билета"""
+    await show_visa_support(callback)
+
+
+# ============================================
+# Daily allowance (Суточные)
+# ============================================
+
+@router.callback_query(F.data == "travel_per_diem")
+async def start_per_diem_form(callback: CallbackQuery, state: FSMContext):
+    """Начало формы суточных"""
+    await state.set_state(TravelStates.waiting_for_per_diem_payment_type)
+
+    lang = await get_user_lang(callback.from_user.id)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=get_text_sync(lang, 'per_diem_card'), callback_data="per_diem_card")],
+        [InlineKeyboardButton(text=get_text_sync(lang, 'per_diem_crypto'), callback_data="per_diem_crypto")],
+        [InlineKeyboardButton(text=get_text_sync(lang, 'back'), callback_data="travel_back_to_menu")]
+    ])
+    await callback.message.edit_text(
+        await t(callback.from_user.id, 'per_diem_question'),
+        reply_markup=keyboard
+    )
+
+
+@router.callback_query(F.data == "per_diem_card", TravelStates.waiting_for_per_diem_payment_type)
+async def per_diem_card_selected(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(payment_type="card")
+    await state.set_state(TravelStates.waiting_for_per_diem_card)
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Back", callback_data="back_to_per_diem_type")]
+    ])
+
+    await callback.message.edit_text("💳 Enter your card number:", reply_markup=keyboard)
+
+
+@router.callback_query(F.data == "per_diem_crypto", TravelStates.waiting_for_per_diem_payment_type)
+async def per_diem_crypto_selected(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(payment_type="crypto")
+    await state.set_state(TravelStates.waiting_for_per_diem_crypto_network)
+
+    lang = await get_user_lang(callback.from_user.id)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=get_text_sync(lang, 'network_trc20'), callback_data="crypto_trc20")],
+        [InlineKeyboardButton(text=get_text_sync(lang, 'network_erc20'), callback_data="crypto_erc20")],
+        [InlineKeyboardButton(text=get_text_sync(lang, 'network_bep20'), callback_data="crypto_bep20")],
+        [InlineKeyboardButton(text=get_text_sync(lang, 'back'), callback_data="back_to_per_diem_type")]
+    ])
+
+    await callback.message.edit_text("🪙 Select your wallet network:", reply_markup=keyboard)
+
+
+@router.callback_query(F.data.startswith("crypto_"), TravelStates.waiting_for_per_diem_crypto_network)
+async def per_diem_crypto_network(callback: CallbackQuery, state: FSMContext):
+    network = callback.data.replace("crypto_", "").upper()
+    await state.update_data(crypto_network=network)
+    await state.set_state(TravelStates.waiting_for_per_diem_crypto_address)
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Back", callback_data="back_to_per_diem_network")]
+    ])
+
+    await callback.message.edit_text(f"🪙 Enter your wallet address ({network}):", reply_markup=keyboard)
+
+
+@router.message(TravelStates.waiting_for_per_diem_card)
+async def process_per_diem_card(message: Message, state: FSMContext):
+    card_number = message.text.strip()
+    digits = re.sub(r'\D', '', card_number)
+
+    if len(digits) < 16:
+        await message.answer("❌ Invalid card number. Try again:")
+        return
+
+    await state.update_data(payment_details=card_number)
+    await show_per_diem_consent(message, state)
+
+
+@router.message(TravelStates.waiting_for_per_diem_crypto_address)
+async def process_per_diem_crypto_address(message: Message, state: FSMContext):
+    address = message.text.strip()
+
+    if len(address) < 10:
+        await message.answer("❌ Address too short. Try again:")
+        return
+
+    data = await state.get_data()
+    payment_details = f"{data.get('crypto_network')}: {address}"
+    await state.update_data(payment_details=payment_details)
+    await show_per_diem_consent(message, state)
+
+
+async def show_per_diem_consent(update: Union[Message, CallbackQuery], state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_per_diem_consent)
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ I consent", callback_data="per_diem_consent")],
+        [InlineKeyboardButton(text="❌ Cancel", callback_data="travel_back_to_menu")]
+    ])
+
+    if isinstance(update, Message):
+        await update.answer(TEXTS['per_diem_consent'], reply_markup=keyboard)
+    else:
+        await update.message.edit_text(TEXTS['per_diem_consent'], reply_markup=keyboard)
+
+
+@router.callback_query(F.data == "per_diem_consent", TravelStates.waiting_for_per_diem_consent)
+async def process_per_diem_consent(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+
+    per_diem_data = {
+        'username': callback.from_user.username,
+        'user_id': callback.from_user.id,
+        'payment_type': data.get('payment_type'),
+        'payment_details': data.get('payment_details'),
+        'consent_given': True
+    }
+
+    await db.save_per_diem_request(per_diem_data)
+
+    await db.log_user_action(
+        user_id=callback.from_user.id,
+        username=callback.from_user.username,
+        action="per_diem_request_submitted",
+        details={"payment_type": data.get('payment_type')}
+    )
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Back to Travel", callback_data="travel_back_to_menu")],
+        [InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")]
+    ])
+
+    await callback.message.edit_text(
+        TEXTS['per_diem_success'],
+        reply_markup=keyboard,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    await state.clear()
+
+
+# ============================================
+# MY REQUESTS (Мои заявки)
+# ============================================
+
+@router.callback_query(F.data == "travel_my_requests")
+async def show_my_requests(callback: CallbackQuery):
+    username = callback.from_user.username
+
+    try:
+        visa_status = await db.get_travel_request_status(username, "visa")
+        flight_status = await db.get_travel_request_status(username, "flight")
+        per_diem_status = await db.get_travel_request_status(username, "per_diem")
+
+        status_text = "📋 *Your Travel Requests*\n\n"
+
+        if visa_status.get("status") == "pending":
+            status_text += f"🛂 *Visa Support:* ⏳ Processing\n   Submitted: {visa_status.get('submitted')}\n\n"
+        elif visa_status.get("status") == "no_requests":
+            status_text += f"🛂 *Visa Support:* 📝 No requests yet\n\n"
+
+        if flight_status.get("status") == "pending":
+            status_text += f"✈️ *Flight Request:* ⏳ Processing\n   Submitted: {flight_status.get('submitted')}\n\n"
+        elif flight_status.get("status") == "no_requests":
+            status_text += f"✈️ *Flight Request:* 📝 No requests yet\n\n"
+
+        if per_diem_status.get("status") == "pending":
+            status_text += f"💰 *Daily allowance:* ⏳ Processing\n   Submitted: {per_diem_status.get('submitted')}\n\n"
+        elif per_diem_status.get("status") == "no_requests":
+            status_text += f"💰 *Daily allowance:* 📝 No requests yet\n\n"
+
+        status_text += "_You will receive notifications when status changes._"
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 Check again", callback_data="travel_my_requests")],
+            [InlineKeyboardButton(text="📝 New request", callback_data="travel_visa_support")],
+            [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu")]
+        ])
+
+        await callback.message.edit_text(status_text, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN)
+
+    except Exception as e:
+        logger.error(f"Error showing requests: {e}")
+        await callback.message.edit_text(
+            "❌ Error loading your requests.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu")]
+            ])
+        )
+
+
+# ============================================
+# QUESTION TO MANAGER (Вопрос менеджеру)
+# ============================================
+
+@router.callback_query(F.data == "travel_question")
+async def show_question(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_travel_question)
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Back", callback_data="travel_back_to_menu")]
+    ])
+
+    await callback.message.edit_text(
+        "❓ Question to Travel Manager\n\nPlease write your question (max 500 characters):",
+        reply_markup=keyboard
+    )
+
+
+@router.message(TravelStates.waiting_for_travel_question, F.text.len() <= 500)
+async def process_travel_question(message: Message, state: FSMContext):
+    question_text = message.text
+
+    travel_question_data = {
+        'username': message.from_user.username,
+        'user_id': message.from_user.id,
+        'category': 'travel_general',
+        'question': question_text
+    }
+
+    if await db.save_travel_question(travel_question_data):
+        await send_question_to_manager(
+            bot=message.bot,
+            manager_chat_id=TRAVEL_MANAGER_CHAT_ID,
+            user_data=travel_question_data,
+            question_text=question_text,
+            question_type="travel"
+        )
+
+        await db.log_user_action(
+            user_id=message.from_user.id,
+            username=message.from_user.username,
+            action="travel_question_submitted",
+            details={"data": travel_question_data}
+        )
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Back to Travel Menu", callback_data="travel_back_to_menu")]
+        ])
+
+        await message.answer(
+            "✅ Question sent!\n\nThank you for your question. Our travel team will contact you soon.",
+            reply_markup=keyboard
+        )
+    else:
+        await message.answer("❌ Error saving question. Please try again later.")
+
+    await state.clear()
+
+
+@router.message(TravelStates.waiting_for_travel_question, F.text.len() > 500)
+async def process_travel_question_too_long(message: Message):
+    await message.answer("❌ Question is too long. Maximum 500 characters.")
+
+
+# ============================================
+# BACK BUTTON HANDLERS
 # ============================================
 
 @router.callback_query(F.data == "back_to_first_name")
 async def back_to_first_name(callback: CallbackQuery, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_first_name)
-    keyboard = get_form_back_keyboard("travel_back_to_menu")
-
     await callback.message.edit_text(
-        "Step 1 of 13\n"
-        "Your first name as in your passport / Ваше имя как в загранпаспорте:",
+        "Step 1 of 12\nYour first name as in passport:",
+        reply_markup=get_form_back_keyboard("travel_back_to_menu")
+    )
+
+
+@router.callback_query(F.data == "back_to_last_name")
+async def back_to_last_name(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_last_name)
+    await callback.message.edit_text(
+        "Step 2 of 12\nYour last name as in passport:",
+        reply_markup=get_form_back_keyboard("back_to_first_name")
+    )
+
+
+@router.callback_query(F.data == "back_to_phone")
+async def back_to_phone(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_phone)
+    await callback.message.edit_text(
+        "Step 3 of 12\nYour phone number:",
+        reply_markup=get_form_back_keyboard("back_to_last_name")
+    )
+
+
+@router.callback_query(F.data == "back_to_passport_number")
+async def back_to_passport_number(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_passport_number)
+    await callback.message.edit_text(
+        "Step 4 of 12\nPassport number:",
+        reply_markup=get_form_back_keyboard("back_to_phone")
+    )
+
+
+@router.callback_query(F.data == "back_to_birth_date")
+async def back_to_birth_date(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_birth_date)
+    await callback.message.edit_text(
+        "Step 5 of 12\nDate of birth (DD.MM.YYYY):",
+        reply_markup=get_form_back_keyboard("back_to_passport_number")
+    )
+
+
+@router.callback_query(F.data == "back_to_passport_country")
+async def back_to_passport_country(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_passport_country)
+    await callback.message.edit_text(
+        "Step 6 of 12\nCountry of passport issuance:",
+        reply_markup=get_form_back_keyboard("back_to_birth_date")
+    )
+
+
+@router.callback_query(F.data == "back_to_issue_date")
+async def back_to_issue_date(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_issue_date)
+    await callback.message.edit_text(
+        "Step 7 of 12\nPassport issue date (DD.MM.YYYY):",
+        reply_markup=get_form_back_keyboard("back_to_passport_country")
+    )
+
+
+@router.callback_query(F.data == "back_to_expiry_date")
+async def back_to_expiry_date(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_expiry_date)
+    await callback.message.edit_text(
+        "Step 8 of 12\nPassport expiration date (DD.MM.YYYY):",
+        reply_markup=get_form_back_keyboard("back_to_issue_date")
+    )
+
+
+@router.callback_query(F.data == "back_to_departure_from")
+async def back_to_departure_from(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_departure_from)
+    await callback.message.edit_text(
+        "Step 9 of 12\nWhere are you planning to fly from?",
+        reply_markup=get_form_back_keyboard("back_to_expiry_date")
+    )
+
+
+@router.callback_query(F.data == "back_to_return_to")
+async def back_to_return_to(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_return_to)
+    await callback.message.edit_text(
+        "Step 10 of 12\nWhere are you planning to return to?",
+        reply_markup=get_form_back_keyboard("back_to_departure_from")
+    )
+
+
+@router.callback_query(F.data == "back_to_baggage")
+async def back_to_baggage(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_baggage)
+    keyboard = get_baggage_keyboard("back_to_return_to")
+    await callback.message.edit_text(
+        "Step 11 of 12\nDo you need checked baggage?",
         reply_markup=keyboard
     )
 
 
-# Добавьте аналогичные обработчики для остальных back кнопок:
-# back_to_last_name, back_to_phone, back_to_passport_number, и т.д.
+@router.callback_query(F.data == "back_to_per_diem_type")
+async def back_to_per_diem_type(callback: CallbackQuery, state: FSMContext):
+    await start_per_diem_form(callback, state)
 
-# ============================================
-# УТИЛИТЫ
-# ============================================
 
-@router.callback_query(F.data == "visa_update_status")
-async def update_visa_status(callback: CallbackQuery):
-    """Обновить статус визы"""
-    await show_visa_support(callback)
+@router.callback_query(F.data == "back_to_per_diem_network")
+async def back_to_per_diem_network(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_per_diem_crypto_network)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="TRC20", callback_data="crypto_trc20")],
+        [InlineKeyboardButton(text="ERC20", callback_data="crypto_erc20")],
+        [InlineKeyboardButton(text="BEP20", callback_data="crypto_bep20")],
+        [InlineKeyboardButton(text="◀️ Back", callback_data="back_to_per_diem_type")]
+    ])
+    await callback.message.edit_text("🪙 Select your wallet network:", reply_markup=keyboard)

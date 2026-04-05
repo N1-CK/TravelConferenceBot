@@ -1,6 +1,3 @@
-# handlers/managers_chat.py
-import asyncio
-import json
 import os
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -36,7 +33,7 @@ async def send_question_to_manager(bot: Bot, manager_chat_id: int, user_data: di
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text="📝 Ответить пользователю",
+            text="📝 Reply to user",
             callback_data=f"reply_to_{user_data['user_id']}_{question_type}"
         )]
     ])

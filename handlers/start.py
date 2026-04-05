@@ -4,79 +4,26 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from typing import Union
 
 from utility.auth import check_whitelist
 from database import db
-from keyboards import get_agreement_keyboard, get_main_menu_keyboard
-from datetime import datetime
+from keyboards import get_main_menu_keyboard
+from utility.lang_utils import *
 
 router = Router()
 
 
 class RegistrationStates(StatesGroup):
-    """Состояния регистрации нового пользователя"""
     waiting_for_language = State()
     waiting_for_fullname = State()
     waiting_for_position = State()
     waiting_for_company = State()
 
-class ConferenceViewStates(StatesGroup):
-    viewing_conference = State()
-
-# Тексты на разных языках
-LANG_TEXTS = {
-    'ru': {
-        'welcome': "Добро пожаловать в Travel Conference Bot!",
-        'choose_lang': "Пожалуйста, выберите язык:",
-        'ask_fullname': "Пожалуйста, введите ваше имя и фамилию:",
-        'ask_position': "Укажите вашу должность:",
-        'ask_company': "Укажите название вашей компании/партнерской программы:",
-        'success': (
-            "Добро пожаловать в Travel Conference Bot!"
-        ),
-        'language_selected': "🇷🇺 Выбран русский язык",
-        'error_no_username': (
-            "У вас не установлен username в Telegram.\n\n"
-            "Пожалуйста, установите username в настройках Telegram:\n"
-            "Настройки → Имя пользователя (username)"
-        ),
-        'error_not_whitelisted': (
-            "Извините, у вас нет доступа к боту конференции.\n\n"
-            "Обратитесь к своему руководителю."
-        )
-    },
-    'en': {
-        'welcome': "Welcome to Travel Conference Bot!",
-        'choose_lang': "Please choose your language:",
-        'ask_fullname': "Please enter your full name:",
-        'ask_position': "Enter your job title:",
-        'ask_company': "Enter your company/partner program name:",
-        'success': (
-            "Welcome to Travel Conference Bot!"
-        ),
-        'language_selected': "🇬🇧 English selected",
-        'error_no_username': (
-            "You don't have a username set in Telegram.\n\n"
-            "Please set your username in Telegram settings:\n"
-            "Settings → Username"
-        ),
-        'error_not_whitelisted': (
-            "Sorry, you do not have access to this bot.\n\n"
-            "Please contact your manager."
-        )
-    }
-}
-
-
-def escape_markdown(text: str) -> str:
-    """Экранирует специальные символы Markdown"""
-    escape_chars = r'_*[]()~`>#+=|{}!'
-    return ''.join(f'\\{char}' if char in escape_chars else char for char in text)
 
 def get_language_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура выбора языка"""
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text="🇷🇺 Русский", callback_data="lang_ru"),
@@ -85,245 +32,188 @@ def get_language_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-async def check_and_register_user(message: Message, user_id: int, username: str) -> bool:
-    """Проверяет, прошел ли пользователь полную регистрацию"""
-    # Проверяем, есть ли уже данные пользователя
+async def check_and_register_user(user_id: int, username: str) -> bool:
     user_data = await db.get_user_data(user_id)
     if user_data and user_data.get('full_name') and user_data.get('company'):
-        # Пользователь уже зарегистрирован
         return True
     return False
 
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
-    """Обработчик команды /start"""
     user_id = message.from_user.id
     username = message.from_user.username
-    lang = 'ru'
 
     if not username:
-        await message.answer(LANG_TEXTS['ru']['error_no_username'])
+        await message.answer(await t(user_id, 'error_no_username'))
         return
 
     if not await check_whitelist(username):
-        await message.answer(LANG_TEXTS['ru']['error_not_whitelisted'])
+        await message.answer(await t(user_id, 'error_not_whitelisted'))
         return
 
-    if await check_and_register_user(message, user_id, username):
-        # Если зарегистрирован - показываем список конференций
-        await show_conferences_selection(message, username, lang)
+    if await check_and_register_user(user_id, username):
+        await show_conferences_selection(message, username, user_id)
         return
 
-    # Новый пользователь - регистрация
     await state.set_state(RegistrationStates.waiting_for_language)
     await message.answer(
-        "🌐 Please choose your language / Пожалуйста, выберите язык:",
+        await t(user_id, 'choose_lang'),
         reply_markup=get_language_keyboard()
     )
 
 
 @router.callback_query(F.data.startswith("lang_"), RegistrationStates.waiting_for_language)
 async def process_language_choice(callback: CallbackQuery, state: FSMContext):
-    """Обработка выбора языка"""
-    lang = callback.data.split("_")[1]  # 'ru' или 'en'
-
-    # Сохраняем выбранный язык
+    lang = callback.data.split("_")[1]
     await state.update_data(language=lang)
-
-    # Подтверждаем выбор
-    await callback.message.edit_text(
-        LANG_TEXTS[lang]['language_selected']
-    )
-
-    # Переходим к следующему шагу — запрос ФИО
+    await callback.message.edit_text(await t(callback.from_user.id, 'language_selected'))
     await state.set_state(RegistrationStates.waiting_for_fullname)
-
-    await callback.message.answer(
-        LANG_TEXTS[lang]['ask_fullname']
-    )
-
+    await callback.message.answer(await t(callback.from_user.id, 'ask_fullname'))
     await callback.answer()
 
 
 @router.message(RegistrationStates.waiting_for_fullname)
 async def process_fullname(message: Message, state: FSMContext):
-    """Обработка ввода ФИО"""
     fullname = message.text.strip()
-
-    # Валидация (минимальная)
     if len(fullname) < 3 or len(fullname) > 100:
-        data = await state.get_data()
-        lang = data.get('language', 'ru')
-        await message.answer(
-            "❌ Пожалуйста, введите корректное имя (от 3 до 100 символов).\n"
-            "Please enter a valid name (3-100 characters)."
-        )
+        await message.answer(await t(message.from_user.id, 'error_invalid_name'))
         return
-
-    # Сохраняем ФИО
     await state.update_data(fullname=fullname)
-
-    # Запрашиваем должность
-    data = await state.get_data()
-    lang = data.get('language', 'ru')
     await state.set_state(RegistrationStates.waiting_for_position)
-
-    await message.answer(
-        LANG_TEXTS[lang]['ask_position']
-    )
+    await message.answer(await t(message.from_user.id, 'ask_position'))
 
 
 @router.message(RegistrationStates.waiting_for_position)
 async def process_position(message: Message, state: FSMContext):
-    """Обработка ввода должности"""
     position = message.text.strip()
-
     if len(position) < 2 or len(position) > 100:
-        data = await state.get_data()
-        lang = data.get('language', 'ru')
-        await message.answer(
-            "❌ Пожалуйста, введите корректную должность.\n"
-            "Please enter a valid job title."
-        )
+        await message.answer(await t(message.from_user.id, 'error_invalid_position'))
         return
-
     await state.update_data(position=position)
-
-    # Запрашиваем компанию
-    data = await state.get_data()
-    lang = data.get('language', 'ru')
     await state.set_state(RegistrationStates.waiting_for_company)
+    await message.answer(await t(message.from_user.id, 'ask_company'))
 
-    await message.answer(
-        LANG_TEXTS[lang]['ask_company']
-    )
-
-
-async def show_conferences_selection(message: Message, username: str, lang: str = 'ru'):
-    """Показать пользователю список его конференций в виде кнопок"""
-    conferences = await db.get_user_conferences(username)
-
-    if not conferences:
-        await message.answer(
-            LANG_TEXTS[lang]['success'],
-            reply_markup=get_main_menu_keyboard()
-        )
-        return
-
-    # Создаем клавиатуру с кнопками конференций
-    builder = InlineKeyboardBuilder()
-
-    for conf in conferences:
-        # Формируем текст кнопки с городом если есть
-        button_text = conf['conference_name']
-        if conf.get('city'):
-            button_text += f" ({conf['city']})"
-
-        builder.row(InlineKeyboardButton(
-            text=button_text,
-            callback_data=f"select_conf_{conf['conference_name']}"
-        ))
-
-    # Добавляем кнопку "Пропустить" если нужно
-    builder.row(InlineKeyboardButton(
-        text="⏭️ Пропустить",
-        callback_data="skip_conf_selection"
-    ))
-
-    await message.answer(
-        "📋 Выберите вашу конференцию / Select your conference:",
-        reply_markup=builder.as_markup()
-    )
-
-
-@router.callback_query(F.data.startswith("select_conf_"))
-async def process_conference_selection(callback: CallbackQuery, state: FSMContext):
-    """Обработка выбора конференции"""
-    conference_name = callback.data.replace("select_conf_", "")
-
-    # Сохраняем выбранную конференцию в состояние
-    await state.update_data(selected_conference=conference_name)
-
-    # Логируем выбор
-    await db.log_user_action(
-        user_id=callback.from_user.id,
-        username=callback.from_user.username,
-        action="conference_selected",
-        details={"conference": conference_name}
-    )
-
-    # Показываем главное меню с новой кнопкой
-    await show_main_menu_with_conf_button(callback.message, state)
-
-
-@router.callback_query(F.data == "skip_conf_selection")
-async def skip_conference_selection(callback: CallbackQuery, state: FSMContext):
-    """Пропустить выбор конференции"""
-    await show_main_menu_with_conf_button(callback.message, state)
-
-
-async def show_main_menu_with_conf_button(message: Message, state: FSMContext):
-    """Показать главное меню с кнопкой выбора конференции"""
-    from keyboards import get_main_menu_keyboard
-
-    # Получаем выбранную конференцию из состояния
-    data = await state.get_data()
-    selected_conf = data.get('selected_conference')
-
-    # Модифицируем главное меню - добавляем кнопку выбора конференции
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text="📢 PR", callback_data="menu_pr"),
-        InlineKeyboardButton(text="🎪 EVENT", callback_data="menu_event"),
-        InlineKeyboardButton(text="✈️ TRAVEL", callback_data="menu_travel")
-    )
-    builder.row(
-        InlineKeyboardButton(text="❓ Помощь", callback_data="menu_help"),
-        InlineKeyboardButton(text="👤 Профиль", callback_data="menu_profile")
-    )
-    # Добавляем кнопку выбора конференции
-    conf_text = "🔄 Сменить конференцию" if selected_conf else "🎯 Выбрать конференцию"
-    builder.row(InlineKeyboardButton(text=conf_text, callback_data="show_conference_list"))
-
-    welcome_text = f"Выбрана конференция: *{selected_conf}*\n\n" if selected_conf else ""
-    welcome_text += "Главное меню. Выберите раздел:"
-
-    await message.edit_text(
-        welcome_text,
-        reply_markup=builder.as_markup(),
-        parse_mode=ParseMode.MARKDOWN if selected_conf else None
-    )
-
-@router.callback_query(F.data == "show_conference_list")
-async def show_conference_list(callback: CallbackQuery, state: FSMContext):
-    """Показать список конференций для выбора"""
-    username = callback.from_user.username
-    await show_conferences_selection(callback.message, username)
 
 @router.message(RegistrationStates.waiting_for_company)
 async def process_company(message: Message, state: FSMContext):
-    """Обработка ввода компании и завершение регистрации"""
-    company = message.text.strip()
+    company_input = message.text.strip()
 
-    if len(company) < 2 or len(company) > 100:
-        data = await state.get_data()
-        lang = data.get('language', 'ru')
-        await message.answer(
-            "❌ Пожалуйста, введите корректное название компании.\n"
-            "Please enter a valid company name."
-        )
+    if len(company_input) < 2:
+        await message.answer(await t(message.from_user.id, 'error_invalid_company'))
         return
 
-    # Получаем все данные из state
+    # Ищем компании по префиксу
+    matches = await db.search_companies_by_prefix(company_input)
+
+    if len(matches) == 1:
+        # Точное совпадение
+        await complete_registration(message, state, matches[0])
+
+    elif len(matches) > 1:
+        # Несколько совпадений - показываем кнопки
+        builder = InlineKeyboardBuilder()
+        for comp in matches:
+            builder.row(InlineKeyboardButton(text=comp, callback_data=f"reg_company_{comp}"))
+        builder.row(InlineKeyboardButton(text="✏️ Ввести вручную", callback_data="reg_company_manual"))
+
+        await state.update_data(manual_company=company_input)
+        await message.answer(
+            "🔍 Найдено несколько компаний. Выберите одну:",
+            reply_markup=builder.as_markup()
+        )
+
+    else:
+        # Нет совпадений
+        builder = InlineKeyboardBuilder()
+        builder.row(InlineKeyboardButton(
+            text=f"✅ Подтвердить '{company_input}'",
+            callback_data=f"reg_company_confirm_{company_input}"
+        ))
+        builder.row(InlineKeyboardButton(
+            text="📋 Выбрать из списка",
+            callback_data="reg_company_show_list"
+        ))
+
+        await state.update_data(manual_company=company_input)
+        await message.answer(
+            f"Компания '{company_input}' не найдена в списке.\n\n"
+            f"Если это правильное название, нажмите подтвердить.\n"
+            f"Иначе выберите из списка:",
+            reply_markup=builder.as_markup()
+        )
+
+
+@router.message(RegistrationStates.waiting_for_company)
+async def process_company(message: Message, state: FSMContext):
+    company_input = message.text.strip()
+
+    if len(company_input) < 2:
+        await message.answer(await t(message.from_user.id, 'error_invalid_company'))
+        return
+
+    # Ищем компании по префиксу
+    matches = await db.search_companies_by_prefix(company_input)
+
+    # Сохраняем введенное значение
+    await state.update_data(manual_company=company_input)
+
+    if matches:
+        # Найдены совпадения - показываем кнопки
+        builder = InlineKeyboardBuilder()
+        for comp in matches[:10]:  # Не более 10 вариантов
+            builder.row(InlineKeyboardButton(text=comp, callback_data=f"reg_company_{comp}"))
+        builder.row(InlineKeyboardButton(
+            text=f"✅ Подтвердить '{company_input}'",
+            callback_data=f"reg_company_confirm_{company_input}"
+        ))
+
+        await message.answer(
+            f"🔍 Найдено несколько компаний. Выберите одну или подтвердите свой вариант:\n\n"
+            f"Ваш ввод: {company_input}",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        # Нет совпадений - только подтверждение
+        builder = InlineKeyboardBuilder()
+        builder.row(InlineKeyboardButton(
+            text=f"✅ Подтвердить '{company_input}'",
+            callback_data=f"reg_company_confirm_{company_input}"
+        ))
+
+        await message.answer(
+            f"Компания '{company_input}' не найдена в списке.\n\n"
+            f"Если это правильное название, нажмите подтвердить.\n"
+            f"Иначе введите название заново:",
+            reply_markup=builder.as_markup()
+        )
+
+
+@router.callback_query(F.data.startswith("reg_company_"))
+async def process_company_callback(callback: CallbackQuery, state: FSMContext):
+    action = callback.data.replace("reg_company_", "")
+
+    if action.startswith("confirm_"):
+        company = action.replace("confirm_", "")
+        await complete_registration(callback, state, company)
+    elif action.startswith("select_"):
+        company = action.replace("select_", "")
+        await complete_registration(callback, state, company)
+    else:
+        # Обычный выбор компании из списка
+        company = action
+        await complete_registration(callback, state, company)
+
+
+async def complete_registration(update: Union[Message, CallbackQuery], state: FSMContext, company: str):
+    """Завершение регистрации"""
     data = await state.get_data()
-    user_id = message.from_user.id
-    username = message.from_user.username
+    user_id = update.from_user.id
+    username = update.from_user.username
     lang = data.get('language', 'ru')
     fullname = data.get('fullname')
     position = data.get('position')
 
-    # Сохраняем пользователя в БД
     user_data = {
         'user_id': user_id,
         'username': username,
@@ -336,92 +226,167 @@ async def process_company(message: Message, state: FSMContext):
     success = await db.save_user_registration(user_data)
 
     if success:
-        # Логируем успешную регистрацию
         await db.log_user_action(
             user_id=user_id,
             username=username,
             action="user_registered",
-            details={
-                "language": lang,
-                "full_name": fullname,
-                "position": position,
-                "company": company
-            }
+            details={"company": company, "language": lang}
         )
 
-        # ПОКАЗЫВАЕМ КОНФЕРЕНЦИИ ПЕРЕД ГЛАВНЫМ МЕНЮ
-        await show_conferences_selection(message, username, lang)
+        # Показываем выбор конференции (теперь обязательный)
+        if isinstance(update, Message):
+            await show_conferences_selection(update, username, user_id)
+        else:
+            await show_conferences_selection(update.message, username, user_id)
+            await update.answer()
     else:
-        # Ошибка сохранения
-        await message.answer(
-            "❌ Произошла ошибка при регистрации. Пожалуйста, попробуйте позже.\n"
-            "An error occurred. Please try again later."
-        )
+        error_text = await t(user_id, 'error_registration_failed')
+        if isinstance(update, Message):
+            await update.answer(error_text)
+        else:
+            await update.message.answer(error_text)
 
-    # Очищаем состояние
     await state.clear()
 
 
-@router.callback_query(F.data.startswith("view_conf_"))
-async def view_conference_details(callback: CallbackQuery):
-    """Показать детали конкретной конференции"""
-    conference_name = callback.data.replace("view_conf_", "")
-    username = callback.from_user.username
-
+async def show_conferences_selection(message: Message, username: str, user_id: int):
+    """Показать список конференций пользователя (обязательный выбор)"""
     conferences = await db.get_user_conferences(username)
-    conference = next((c for c in conferences if c['conference_name'] == conference_name), None)
+    lang = await get_user_lang(user_id)
 
-    if not conference:
-        await callback.answer("Conference not found", show_alert=True)
+    if not conferences:
+        # Если нет конференций, показываем главное меню без выбора
+        await message.answer(
+            await t(user_id, 'welcome'),
+            reply_markup=await get_main_menu_keyboard(user_id)
+        )
         return
 
-    # Формируем детальное сообщение
-    details = f"📋 *{conference['conference_name']}*\n\n"
+    builder = InlineKeyboardBuilder()
+    for conf in conferences:
+        button_text = conf['conference_name']
+        if conf.get('city'):
+            button_text += f" ({conf['city']})"
+        builder.row(InlineKeyboardButton(
+            text=button_text,
+            callback_data=f"select_conf_{conf['conference_name']}"
+        ))
 
-    if conference.get('city'):
-        details += f"📍 *City:* {conference['city']}\n"
+    # Убрали кнопку "Пропустить" - выбор обязателен
 
-    if conference.get('conference_start_date') and conference.get('conference_end_date'):
-        details += f"📅 *Conference dates:* {conference['conference_start_date']} - {conference['conference_end_date']}\n"
+    await message.answer(
+        get_text_sync(lang, 'select_conference'),  # Локализованный текст
+        reply_markup=builder.as_markup()
+    )
 
-    if conference.get('trip_start_date') and conference.get('trip_end_date'):
-        details += f"✈️ *Trip dates:* {conference['trip_start_date']} - {conference['trip_end_date']}\n"
 
-    # Клавиатура для возврата
+@router.callback_query(F.data.startswith("select_conf_"))
+async def process_conference_selection(callback: CallbackQuery, state: FSMContext):
+    conference_name = callback.data.replace("select_conf_", "")
+    await state.update_data(selected_conference=conference_name)
+
+    # Сохраняем выбранную конференцию в БД
+    user_id = callback.from_user.id
+    async with db.pool.acquire() as conn:
+        await conn.execute(f"""
+            UPDATE {db.db_schema_config}.user_profiles 
+            SET selected_conference = $1, updated_at = NOW()
+            WHERE user_id = $2
+        """, conference_name, user_id)
+
+    await db.log_user_action(
+        user_id=callback.from_user.id,
+        username=callback.from_user.username,
+        action="conference_selected",
+        details={"conference": conference_name}
+    )
+
+    await show_main_menu_with_conf_button(callback.message, state, callback.from_user.id)
+
+
+@router.callback_query(F.data.startswith("select_conf_"))
+async def process_conference_selection(callback: CallbackQuery, state: FSMContext):
+    conference_name = callback.data.replace("select_conf_", "")
+    await state.update_data(selected_conference=conference_name)
+
+    await db.log_user_action(
+        user_id=callback.from_user.id,
+        username=callback.from_user.username,
+        action="conference_selected",
+        details={"conference": conference_name}
+    )
+
+    await show_main_menu_with_conf_button(callback.message, state)
+
+
+@router.callback_query(F.data == "skip_conf_selection")
+async def skip_conference_selection(callback: CallbackQuery, state: FSMContext):
+    await show_main_menu_with_conf_button(callback.message, state)
+
+
+async def show_main_menu_with_conf_button(message: Message, state: FSMContext, user_id: int = None):
+    """Показать главное меню с отображением выбранной конференции"""
+    if user_id is None:
+        user_id = message.from_user.id
+
+    lang = await get_user_lang(user_id)
+
+    # Получаем выбранную конференцию из БД
+    async with db.pool.acquire() as conn:
+        selected_conf = await conn.fetchval(f"""
+            SELECT selected_conference FROM {db.db_schema_config}.user_profiles 
+            WHERE user_id = $1
+        """, user_id)
+
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="◀️ Back to conferences", callback_data="back_to_conferences"),
-        InlineKeyboardButton(text="🏠 Main Menu", callback_data="menu_main")
+        InlineKeyboardButton(text=get_text_sync(lang, 'pr'), callback_data="menu_pr"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'event'), callback_data="menu_event"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'travel'), callback_data="menu_travel")
+    )
+    builder.row(
+        InlineKeyboardButton(text=get_text_sync(lang, 'help'), callback_data="menu_help"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'my_profile'), callback_data="menu_profile")
     )
 
-    await callback.message.edit_text(
-        details,
+    if selected_conf:
+        conf_text = get_text_sync(lang, 'switch_conference')
+        welcome_text = f"{get_text_sync(lang, 'conference_selected', conference=selected_conf)}\n\n{get_text_sync(lang, 'main_menu_title')}"
+    else:
+        conf_text = get_text_sync(lang, 'select_conference_button')
+        welcome_text = get_text_sync(lang, 'main_menu_title')
+
+    builder.row(InlineKeyboardButton(text=conf_text, callback_data="show_conference_list"))
+
+    await message.edit_text(
+        welcome_text,
         reply_markup=builder.as_markup(),
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode="Markdown" if selected_conf else None
     )
 
 
-@router.callback_query(F.data == "back_to_conferences")
-async def back_to_conferences(callback: CallbackQuery):
-    """Вернуться к списку конференций"""
+@router.callback_query(F.data == "show_conference_list")
+async def show_conference_list(callback: CallbackQuery, state: FSMContext):
+    """Показать список конференций для смены"""
     username = callback.from_user.username
-    user_data = await db.get_user_data(callback.from_user.id)
-    lang = user_data.get('language', 'ru') if user_data else 'ru'
+    user_id = callback.from_user.id
 
-    await show_conferences_selection(callback.message, username, lang)
+    # Удаляем старое сообщение
+    try:
+        await callback.message.delete()
+    except:
+        pass
+
+    await show_conferences_selection(callback.message, username, user_id)
 
 
-# Обработчик для уже зарегистрированных пользователей
 @router.callback_query(F.data == "menu_main")
 async def return_to_main_menu(callback: CallbackQuery, state: FSMContext):
-    """Возврат в главное меню для зарегистрированных пользователей"""
     await state.clear()
-
-    # Получаем язык пользователя из БД
     user_data = await db.get_user_data(callback.from_user.id)
     lang = user_data.get('language', 'ru') if user_data else 'ru'
 
     await callback.message.edit_text(
-        LANG_TEXTS[lang]['success'],
-        reply_markup=get_main_menu_keyboard()
+        await t(callback.from_user.id, 'welcome'),
+        reply_markup=await get_main_menu_keyboard(callback.from_user.id)
     )

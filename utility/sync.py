@@ -85,18 +85,18 @@ class GoogleSheetsSync:
                 """)
 
                 # Insert into temp table
-                for _, row in df.iterrows():
-                    await conn.execute("""
-                        INSERT INTO temp_restaurants
-                        (city, restaurant, address, cost, link, comment)
-                        VALUES ($1, $2, $3, $4, $5, $6)
-                    """,
-                        row.get('City', ''),
-                        row.get('Restaurant', ''),
-                        row.get('Address', ''),
-                        row.get('Cost', ''),
-                        row.get('Link', ''),
-                        row.get('Comment', ''))
+                # for _, row in df.iterrows():
+                #     await conn.execute("""
+                #         INSERT INTO temp_restaurants
+                #         (city, restaurant, address, cost, link, comment)
+                #         VALUES ($1, $2, $3, $4, $5, $6)
+                #     """,
+                #         row.get('City', ''),
+                #         row.get('Restaurant', ''),
+                #         row.get('Address', ''),
+                #         row.get('Cost', ''),
+                #         row.get('Link', ''),
+                #         row.get('Comment', ''))
 
                 # Move to main table
                 await conn.execute(f"""
@@ -130,7 +130,7 @@ class GoogleSheetsSync:
                 bookings = await conn.fetch(f"""
                     SELECT b.*, w.company as user_company
                     FROM {db.db_schema}.bookings b
-                    LEFT JOIN {db.db_schema}.whitelist w ON b.username = w.username
+                    LEFT JOIN {db.db_schema_config}.whitelist w ON b.username = w.username
                     ORDER BY b.created_at
                 """)
 

@@ -2,9 +2,13 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from keyboards import get_main_menu_keyboard, get_profile_edit_keyboard, get_language_keyboard
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+from keyboards import get_main_menu_keyboard, get_profile_edit_keyboard, get_language_keyboard, get_event_menu_keyboard, \
+    get_pr_menu_keyboard, get_travel_menu_keyboard
 from database import db
 import logging
+from utility.lang_utils import *
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -21,49 +25,79 @@ class ProfileEditStates(StatesGroup):
 async def show_main_menu(callback: CallbackQuery, state: FSMContext):
     """Показать главное меню"""
     await state.clear()  # Очищаем все состояния
+
+    user_id = callback.from_user.id
+    lang = await get_user_lang(user_id)
+
+    # Получаем выбранную конференцию из БД
+    async with db.pool.acquire() as conn:
+        selected_conf = await conn.fetchval(f"""
+            SELECT selected_conference FROM {db.db_schema_config}.user_profiles 
+            WHERE user_id = $1
+        """, user_id)
+
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text=get_text_sync(lang, 'pr'), callback_data="menu_pr"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'event'), callback_data="menu_event"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'travel'), callback_data="menu_travel")
+    )
+    builder.row(
+        InlineKeyboardButton(text=get_text_sync(lang, 'help'), callback_data="menu_help"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'my_profile'), callback_data="menu_profile")
+    )
+
+    if selected_conf:
+        conf_text = get_text_sync(lang, 'switch_conference')
+        welcome_text = f"{get_text_sync(lang, 'conference_selected', conference=selected_conf)}\n\n{get_text_sync(lang, 'main_menu_title')}"
+    else:
+        conf_text = get_text_sync(lang, 'select_conference_button')
+        welcome_text = get_text_sync(lang, 'main_menu_title')
+
+    builder.row(InlineKeyboardButton(text=conf_text, callback_data="show_conference_list"))
+
     try:
         await callback.message.edit_text(
-            "Главное меню. Выберите раздел:",
-            reply_markup=get_main_menu_keyboard()
+            welcome_text,
+            reply_markup=builder.as_markup(),
+            parse_mode="Markdown" if selected_conf else None
         )
     except:
         await callback.message.delete()
-        await callback.answer(
-            "Главное меню. Выберите раздел:",
-            reply_markup=get_main_menu_keyboard()
+        await callback.message.answer(
+            welcome_text,
+            reply_markup=builder.as_markup(),
+            parse_mode="Markdown" if selected_conf else None
         )
 
 
 @router.callback_query(F.data == "menu_pr")
 async def show_pr_menu(callback: CallbackQuery, state: FSMContext):
-    """Переход в раздел PR"""
-    from keyboards import get_pr_menu_keyboard
-
+    """Переход в раздел PR с локализацией"""
+    user_id = callback.from_user.id
     await callback.message.edit_text(
-        "📢 Раздел PR\n\n"
-        "Выберите опцию:",
-        reply_markup=get_pr_menu_keyboard()
+        await t(user_id, 'pr_title'),
+        reply_markup=await get_pr_menu_keyboard(user_id)
     )
 
 
 @router.callback_query(F.data == "menu_event")
 async def show_event_menu(callback: CallbackQuery, state: FSMContext):
-    """Переход в раздел EVENT"""
-    from keyboards import get_event_menu_keyboard
-
+    """Переход в раздел EVENT с локализацией"""
+    user_id = callback.from_user.id
     await callback.message.edit_text(
-        "🎪 Раздел EVENT\n\n"
-        "Выберите опцию:",
-        reply_markup=get_event_menu_keyboard()
+        await t(user_id, 'event_title'),
+        reply_markup=await get_event_menu_keyboard(user_id)
     )
-
 
 @router.callback_query(F.data == "menu_travel")
 async def show_travel_menu(callback: CallbackQuery, state: FSMContext):
-    """Переход в раздел TRAVEL - используем единый travel_module.py"""
-    # Вместо прямой загрузки клавиатуры, переходим в travel_module
-    from handlers.travel_module import show_travel_menu as travel_menu_handler
-    await travel_menu_handler(callback, state)
+    """Переход в раздел TRAVEL с локализацией"""
+    user_id = callback.from_user.id
+    await callback.message.edit_text(
+        await t(user_id, 'travel_title'),
+        reply_markup=await get_travel_menu_keyboard(user_id)
+    )
 
 
 @router.callback_query(F.data == "menu_profile")
@@ -76,7 +110,6 @@ async def show_profile(callback: CallbackQuery):
     user_data = await db.get_user_data(user_id)
 
     if not user_data:
-        # Если данных нет, создаем базовую запись
         user_data = {
             'user_id': user_id,
             'username': username,
@@ -87,22 +120,18 @@ async def show_profile(callback: CallbackQuery):
         }
         await db.save_user_registration(user_data)
 
-    # Формируем текст профиля
-    profile_text = (
-        "👤 *Ваш профиль*\n\n"
-        f"*ID:* `{user_id}`\n"
-        f"*Username:* @{username}\n"
-        f"*Имя:* {user_data.get('full_name', 'Не указано')}\n"
-        f"*Должность:* {user_data.get('position', 'Не указано')}\n"
-        f"*Компания:* {user_data.get('company', 'Не указано')}\n"
-        f"*Язык:* {'🇷🇺 Русский' if user_data.get('language') == 'ru' else '🇬🇧 English'}\n"
-        f"*Дата регистрации:* {user_data.get('registered_at', 'Не указано').strftime('%d.%m.%Y') if user_data.get('registered_at') else 'Не указано'}\n\n"
-        "Выберите действие:"
+    lang = user_data.get('language', 'ru')
+    profile_text = await t(
+        user_id,
+        'profile_template',
+        user_id=user_id,
+        username=username,
+        full_name=user_data.get('full_name', get_text_sync(lang, 'not_specified')),
+        position=user_data.get('position', get_text_sync(lang, 'not_specified')),
+        company=user_data.get('company', get_text_sync(lang, 'not_specified')),
+        language='🇷🇺 Русский' if user_data.get('language') == 'ru' else '🇬🇧 English',
+        registered_at=user_data.get('registered_at', '').strftime('%d.%m.%Y') if user_data.get('registered_at') else get_text_sync(lang, 'not_specified')
     )
-
-    # Клавиатура с кнопками редактирования
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     builder = InlineKeyboardBuilder()
     builder.row(
@@ -118,11 +147,20 @@ async def show_profile(callback: CallbackQuery):
         InlineKeyboardButton(text="◀️ Главное меню", callback_data="menu_main")
     )
 
-    await callback.message.edit_text(
-        profile_text,
-        reply_markup=builder.as_markup(),
-        parse_mode="Markdown"
-    )
+    try:
+        await callback.message.edit_text(
+            profile_text,
+            reply_markup=builder.as_markup(),
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        await callback.message.delete()
+        await callback.message.answer(
+            profile_text,
+            reply_markup=builder.as_markup(),
+            parse_mode="Markdown"
+        )
+    await callback.answer()
 
 @router.callback_query(F.data == "profile_refresh")
 async def refresh_profile(callback: CallbackQuery):
@@ -133,19 +171,15 @@ async def refresh_profile(callback: CallbackQuery):
 @router.callback_query(F.data == "menu_help")
 async def show_help(callback: CallbackQuery):
     """Показать помощь"""
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-    from keyboards import get_main_menu_keyboard
+    user_id = callback.from_user.id
+    lang = await get_user_lang(user_id)
 
-    # Создаем клавиатуру с кнопкой "Главное меню"
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="◀️ Главное меню", callback_data="menu_main")]
+        [InlineKeyboardButton(text=get_text_sync(lang, 'back'), callback_data="menu_main")]
     ])
 
     await callback.message.edit_text(
-        "🆘 Помощь по боту:\n\n"
-        "• Для возврата в главное меню нажмите кнопку ниже\n"
-        "• По вопросам доступа обращайтесь к администратору\n"
-        "• Технические проблемы: support@conference.com",
+        get_text_sync(lang, 'help_text'),
         reply_markup=keyboard
     )
 
@@ -185,7 +219,7 @@ async def process_name_edit(message: Message, state: FSMContext):
     try:
         async with db.pool.acquire() as conn:
             await conn.execute(f"""
-                UPDATE {db.db_schema}.user_profiles 
+                UPDATE {db.db_schema_config}.user_profiles 
                 SET full_name = $1, updated_at = NOW()
                 WHERE user_id = $2
             """, new_name, user_id)
@@ -247,7 +281,7 @@ async def process_position_edit(message: Message, state: FSMContext):
     try:
         async with db.pool.acquire() as conn:
             await conn.execute(f"""
-                UPDATE {db.db_schema}.user_profiles 
+                UPDATE {db.db_schema_config}.user_profiles 
                 SET position = $1, updated_at = NOW()
                 WHERE user_id = $2
             """, new_position, user_id)
@@ -308,7 +342,7 @@ async def process_company_edit(message: Message, state: FSMContext):
         async with db.pool.acquire() as conn:
             # Обновляем в user_profiles
             await conn.execute(f"""
-                UPDATE {db.db_schema}.user_profiles 
+                UPDATE {db.db_schema_config}.user_profiles 
                 SET company = $1, updated_at = NOW()
                 WHERE user_id = $2
             """, new_company, user_id)
@@ -369,7 +403,7 @@ async def process_language_edit(callback: CallbackQuery, state: FSMContext):
     try:
         async with db.pool.acquire() as conn:
             await conn.execute(f"""
-                UPDATE {db.db_schema}.user_profiles 
+                UPDATE {db.db_schema_config}.user_profiles 
                 SET language = $1, updated_at = NOW()
                 WHERE user_id = $2
             """, new_lang, user_id)

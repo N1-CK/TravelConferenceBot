@@ -20,7 +20,12 @@ class Database:
     def __init__(self):
         if not hasattr(self, 'pool'):
             self.pool = None
-            self.db_schema = os.getenv('DB_SCHEMA', 'conference')
+            self.db_schema = os.getenv('DB_SCHEMA', 'travelconference_bot')
+            self.db_schema_config = os.getenv('DB_SCHEMA_CONFIG', 'travelconference_config')
+            self.db_schema_travel = os.getenv('DB_SCHEMA_CONFIG', 'travelconference_travel')
+            self.db_schema_pr = os.getenv('DB_SCHEMA_CONFIG', 'travelconference_pr')
+            self.db_schema_event = os.getenv('DB_SCHEMA_CONFIG', 'travelconference_event')
+            self.db_schema_admin = os.getenv('DB_SCHEMA_CONFIG', 'travelconference_admin')
 
     async def create_pool(self):
         """Создание пула подключений"""
@@ -47,16 +52,76 @@ class Database:
                 # Существующие таблицы Conference Bot
                 tables = [
                     f'''
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.whitelist (
+                        CREATE SCHEMA IF NOT EXISTS systemcheck_bot;
+                    ''',
+                    f'''
+                        CREATE SCHEMA IF NOT EXISTS {self.db_schema};
+                    ''',
+                    f'''
+                        CREATE SCHEMA IF NOT EXISTS {self.db_schema_config};
+                    ''',
+                    f'''
+                        CREATE SCHEMA IF NOT EXISTS {self.db_schema_admin};
+                    ''',
+                    f'''
+                        CREATE SCHEMA IF NOT EXISTS {self.db_schema_travel};
+                    ''',
+                    f'''
+                        CREATE SCHEMA IF NOT EXISTS {self.db_schema_event};
+                    ''',
+                    f'''
+                        CREATE SCHEMA IF NOT EXISTS {self.db_schema_pr};
+                    ''',
+
+                    # Белый список
+                    f'''
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_config}.whitelist (
                         username TEXT PRIMARY KEY,
-                        telegram_id BIGINT,
-                        company TEXT,
-                        role TEXT,
                         is_active BOOLEAN DEFAULT TRUE,
                         created_at TIMESTAMP DEFAULT NOW(),
                         updated_at TIMESTAMP DEFAULT NOW()
                     )
                     ''',
+
+                    # Список всех компаний
+                    await conn.execute(f"""
+                        CREATE TABLE IF NOT EXISTS {self.db_schema_config}.companies (
+                            id SERIAL PRIMARY KEY,
+                            company_name TEXT UNIQUE NOT NULL,
+                            is_active BOOLEAN DEFAULT TRUE,
+                            updated_at TIMESTAMP DEFAULT NOW()
+                        )
+                    """),
+
+                    f"""
+                        CREATE TABLE IF NOT EXISTS {self.db_schema_config}.conferences (
+                            id SERIAL PRIMARY KEY,
+                            conference_name TEXT UNIQUE NOT NULL,
+                            start_date TEXT,
+                            end_date TEXT,
+                            city TEXT,
+                            bot_link TEXT,
+                            additional_info TEXT,
+                            sheet_name TEXT,
+                            is_active BOOLEAN DEFAULT TRUE,
+                            created_at TIMESTAMP DEFAULT NOW(),
+                            updated_at TIMESTAMP DEFAULT NOW()
+                        )
+                    """,
+
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_config}.user_profiles (
+                        user_id BIGINT PRIMARY KEY,
+                        username TEXT NOT NULL,
+                        language TEXT DEFAULT 'en',
+                        full_name TEXT,
+                        position TEXT,
+                        company TEXT,
+                        selected_conference TEXT,
+                        registered_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
+                    )
+                    """,
 
                     # User logs
                     f'''
@@ -83,7 +148,8 @@ class Database:
                         language TEXT,
                         photo_required BOOLEAN,
                         photo_file_id TEXT,
-                        created_at TIMESTAMP DEFAULT NOW()
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        comments TEXT DEFAULT ''
                     )
                     ''',
 
@@ -124,7 +190,7 @@ class Database:
                     # Auth users (объединяем с whitelist)
                     f'''
                     CREATE TABLE IF NOT EXISTS {self.db_schema}.affiliate_auth_users (
-                        username TEXT PRIMARY KEY REFERENCES {self.db_schema}.whitelist(username),
+                        username TEXT PRIMARY KEY REFERENCES {self.db_schema_config}.whitelist(username),
                         flag BOOLEAN DEFAULT TRUE,
                         company TEXT,
                         created_at TIMESTAMP DEFAULT NOW()
@@ -309,10 +375,6 @@ class Database:
                     )
                     ''',
 
-                    # Логи статуса бота
-                    f'''
-                    CREATE SCHEMA IF NOT EXISTS systemcheck_bot;
-                    ''',
 
                     f'''
                     CREATE TABLE IF NOT EXISTS systemcheck_bot.bots_status (
@@ -443,7 +505,7 @@ class Database:
                     f"""
                     SELECT au.flag 
                     FROM {self.db_schema}.affiliate_auth_users au
-                    JOIN {self.db_schema}.whitelist w ON au.username = w.username
+                    JOIN {self.db_schema_config}.whitelist w ON au.username = w.username
                     WHERE au.username = $1 AND w.is_active = TRUE
                     """,
                     username
@@ -457,13 +519,13 @@ class Database:
         """Добавление пользователя Affiliate Bot"""
         try:
             async with self.pool.acquire() as conn:
-                # Добавляем в whitelist если нет
+                # Добавляем в whitelist
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.whitelist (username, company)
-                    VALUES ($1, $2)
+                    INSERT INTO {self.db_schema_config}.whitelist (username, is_active)
+                    VALUES ($1, TRUE)
                     ON CONFLICT (username) DO UPDATE
-                    SET is_active = TRUE, company = EXCLUDED.company
-                """, username, company)
+                    SET is_active = TRUE
+                """, username)
 
                 await conn.execute(f"""
                     INSERT INTO {self.db_schema}.affiliate_auth_users (username, company, flag)
@@ -755,7 +817,6 @@ class Database:
 
     async def save_user_agreement(self, user_id: int, username: str,
                                   version: str, agreement_type: str = 'terms') -> bool:
-        """Сохранение согласия пользователя"""
         try:
             async with self.pool.acquire() as conn:
                 await conn.execute(f"""
@@ -767,14 +828,13 @@ class Database:
                         accepted_at = NOW()
                 """, user_id, username, agreement_type, version)
 
+                # Только username, без telegram_id и company
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.whitelist (username, telegram_id, is_active)
-                    VALUES ($1, $2, TRUE)
+                    INSERT INTO {self.db_schema_config}.whitelist (username, is_active)
+                    VALUES ($1, TRUE)
                     ON CONFLICT (username) DO UPDATE
-                    SET telegram_id = EXCLUDED.telegram_id,
-                        is_active = TRUE,
-                        updated_at = NOW()
-                """, username, user_id)
+                    SET is_active = TRUE
+                """, username)
 
                 return True
         except Exception as e:
@@ -823,6 +883,45 @@ class Database:
         except Exception as e:
             logger.error(f"Error getting flight details: {e}")
             return []
+
+    async def save_ticket_request(self, data: dict) -> bool:
+        """Сохранение заявки на билет конференции"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Создаем таблицу если нет
+                await conn.execute(f"""
+                    CREATE TABLE IF NOT EXISTS {self.db_schema}.event_ticket_requests (
+                        id SERIAL PRIMARY KEY,
+                        username TEXT,
+                        user_id BIGINT,
+                        full_name TEXT,
+                        position TEXT,
+                        company TEXT,
+                        email TEXT,
+                        phone TEXT,
+                        country TEXT,
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+
+                await conn.execute(f"""
+                    INSERT INTO {self.db_schema}.event_ticket_requests 
+                    (username, user_id, full_name, position, company, email, phone, country)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                """,
+                                   data['username'],
+                                   data['user_id'],
+                                   data.get('full_name', ''),
+                                   data.get('position', ''),
+                                   data.get('company', ''),
+                                   data.get('email', ''),
+                                   data.get('phone', ''),
+                                   data.get('country', '')
+                                   )
+                return True
+        except Exception as e:
+            logger.error(f"Error saving ticket request: {e}")
+            return False
 
     async def save_flight_request(self, flight_data: Dict) -> bool:
         """Save flight request to database"""
@@ -967,7 +1066,7 @@ class Database:
                 result = await conn.fetchval(
                     f"""
                     SELECT is_active 
-                    FROM {self.db_schema}.whitelist 
+                    FROM {self.db_schema_config}.whitelist 
                     WHERE username = $1
                     """,
                     username
@@ -976,6 +1075,20 @@ class Database:
         except Exception as e:
             logger.error(f"Error checking whitelist for {username}: {e}")
             return False
+
+    async def get_selected_conference(self, user_id: int) -> str:
+        """Получить выбранную конференцию пользователя"""
+        try:
+            async with self.pool.acquire() as conn:
+                result = await conn.fetchval(f"""
+                    SELECT selected_conference 
+                    FROM {self.db_schema_config}.user_profiles 
+                    WHERE user_id = $1
+                """, user_id)
+                return result or ""
+        except Exception as e:
+            logger.error(f"Error getting selected conference: {e}")
+            return ""
 
     # database.py
     async def log_user_action(self, user_id: int, username: str, action: str, details: dict = None) -> bool:
@@ -1112,7 +1225,7 @@ class Database:
                                    )
                 return True
         except Exception as e:
-            logger.error(f"Error saving per diem request: {e}")
+            logger.error(f"Error saving daily allowance request: {e}")
             return False
 
     async def set_user_company(self, user_id: int, username: str, company: str) -> bool:
@@ -1137,7 +1250,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 company = await conn.fetchval(f"""
-                    SELECT company FROM {self.db_schema}.user_profiles
+                    SELECT company FROM {self.db_schema_config}.user_profiles
                     WHERE user_id = $1
                 """, user_id)
                 return company or ""
@@ -1189,7 +1302,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 # Создаем таблицу если нет
                 await conn.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.user_profiles (
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_config}.user_profiles (
                         user_id BIGINT PRIMARY KEY,
                         username TEXT NOT NULL,
                         language TEXT DEFAULT 'ru',
@@ -1203,7 +1316,7 @@ class Database:
 
                 # Вставляем или обновляем данные
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.user_profiles 
+                    INSERT INTO {self.db_schema_config}.user_profiles 
                     (user_id, username, language, full_name, position, company, updated_at)
                     VALUES ($1, $2, $3, $4, $5, $6, NOW())
                     ON CONFLICT (user_id) DO UPDATE
@@ -1243,7 +1356,7 @@ class Database:
                 row = await conn.fetchrow(f"""
                     SELECT user_id, username, language, full_name, position, company, 
                            registered_at, updated_at
-                    FROM {self.db_schema}.user_profiles 
+                    FROM {self.db_schema_config}.user_profiles 
                     WHERE user_id = $1
                 """, user_id)
 
@@ -1260,7 +1373,13 @@ class Database:
 
     async def sync_whitelist_from_google_sheets(self, spreadsheet_name: str = "Whitelist") -> bool:
         """
-        Синхронизация whitelist из Google Sheets
+        Синхронизация whitelist и конференций из Google Sheets
+
+        Структура:
+        - Лист "Общая информация": столбец A - список компаний → в config.companies
+        - Остальные листы - конференции:
+            * Столбцы A-C: TG_username, Дата начала поездки, Дата окончания поездки
+            * Столбцы E-J: Название конференции, Даты начала конференции, Дата окончания конференции, Город, Бот, Доп. информация
         """
         try:
             from utility.sync import GoogleSheetsSync
@@ -1270,75 +1389,148 @@ class Database:
                 logger.error("Failed to connect to Google Sheets")
                 return False
 
-
-            # Открываем таблицу
             sh = sync.gc.open(spreadsheet_name)
             worksheets = sh.worksheets()
 
             async with self.pool.acquire() as conn:
-                # Очищаем существующие записи для обновляемых пользователей
-                await conn.execute(f"TRUNCATE TABLE {self.db_schema}.whitelist RESTART IDENTITY CASCADE")
+                # Очищаем старые данные
+                await conn.execute(f"TRUNCATE TABLE {self.db_schema_config}.whitelist CASCADE")
+                await conn.execute(f"TRUNCATE TABLE {self.db_schema}.user_conferences CASCADE")
+                await conn.execute(f"TRUNCATE TABLE {self.db_schema_config}.conferences CASCADE")
 
-                all_users = []
+                total_users = 0
+                total_conferences = 0
+                total_companies = 0
 
-                # Проходим по всем листам (конференциям)
                 for worksheet in worksheets:
-                    conference_name = worksheet.title
+                    sheet_name = worksheet.title
                     records = worksheet.get_all_records()
 
+                    if not records:
+                        continue
+
+                    # ============================================
+                    # ЛИСТ "Общая информация" - компании
+                    # ============================================
+                    if sheet_name == "Общая информация":
+                        for record in records:
+                            company_name = None
+                            for key, value in record.items():
+                                if value and str(value).strip():
+                                    company_name = str(value).strip()
+                                    break
+
+                            if not company_name:
+                                continue
+
+                            if company_name.lower() in ['список всех компаний и партнерок', 'company', 'companies']:
+                                continue
+
+                            await conn.execute(f"""
+                                INSERT INTO {self.db_schema_config}.companies (company_name, is_active)
+                                VALUES ($1, TRUE)
+                                ON CONFLICT (company_name) DO UPDATE
+                                SET is_active = TRUE
+                            """, company_name)
+                            total_companies += 1
+
+                        logger.info(f"✅ Synced {total_companies} companies from 'Общая информация'")
+                        continue
+
+                    # ============================================
+                    # ОСТАЛЬНЫЕ ЛИСТЫ - конференции и пользователи
+                    # ============================================
+
+                    # Получаем информацию о конференции
+                    conference_info = {}
+                    for row in records:
+                        if row.get('Название конференции'):
+                            conference_info = {
+                                'conference_name': row.get('Название конференции', sheet_name),
+                                'conf_start': row.get('Даты начала конференции', ''),
+                                'conf_end': row.get('Дата окончания конференции', ''),
+                                'city': row.get('Город конференции', ''),
+                                'bot_link': row.get('Бот конференции', ''),
+                                'additional_info': row.get('Дополнительная информация', '')
+                            }
+                            break
+
+                    if not conference_info.get('conference_name'):
+                        conference_info = {
+                            'conference_name': sheet_name,
+                            'conf_start': '',
+                            'conf_end': '',
+                            'city': '',
+                            'bot_link': '',
+                            'additional_info': ''
+                        }
+
+                    # Сохраняем конференцию
+                    await conn.execute(f"""
+                        INSERT INTO {self.db_schema_config}.conferences 
+                        (conference_name, start_date, end_date, city, bot_link, additional_info, sheet_name)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                        ON CONFLICT (conference_name) DO UPDATE
+                        SET start_date = EXCLUDED.start_date,
+                            end_date = EXCLUDED.end_date,
+                            city = EXCLUDED.city,
+                            bot_link = EXCLUDED.bot_link,
+                            additional_info = EXCLUDED.additional_info,
+                            sheet_name = EXCLUDED.sheet_name
+                    """,
+                                       conference_info['conference_name'],
+                                       conference_info['conf_start'],
+                                       conference_info['conf_end'],
+                                       conference_info['city'],
+                                       conference_info['bot_link'],
+                                       conference_info['additional_info'],
+                                       sheet_name
+                                       )
+                    total_conferences += 1
+
+                    # Обрабатываем пользователей
                     for record in records:
                         username = record.get('TG_username', '').strip()
                         if not username or username.lower() == 'tg_username':
                             continue
 
-                        # Собираем данные пользователя
-                        user_data = {
-                            'username': username,
-                            'conference': conference_name,
-                            'trip_start': record.get('Дата начала поездки', ''),
-                            'trip_end': record.get('Дата окончания поездки', ''),
-                            'conf_start': record.get('Даты начала конференции', ''),
-                            'conf_end': record.get('Дата окончания конференции', ''),
-                            'city': record.get('Город конференции', '')
-                        }
-
-                        all_users.append(user_data)
-
-                        # Добавляем/обновляем пользователя в whitelist
+                        # Сохраняем в whitelist (только username и is_active)
                         await conn.execute(f"""
-                            INSERT INTO {self.db_schema}.whitelist 
-                            (username, company, is_active, created_at, updated_at)
-                            VALUES ($1, $2, TRUE, NOW(), NOW())
+                            INSERT INTO {self.db_schema_config}.whitelist (username, is_active)
+                            VALUES ($1, TRUE)
                             ON CONFLICT (username) DO UPDATE
-                            SET is_active = TRUE,
-                                company = EXCLUDED.company,
-                                updated_at = NOW()
-                        """, username, conference_name)
+                            SET is_active = TRUE
+                        """, username)
 
-                        # Сохраняем конференции пользователя
+                        # Сохраняем конференцию пользователя
                         await conn.execute(f"""
                             INSERT INTO {self.db_schema}.user_conferences 
                             (username, conference_name, trip_start_date, trip_end_date, 
-                             conference_start_date, conference_end_date, city)
-                            VALUES ($1, $2, $3, $4, $5, $6, $7)
+                             conference_start_date, conference_end_date, city, bot_link, additional_info)
+                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                             ON CONFLICT (username, conference_name) DO UPDATE
                             SET trip_start_date = EXCLUDED.trip_start_date,
                                 trip_end_date = EXCLUDED.trip_end_date,
                                 conference_start_date = EXCLUDED.conference_start_date,
                                 conference_end_date = EXCLUDED.conference_end_date,
                                 city = EXCLUDED.city,
-                                updated_at = NOW()
+                                bot_link = EXCLUDED.bot_link,
+                                additional_info = EXCLUDED.additional_info
                         """,
                                            username,
-                                           conference_name,
-                                           user_data['trip_start'],
-                                           user_data['trip_end'],
-                                           user_data['conf_start'],
-                                           user_data['conf_end'],
-                                           user_data['city']
+                                           conference_info['conference_name'],
+                                           record.get('Дата начала поездки', ''),
+                                           record.get('Дата окончания поездки', ''),
+                                           conference_info['conf_start'],
+                                           conference_info['conf_end'],
+                                           conference_info['city'],
+                                           conference_info['bot_link'],
+                                           conference_info['additional_info']
                                            )
+                        total_users += 1
 
-                logger.info(f"✅ Synced {len(all_users)} users from {len(worksheets)} conferences")
+                logger.info(
+                    f"✅ Synced {total_users} users, {total_conferences} conferences, {total_companies} companies")
                 return True
 
         except Exception as e:
@@ -1346,50 +1538,53 @@ class Database:
             return False
 
     async def get_user_conferences(self, username: str) -> List[Dict]:
-        """
-        Получить все конференции пользователя из whitelist
-        """
+        """Получить все конференции пользователя"""
         try:
             async with self.pool.acquire() as conn:
-                try:
-                    rows = await conn.fetch(f"""
-                        SELECT conference_name, trip_start_date, trip_end_date,
-                               conference_start_date, conference_end_date, city
-                        FROM {self.db_schema}.user_conferences
-                        WHERE username = $1
-                        ORDER BY conference_start_date
-                    """, username)
-
-                    if rows:
-                        return [dict(row) for row in rows]
-                except Exception as e:
-                    logger.warning(f"user_conferences table might not exist: {e}")
-
-                # Fallback: получаем из whitelist по company (для обратной совместимости)
-                company = await conn.fetchval(f"""
-                    SELECT company FROM {self.db_schema}.whitelist WHERE username = $1
+                rows = await conn.fetch(f"""
+                    SELECT conference_name, trip_start_date, trip_end_date,
+                           conference_start_date, conference_end_date, city
+                    FROM {self.db_schema}.user_conferences
+                    WHERE username = $1
+                    ORDER BY conference_start_date
                 """, username)
-
-                if company:
-                    return [{
-                        'conference_name': company,
-                        'city': '',
-                        'conference_start_date': '',
-                        'conference_end_date': ''
-                    }]
-
-                return []
-
+                return [dict(row) for row in rows] if rows else []
         except Exception as e:
             logger.error(f"Error getting user conferences: {e}")
             return []
 
-    async def get_user_active_conferences(self, username: str) -> List[str]:
-        """
-        Получить список названий активных конференций пользователя
-        """
-        conferences = await self.get_user_conferences(username)
-        return [conf['conference_name'] for conf in conferences if conf.get('conference_name')]
+    async def get_user_active_conferences(self, username: str) -> List[Dict]:
+        """Получить список активных конференций пользователя"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT 
+                        conference_name,
+                        trip_start_date,
+                        trip_end_date,
+                        conference_start_date,
+                        conference_end_date,
+                        city,
+                        bot_link,
+                        additional_info
+                    FROM {self.db_schema}.user_conferences
+                    WHERE username = $1
+                    ORDER BY conference_start_date
+                """, username)
+
+                if rows:
+                    result = []
+                    for row in rows:
+                        record = dict(row)
+                        record['bot_link'] = record.get('bot_link') or ''
+                        record['additional_info'] = record.get('additional_info') or ''
+                        result.append(record)
+                    return result
+                return []
+        except Exception as e:
+            logger.error(f"Error getting user active conferences: {e}")
+            return []
+
 
     async def check_user_conference_access(self, username: str, conference: str) -> bool:
         """
@@ -1892,7 +2087,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
                     SELECT up.user_id, up.username, up.full_name, up.company
-                    FROM {self.db_schema}.user_profiles up
+                    FROM {self.db_schema_config}.user_profiles up
                     JOIN {self.db_schema}.user_group_membership ugm ON up.user_id = ugm.user_id
                     WHERE ugm.group_id = $1
                     ORDER BY up.username
@@ -2025,6 +2220,35 @@ class Database:
             logger.error(f"Error getting group features: {e}")
             return []
 
+    async def get_all_companies_from_config(self) -> list:
+        """Получить список всех компаний из конфига"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT company_name FROM {self.db_schema_config}.companies
+                    WHERE is_active = TRUE
+                    ORDER BY company_name
+                """)
+                return [row['company_name'] for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting companies from config: {e}")
+            return []
+
+    async def search_companies_by_prefix(self, prefix: str) -> list:
+        """Поиск компаний по префиксу (для автодополнения)"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT company_name FROM {self.db_schema_config}.companies
+                    WHERE is_active = TRUE AND company_name ILIKE $1
+                    ORDER BY company_name
+                    LIMIT 10
+                """, f"{prefix}%")
+                return [row['company_name'] for row in rows]
+        except Exception as e:
+            logger.error(f"Error searching companies: {e}")
+            return []
+
     async def get_all_users_with_groups(self) -> list:
         """Получить всех пользователей с их группами и функциями"""
         try:
@@ -2036,7 +2260,7 @@ class Database:
                         up.full_name,
                         up.company,
                         up.position
-                    FROM {self.db_schema}.user_profiles up
+                    FROM {self.db_schema_config}.user_profiles up
                     ORDER BY up.username
                 """)
 
@@ -2077,7 +2301,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
                     SELECT user_id, username, full_name, company
-                    FROM {self.db_schema}.user_profiles
+                    FROM {self.db_schema_config}.user_profiles
                     ORDER BY username
                 """)
                 return [dict(row) for row in rows]
@@ -2203,7 +2427,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 total_users = await conn.fetchval(f"""
-                    SELECT COUNT(DISTINCT user_id) FROM {self.db_schema}.user_profiles
+                    SELECT COUNT(DISTINCT user_id) FROM {self.db_schema_config}.user_profiles
                 """) or 0
 
                 active_today = await conn.fetchval(f"""
@@ -2214,7 +2438,7 @@ class Database:
 
                 companies_stats = await conn.fetch(f"""
                     SELECT company, COUNT(DISTINCT user_id) as user_count
-                    FROM {self.db_schema}.user_profiles
+                    FROM {self.db_schema_config}.user_profiles
                     WHERE company IS NOT NULL AND company != ''
                     GROUP BY company
                     ORDER BY user_count DESC
@@ -2336,7 +2560,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
                     SELECT DISTINCT company
-                    FROM {self.db_schema}.user_profiles
+                    FROM {self.db_schema_config}.user_profiles
                     WHERE company IS NOT NULL AND company != ''
                     ORDER BY company
                 """)
@@ -2381,7 +2605,7 @@ class Database:
                         up.registered_at,
                         (SELECT MAX(timestamp) FROM {self.db_schema}.user_logs WHERE user_id = up.user_id) as last_active,
                         (SELECT COUNT(*) FROM {self.db_schema}.user_logs WHERE user_id = up.user_id AND timestamp > NOW() - INTERVAL '5 minutes') > 0 as is_online
-                    FROM {self.db_schema}.user_profiles up
+                    FROM {self.db_schema_config}.user_profiles up
                     ORDER BY up.registered_at DESC
                 """)
                 users = [dict(row) for row in rows]
@@ -2419,7 +2643,7 @@ class Database:
                     SELECT 
                         up.*,
                         (SELECT MAX(timestamp) FROM {self.db_schema}.user_logs WHERE user_id = up.user_id) as last_active
-                    FROM {self.db_schema}.user_profiles up
+                    FROM {self.db_schema_config}.user_profiles up
                     WHERE up.user_id = $1
                 """, user_id)
 

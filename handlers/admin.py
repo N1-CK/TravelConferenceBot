@@ -71,7 +71,7 @@ async def show_stats(callback: CallbackQuery):
     try:
         async with db.pool.acquire() as conn:
             # Общая статистика
-            total_users = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema}.whitelist WHERE is_active = TRUE")
+            total_users = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema_config}.whitelist WHERE is_active = TRUE")
             active_today = await conn.fetchval(f"""
                 SELECT COUNT(DISTINCT user_id) FROM {db.db_schema}.user_logs 
                 WHERE timestamp > NOW() - INTERVAL '1 day'

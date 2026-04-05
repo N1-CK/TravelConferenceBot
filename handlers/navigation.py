@@ -14,7 +14,7 @@ async def go_to_main_menu(callback: CallbackQuery, state: FSMContext):
     from keyboards import get_main_menu_keyboard
     await callback.message.edit_text(
         "Главное меню. Выберите раздел:",
-        reply_markup=get_main_menu_keyboard()
+        reply_markup=await get_main_menu_keyboard()
     )
 
 
@@ -22,24 +22,24 @@ async def go_to_main_menu(callback: CallbackQuery, state: FSMContext):
 async def go_back_in_form(callback: CallbackQuery, state: FSMContext):
     """Назад в форме (универсальный обработчик)"""
     target = callback.data.replace("back_to_", "")
-
+    user_id = callback.from_user.id
     if target == "menu_pr":
         from handlers.pr import get_pr_menu_keyboard
         await callback.message.edit_text(
             "📢 Раздел PR\n\nВыберите опцию:",
-            reply_markup=get_pr_menu_keyboard()
+            reply_markup=await get_pr_menu_keyboard(user_id)
         )
     elif target == "menu_event":
         from handlers.event import get_event_menu_keyboard
         await callback.message.edit_text(
             "🎪 Раздел EVENT\n\nВыберите опцию:",
-            reply_markup=get_event_menu_keyboard()
+            reply_markup=await get_event_menu_keyboard(user_id)
         )
     elif target == "menu_travel":
-        from handlers.travel import get_travel_menu_keyboard
+        from handlers.travel_module import get_travel_menu_keyboard
         await callback.message.edit_text(
             "✈️ Раздел TRAVEL\n\nВыберите опцию:",
-            reply_markup=get_travel_menu_keyboard()
+            reply_markup=await get_travel_menu_keyboard(user_id)
         )
     else:
         await go_to_main_menu(callback, state)

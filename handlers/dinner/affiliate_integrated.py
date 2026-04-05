@@ -218,13 +218,13 @@ async def main_menu_callback(call: CallbackQuery, state: FSMContext):
     try:
         await call.message.edit_text(
             "🏠 Main Menu",
-            reply_markup=get_main_menu_keyboard()
+            reply_markup=await get_main_menu_keyboard()
         )
     except:
         await call.message.delete()
         await call.answer(
             "🏠 Main Menu",
-            reply_markup=get_main_menu_keyboard()
+            reply_markup=await get_main_menu_keyboard()
         )
 
 

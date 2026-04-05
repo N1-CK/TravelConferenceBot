@@ -13,7 +13,7 @@ async def add_to_whitelist(username: str, telegram_id: int = None, company: str 
     try:
         async with db.pool.acquire() as conn:
             await conn.execute(f'''
-                INSERT INTO {db.db_schema}.whitelist (username, telegram_id, company, role)
+                INSERT INTO {db.db_schema_config}.whitelist (username, telegram_id, company, role)
                 VALUES ($1, $2, $3, $4)
                 ON CONFLICT (username) DO UPDATE
                 SET telegram_id = EXCLUDED.telegram_id,
