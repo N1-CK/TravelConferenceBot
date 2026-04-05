@@ -67,7 +67,8 @@ async def get_pr_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text=get_text_sync(lang, 'pr_conference_bot'), callback_data="pr_conference_bot")
     )
     builder.row(
-        InlineKeyboardButton(text=get_text_sync(lang, 'pr_question'), callback_data="pr_question")
+        InlineKeyboardButton(text=get_text_sync(lang, 'pr_question'), callback_data="pr_question"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'pr_conference_rules'), callback_data="pr_conference_rules")
     )
     builder.row(
         InlineKeyboardButton(text=get_text_sync(lang, 'back'), callback_data="menu_main"),
