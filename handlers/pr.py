@@ -220,11 +220,10 @@ async def process_language(message: Message, state: FSMContext):
     # Кнопки Да/Нет
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-    lang = await get_user_lang(message.from_user.id)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=get_text_sync(lang, 'yes'), callback_data="banner_photo_yes"),
-         InlineKeyboardButton(text=get_text_sync(lang, 'no'), callback_data="banner_photo_no")],
-        [InlineKeyboardButton(text=get_text_sync(lang, 'back'), callback_data="banner_back_step4")]
+        [InlineKeyboardButton(text=await t(message.from_user.id, 'yes'), callback_data="banner_photo_yes"),
+         InlineKeyboardButton(text=await t(message.from_user.id, 'no'), callback_data="banner_photo_no")],
+        [InlineKeyboardButton(text=await t(message.from_user.id, 'back'), callback_data="banner_back_step4")]
     ])
 
     await message.answer(
@@ -240,7 +239,7 @@ async def process_photo_yes(callback: CallbackQuery, state: FSMContext):
     await state.set_state(PRBannerForm.waiting_for_photo)
     await callback.message.edit_text(
         "Шаг 6 из 6\n"
-        "Пожалуйста, прикрепите изображение:",
+        "Пожалуйста, прикрепите изображение",
         reply_markup=await get_back_next_keyboard(back_to="banner_step5")
     )
 
@@ -293,9 +292,9 @@ async def back_to_photo_choice(callback: CallbackQuery, state: FSMContext):
     await state.set_state(PRBannerForm.waiting_for_photo_choice)
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Да", callback_data="banner_photo_yes"),
-         InlineKeyboardButton(text="❌ Нет", callback_data="banner_photo_no")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="banner_back_step5")]
+        [InlineKeyboardButton(text=await t(callback.from_user.id, 'yes'), callback_data="banner_photo_yes"),
+         InlineKeyboardButton(text=await t(callback.from_user.id, 'no'), callback_data="banner_photo_no")],
+        [InlineKeyboardButton(text=await t(callback.from_user.id, 'back'), callback_data="banner_back_step5")]
     ])
 
     await callback.message.edit_text(

@@ -31,31 +31,31 @@ logger = logging.getLogger(__name__)
 # DECORATORS AND AUTHORIZATION
 # ============================================
 
-def affiliate_auth_required(func):
-    """Decorator for affiliate module access check"""
-
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-        update = args[0]
-        username = update.from_user.username
-
-        if not username:
-            if isinstance(update, Message):
-                await update.answer("Please set username in Telegram")
-            elif isinstance(update, CallbackQuery):
-                await update.answer("Username required", show_alert=True)
-            return
-
-        if not await db.check_affiliate_auth(username):
-            if isinstance(update, Message):
-                await update.answer("For access to partner dinners, use /affiliate_start")
-            elif isinstance(update, CallbackQuery):
-                await update.answer("Authorization required /affiliate_start", show_alert=True)
-            return
-
-        return await func(*args, **kwargs)
-
-    return wrapper
+# def affiliate_auth_required(func):
+#     """Decorator for affiliate module access check"""
+#
+#     @wraps(func)
+#     async def wrapper(*args, **kwargs):
+#         update = args[0]
+#         username = update.from_user.username
+#
+#         if not username:
+#             if isinstance(update, Message):
+#                 await update.answer("Please set username in Telegram")
+#             elif isinstance(update, CallbackQuery):
+#                 await update.answer("Username required", show_alert=True)
+#             return
+#
+#         if not await db.check_affiliate_auth(username):
+#             if isinstance(update, Message):
+#                 await update.answer("For access to partner dinners, use /affiliate_start")
+#             elif isinstance(update, CallbackQuery):
+#                 await update.answer("Authorization required /affiliate_start", show_alert=True)
+#             return
+#
+#         return await func(*args, **kwargs)
+#
+#     return wrapper
 
 
 # ============================================
@@ -202,7 +202,7 @@ async def show_affiliate_main_menu(update: Union[Message, CallbackQuery]):
 
 
 @router.callback_query(F.data == "aff_main")
-@affiliate_auth_required
+# @affiliate_auth_required
 async def back_to_affiliate_main(call: CallbackQuery, state: FSMContext):
     """Back to main menu"""
     await state.clear()
@@ -233,7 +233,7 @@ async def main_menu_callback(call: CallbackQuery, state: FSMContext):
 # ============================================
 
 @router.callback_query(F.data == "aff_restaurants")
-@affiliate_auth_required
+# @affiliate_auth_required
 async def show_restaurants_menu(call: CallbackQuery):
     """Restaurants menu - IDENTICAL TO ORIGINAL"""
     builder = InlineKeyboardBuilder()
@@ -251,7 +251,7 @@ async def show_restaurants_menu(call: CallbackQuery):
 
 
 @router.callback_query(F.data == "aff_city_list")
-@affiliate_auth_required
+# @affiliate_auth_required
 async def show_cities_list(call: CallbackQuery):
     """Show cities list - IDENTICAL TO ORIGINAL"""
     cities = await db.get_cities_from_restaurants()
@@ -293,7 +293,7 @@ async def show_cities_list(call: CallbackQuery):
 
 
 @router.callback_query(F.data.startswith("aff_city_"))
-@affiliate_auth_required
+# @affiliate_auth_required
 async def show_city_restaurants(call: CallbackQuery):
     """Show city restaurants"""
     city = call.data.split("_", 2)[2]
@@ -330,7 +330,7 @@ async def show_city_restaurants(call: CallbackQuery):
 
 
 @router.callback_query(F.data.startswith("aff_rest_"))
-@affiliate_auth_required
+# @affiliate_auth_required
 async def show_restaurant_info(call: CallbackQuery):
     """Show restaurant info"""
     rest_id = int(call.data.split("_", 2)[2])
@@ -446,7 +446,7 @@ class BookingCalendar:
 
 
 @router.callback_query(F.data == "aff_bookings")
-@affiliate_auth_required
+# @affiliate_auth_required
 async def start_booking_process(call: CallbackQuery, state: FSMContext):
     """Start booking process"""
     await call.message.edit_text("Enter your name (manager attending the meeting):")
@@ -454,7 +454,7 @@ async def start_booking_process(call: CallbackQuery, state: FSMContext):
 
 
 @router.message(BookingStates.waiting_for_manager)
-@affiliate_auth_required
+# @affiliate_auth_required
 async def process_manager_name(msg: Message, state: FSMContext):
     """Process manager name"""
     await state.update_data(manager=msg.text)
@@ -502,7 +502,7 @@ async def booking_select_day(callback: CallbackQuery, state: FSMContext):
 
 
 @router.message(BookingStates.waiting_for_time)
-@affiliate_auth_required
+# @affiliate_auth_required
 async def process_booking_time(msg: Message, state: FSMContext):
     """Process booking time"""
     if not re.match(r'^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$', msg.text):
@@ -523,7 +523,7 @@ async def process_booking_time(msg: Message, state: FSMContext):
 
 
 @router.message(BookingStates.waiting_for_company)
-@affiliate_auth_required
+# @affiliate_auth_required
 async def process_partner_company(msg: Message, state: FSMContext):
     """Process partner company"""
     await state.update_data(company=msg.text)
@@ -532,7 +532,7 @@ async def process_partner_company(msg: Message, state: FSMContext):
 
 
 @router.message(BookingStates.waiting_for_partner)
-@affiliate_auth_required
+# @affiliate_auth_required
 async def process_partner_name(msg: Message, state: FSMContext):
     """Process partner name"""
     await state.update_data(partner=msg.text)
@@ -630,7 +630,7 @@ async def process_booking_payment(call: CallbackQuery, state: FSMContext):
 
 
 @router.message(BookingStates.waiting_for_people)
-@affiliate_auth_required
+# @affiliate_auth_required
 async def process_booking_people(msg: Message, state: FSMContext):
     """Process people count"""
     if not msg.text.isdigit() or int(msg.text) < 1:
@@ -732,7 +732,7 @@ async def confirm_booking(call: CallbackQuery, state: FSMContext):
 # ============================================
 
 @router.callback_query(F.data == "aff_my_bookings")
-@affiliate_auth_required
+# @affiliate_auth_required
 async def show_my_bookings(call: CallbackQuery):
     """Show user bookings"""
     username = call.from_user.username
@@ -779,7 +779,7 @@ class ReportStates(StatesGroup):
 
 
 @router.callback_query(F.data == "aff_report")
-@affiliate_auth_required
+# @affiliate_auth_required
 async def start_report(call: CallbackQuery, state: FSMContext):
     """Start report"""
     await call.message.edit_text("Enter manager name who attended the meeting:")
@@ -787,7 +787,7 @@ async def start_report(call: CallbackQuery, state: FSMContext):
 
 
 @router.message(ReportStates.waiting_for_manager)
-@affiliate_auth_required
+# @affiliate_auth_required
 async def process_report_manager(msg: Message, state: FSMContext):
     """Process manager in report"""
     await state.update_data(manager=msg.text)
@@ -796,7 +796,7 @@ async def process_report_manager(msg: Message, state: FSMContext):
 
 
 @router.message(ReportStates.waiting_for_date)
-@affiliate_auth_required
+# @affiliate_auth_required
 async def process_report_date(msg: Message, state: FSMContext):
     """Process date in report"""
     try:
@@ -809,7 +809,7 @@ async def process_report_date(msg: Message, state: FSMContext):
 
 
 @router.message(ReportStates.waiting_for_partner)
-@affiliate_auth_required
+# @affiliate_auth_required
 async def process_report_partner(msg: Message, state: FSMContext):
     """Process partner in report"""
     await state.update_data(partner=msg.text)
@@ -818,7 +818,7 @@ async def process_report_partner(msg: Message, state: FSMContext):
 
 
 @router.message(ReportStates.waiting_for_result)
-@affiliate_auth_required
+# @affiliate_auth_required
 async def process_report_result(msg: Message, state: FSMContext):
     """Process results in report"""
     await state.update_data(result=msg.text)
@@ -827,7 +827,7 @@ async def process_report_result(msg: Message, state: FSMContext):
 
 
 @router.message(ReportStates.waiting_for_budget)
-@affiliate_auth_required
+# @affiliate_auth_required
 async def process_report_budget(msg: Message, state: FSMContext):
     """Process budget in report"""
     await state.update_data(budget=msg.text)
@@ -908,7 +908,7 @@ async def confirm_report(call: CallbackQuery, state: FSMContext):
 # ============================================
 
 @router.callback_query(F.data == "aff_rules")
-@affiliate_auth_required
+# @affiliate_auth_required
 async def show_affiliate_rules(call: CallbackQuery):
     """Show rules - with working back button"""
     try:
@@ -963,7 +963,7 @@ async def show_affiliate_rules(call: CallbackQuery):
 
 
 @router.callback_query(F.data == "aff_limits")
-@affiliate_auth_required
+# @affiliate_auth_required
 async def show_affiliate_limits(call: CallbackQuery):
     """Show limits - with working back button"""
     try:

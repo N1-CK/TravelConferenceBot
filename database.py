@@ -2373,6 +2373,79 @@ class Database:
             logger.error(f"Error updating visa status: {e}")
             return False
 
+    # database.py - добавить эти методы в класс Database
+
+    async def get_stored_passport_data(self, user_id: int) -> dict:
+        """Получить сохраненные паспортные данные пользователя"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Создаем таблицу если нет
+                await conn.execute(f"""
+                    CREATE TABLE IF NOT EXISTS {self.db_schema}.stored_passport_data (
+                        id SERIAL PRIMARY KEY,
+                        user_id BIGINT NOT NULL,
+                        username TEXT NOT NULL,
+                        first_name TEXT,
+                        last_name TEXT,
+                        phone TEXT,
+                        passport_number TEXT,
+                        birth_date TEXT,
+                        passport_country TEXT,
+                        issue_date TEXT,
+                        expiry_date TEXT,
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+
+                row = await conn.fetchrow(f"""
+                    SELECT first_name, last_name, phone, passport_number, 
+                           birth_date, passport_country, issue_date, expiry_date
+                    FROM {self.db_schema}.stored_passport_data
+                    WHERE user_id = $1
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                """, user_id)
+                return dict(row) if row else {}
+        except Exception as e:
+            logger.error(f"Error getting stored passport data: {e}")
+            return {}
+
+    async def save_passport_data(self, user_id: int, username: str, passport_data: dict) -> bool:
+        """Сохранить паспортные данные пользователя"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Создаем таблицу если нет (уже создана в get_stored_passport_data)
+                await conn.execute(f"""
+                    INSERT INTO {self.db_schema}.stored_passport_data 
+                    (user_id, username, first_name, last_name, phone, passport_number, 
+                     birth_date, passport_country, issue_date, expiry_date)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                """, user_id, username,
+                                   passport_data.get('first_name'), passport_data.get('last_name'),
+                                   passport_data.get('phone'), passport_data.get('passport_number'),
+                                   passport_data.get('birth_date'), passport_data.get('passport_country'),
+                                   passport_data.get('issue_date'), passport_data.get('expiry_date'))
+                return True
+        except Exception as e:
+            logger.error(f"Error saving passport data: {e}")
+            return False
+
+    async def get_available_flights(self, username: str, departure_from: str, return_to: str) -> List[Dict]:
+        """Получить доступные рейсы для пользователя"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT * FROM {self.db_schema}.user_flights
+                    WHERE username = $1 
+                    AND departure_from ILIKE $2
+                    AND arrival_city ILIKE $3
+                    ORDER BY departure_date, departure_time
+                """, username, f"%{departure_from}%", f"%{return_to}%")
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting available flights: {e}")
+            return []
+
     async def update_banner_status(self, request_id: int, status: str) -> bool:
         """Обновить статус заявки на баннер"""
         try:

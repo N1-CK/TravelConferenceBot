@@ -73,29 +73,42 @@ async def show_main_menu(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "menu_pr")
 async def show_pr_menu(callback: CallbackQuery, state: FSMContext):
-    """Переход в раздел PR с локализацией"""
+    """Переход в раздел PR с локализацией и отображением конференции"""
     user_id = callback.from_user.id
+    selected_conf = await db.get_selected_conference(user_id)
+
+    conf_text = f"\n\n📌 *Текущая конференция:* {selected_conf}" if selected_conf else ""
+
     await callback.message.edit_text(
-        await t(user_id, 'pr_title'),
+        f"{await t(user_id, 'pr_title')}{conf_text}",
         reply_markup=await get_pr_menu_keyboard(user_id)
     )
 
 
 @router.callback_query(F.data == "menu_event")
 async def show_event_menu(callback: CallbackQuery, state: FSMContext):
-    """Переход в раздел EVENT с локализацией"""
+    """Переход в раздел EVENT с локализацией и отображением конференции"""
     user_id = callback.from_user.id
+    selected_conf = await db.get_selected_conference(user_id)
+
+    conf_text = f"\n\n📌 *Текущая конференция:* {selected_conf}" if selected_conf else ""
+
     await callback.message.edit_text(
-        await t(user_id, 'event_title'),
+        f"{await t(user_id, 'event_title')}{conf_text}",
         reply_markup=await get_event_menu_keyboard(user_id)
     )
 
+
 @router.callback_query(F.data == "menu_travel")
 async def show_travel_menu(callback: CallbackQuery, state: FSMContext):
-    """Переход в раздел TRAVEL с локализацией"""
+    """Переход в раздел TRAVEL с локализацией и отображением конференции"""
     user_id = callback.from_user.id
+    selected_conf = await db.get_selected_conference(user_id)
+
+    conf_text = f"\n\n📌 *Текущая конференция:* {selected_conf}" if selected_conf else ""
+
     await callback.message.edit_text(
-        await t(user_id, 'travel_title'),
+        f"{await t(user_id, 'travel_title')}{conf_text}",
         reply_markup=await get_travel_menu_keyboard(user_id)
     )
 
@@ -124,13 +137,14 @@ async def show_profile(callback: CallbackQuery):
     profile_text = await t(
         user_id,
         'profile_template',
-        user_id=user_id,
+        userid = user_id,
         username=username,
         full_name=user_data.get('full_name', get_text_sync(lang, 'not_specified')),
         position=user_data.get('position', get_text_sync(lang, 'not_specified')),
         company=user_data.get('company', get_text_sync(lang, 'not_specified')),
         language='🇷🇺 Русский' if user_data.get('language') == 'ru' else '🇬🇧 English',
-        registered_at=user_data.get('registered_at', '').strftime('%d.%m.%Y') if user_data.get('registered_at') else get_text_sync(lang, 'not_specified')
+        registered_at=user_data.get('registered_at', '').strftime('%d.%m.%Y') if user_data.get(
+            'registered_at') else get_text_sync(lang, 'not_specified')
     )
 
     builder = InlineKeyboardBuilder()
