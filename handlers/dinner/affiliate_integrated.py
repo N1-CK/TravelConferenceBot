@@ -191,12 +191,12 @@ async def show_affiliate_main_menu(update: Union[Message, CallbackQuery]):
     text = "Hey! I'm AffilMeet Module.\nHow can I help you?"
 
     if isinstance(update, Message):
+        await update.answer(text)
         await update.answer(text, reply_markup=keyboard)
-    else:  # CallbackQuery
+    else:
         try:
             await update.message.edit_text(text, reply_markup=keyboard)
         except Exception as e:
-            # Если не получается отредактировать (например, сообщение удалено)
             await update.message.answer(text, reply_markup=keyboard)
         await update.answer()
 

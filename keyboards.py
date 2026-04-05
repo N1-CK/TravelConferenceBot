@@ -124,13 +124,20 @@ async def get_back_next_keyboard(back_to: str, next_disabled: bool = False,
                                  cancel: bool = True, user_id: int = None) -> InlineKeyboardMarkup:
     """Универсальная клавиатура с кнопками Назад/Отмена"""
     builder = InlineKeyboardBuilder()
-    lang = await get_user_lang(user_id) if user_id else 'ru'
+
+    # Безопасное получение языка
+    if user_id:
+        lang = await get_user_lang(user_id)
+    else:
+        lang = 'ru'
 
     # Добавляем кнопку "Назад"
-    builder.row(InlineKeyboardButton(text=get_text_sync(lang, 'back'), callback_data=back_to))
+    back_text = get_text_sync(lang, 'back')
+    builder.row(InlineKeyboardButton(text=back_text, callback_data=back_to))
 
     if cancel:
-        builder.row(InlineKeyboardButton(text=get_text_sync(lang, 'cancel'), callback_data="cancel_form"))
+        cancel_text = get_text_sync(lang, 'cancel')
+        builder.row(InlineKeyboardButton(text=cancel_text, callback_data="cancel_form"))
 
     return builder.as_markup()
 

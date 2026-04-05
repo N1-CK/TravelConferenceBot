@@ -3206,6 +3206,12 @@ class Database:
             logger.error(f"Error marking messages read: {e}")
             return False
 
+    async def close(self):
+        """Закрыть пул соединений"""
+        if self.pool:
+            await self.pool.close()
+            logger.info("Database pool closed")
+
 
 # Глобальный экземпляр
 db = Database()

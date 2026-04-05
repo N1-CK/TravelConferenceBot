@@ -285,7 +285,6 @@ async def process_conference_selection(callback: CallbackQuery, state: FSMContex
     conference_name = callback.data.replace("select_conf_", "")
     await state.update_data(selected_conference=conference_name)
 
-    # Сохраняем выбранную конференцию в БД
     user_id = callback.from_user.id
     async with db.pool.acquire() as conn:
         await conn.execute(f"""
@@ -295,29 +294,13 @@ async def process_conference_selection(callback: CallbackQuery, state: FSMContex
         """, conference_name, user_id)
 
     await db.log_user_action(
-        user_id=callback.from_user.id,
+        user_id=user_id,
         username=callback.from_user.username,
         action="conference_selected",
         details={"conference": conference_name}
     )
 
-    await show_main_menu_with_conf_button(callback.message, state, callback.from_user.id)
-
-
-@router.callback_query(F.data.startswith("select_conf_"))
-async def process_conference_selection(callback: CallbackQuery, state: FSMContext):
-    conference_name = callback.data.replace("select_conf_", "")
-    await state.update_data(selected_conference=conference_name)
-
-    await db.log_user_action(
-        user_id=callback.from_user.id,
-        username=callback.from_user.username,
-        action="conference_selected",
-        details={"conference": conference_name}
-    )
-
-    await show_main_menu_with_conf_button(callback.message, state)
-
+    await show_main_menu_with_conf_button(callback.message, state, user_id)
 
 @router.callback_query(F.data == "skip_conf_selection")
 async def skip_conference_selection(callback: CallbackQuery, state: FSMContext):

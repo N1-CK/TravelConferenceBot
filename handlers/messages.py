@@ -30,7 +30,7 @@ async def handle_user_message(message: Message):
     """Сохраняем все сообщения пользователей в БД для отображения в веб-интерфейсе"""
     user_id = message.from_user.id
     username = message.from_user.username or message.from_user.first_name
-    text = message.text or message.caption
+    text = message.text or message.caption or ""
     file_type = None
     file_id = None
 

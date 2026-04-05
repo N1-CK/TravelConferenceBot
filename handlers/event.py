@@ -638,15 +638,6 @@ async def process_event_question(message: Message, state: FSMContext):
     await state.clear()
 
 
-@router.message(EventQuestionForm.waiting_for_question, F.text.len() > 500)
-async def process_event_question_too_long(message: Message):
-    """Вопрос слишком длинный"""
-    await message.answer(
-        "❌ **Вопрос слишком длинный**\n\n"
-        "Максимальная длина вопроса - 500 символов.\n"
-        "Пожалуйста, сократите ваш вопрос и попробуйте снова."
-    )
-
 @router.callback_query(F.data == "event_booth")
 async def show_booth_info(callback: CallbackQuery):
     """Показать информацию о стенде"""
@@ -662,48 +653,6 @@ async def show_booth_info(callback: CallbackQuery):
 
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
 
-
-@router.message(EventQuestionForm.waiting_for_question, F.text.len() <= 500)
-async def process_event_question(message: Message, state: FSMContext):
-    """Обработка вопроса"""
-    question_text = message.text
-    data = await state.get_data()
-
-    event_question_data = {
-        'username': message.from_user.username,
-        'user_id': message.from_user.id,
-        'category': data.get('category', ''),
-        'question': question_text
-    }
-
-    # Сохраняем в БД
-    if await db.save_event_question(event_question_data):
-        # Отправляем в чат event-менеджера
-        await send_question_to_manager(
-            bot=message.bot,  # Используем message.bot
-            manager_chat_id=EVENT_MANAGER_CHAT_ID,
-            user_data=event_question_data,
-            question_text=question_text,
-            question_type="event"
-        )
-
-        await db.log_user_action(
-            user_id=message.from_user.id,
-            username=message.from_user.username,
-            action="event_question_submitted",
-            details={"data": event_question_data}
-        )
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="◀️ Back to EVENT Menu", callback_data="menu_event")]
-    ])
-
-    await message.answer(
-        "✅ Question sent!\n\n"
-        "Thank you for your question. Our EVENT team will contact you soon.",
-        reply_markup=keyboard
-    )
-    await state.clear()
 
 @router.message(EventQuestionForm.waiting_for_question, F.text.len() > 500)
 async def process_event_question_too_long(message: Message):

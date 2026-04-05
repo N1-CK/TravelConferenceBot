@@ -1,6 +1,7 @@
-# utils/lang_utils.py
-from database import db
-from typing import Dict, Any
+from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Общие тексты для всего бота
 COMMON_TEXTS = {
@@ -458,11 +459,13 @@ COMMON_TEXTS = {
 
 
 async def get_user_lang(user_id: int) -> str:
-    """Получить язык пользователя из БД"""
+    """Получить язык пользователя из БД с ленивым импортом"""
     try:
+        from database import db
         user_data = await db.get_user_data(user_id)
         return user_data.get('language', 'ru') if user_data else 'ru'
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error getting user language: {e}")
         return 'ru'
 
 
@@ -471,13 +474,18 @@ async def t(user_id: int, key: str, **kwargs) -> str:
     lang = await get_user_lang(user_id)
     text = COMMON_TEXTS.get(lang, COMMON_TEXTS['ru']).get(key, key)
     if kwargs:
-        text = text.format(**kwargs)
+        try:
+            text = text.format(**kwargs)
+        except KeyError as e:
+            logger.warning(f"Missing format key {e} in text '{key}'")
     return text
-
 
 def get_text_sync(lang: str, key: str, **kwargs) -> str:
     """Синхронная версия для использования в клавиатурах (без await)"""
     text = COMMON_TEXTS.get(lang, COMMON_TEXTS['ru']).get(key, key)
     if kwargs:
-        text = text.format(**kwargs)
+        try:
+            text = text.format(**kwargs)
+        except KeyError as e:
+            logger.warning(f"Missing format key {e} in text '{key}'")
     return text
