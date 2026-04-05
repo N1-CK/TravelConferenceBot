@@ -149,7 +149,7 @@ async def show_travel_menu(callback: CallbackQuery, state: FSMContext):
 
     # Получаем выбранную конференцию
     selected_conf = await db.get_selected_conference(user_id)
-    conf_text = f"\n\n📌 *{await t(user_id, 'conference_selected', conference=selected_conf)}*" if selected_conf else ""
+    conf_text = f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}" if selected_conf else ""
 
     await callback.message.edit_text(
         f"{await t(user_id, 'travel_welcome')}{conf_text}",
@@ -164,7 +164,7 @@ async def back_to_travel_menu(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
 
     selected_conf = await db.get_selected_conference(user_id)
-    conf_text = f"\n\n📌 *{await t(user_id, 'conference_selected', conference=selected_conf)}*" if selected_conf else ""
+    conf_text = f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}" if selected_conf else ""
 
     await callback.message.edit_text(
         f"{await t(user_id, 'travel_welcome')}{conf_text}",

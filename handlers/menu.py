@@ -77,7 +77,7 @@ async def show_pr_menu(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     selected_conf = await db.get_selected_conference(user_id)
 
-    conf_text = f"\n\n📌 *Текущая конференция:* {selected_conf}" if selected_conf else ""
+    conf_text = f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}" if selected_conf else ""
 
     await callback.message.edit_text(
         f"{await t(user_id, 'pr_title')}{conf_text}",
@@ -91,7 +91,7 @@ async def show_event_menu(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     selected_conf = await db.get_selected_conference(user_id)
 
-    conf_text = f"\n\n📌 *Текущая конференция:* {selected_conf}" if selected_conf else ""
+    conf_text = f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}" if selected_conf else ""
 
     await callback.message.edit_text(
         f"{await t(user_id, 'event_title')}{conf_text}",
@@ -105,7 +105,7 @@ async def show_travel_menu(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     selected_conf = await db.get_selected_conference(user_id)
 
-    conf_text = f"\n\n📌 *Текущая конференция:* {selected_conf}" if selected_conf else ""
+    conf_text = f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}" if selected_conf else ""
 
     await callback.message.edit_text(
         f"{await t(user_id, 'travel_title')}{conf_text}",

@@ -1,5 +1,8 @@
-import re
+# handlers/event.py - ПОЛНОСТЬЮ ЛОКАЛИЗОВАННАЯ ВЕРСИЯ
 
+import re
+import os
+import logging
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 from aiogram.fsm.context import FSMContext
@@ -8,16 +11,14 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from keyboards import get_back_next_keyboard, get_event_menu_keyboard
 from database import db
-import logging
-import os
 from handlers.managers_chat import send_question_to_manager
 from utility.lang_utils import t, get_user_lang
 
 EVENT_MANAGER_CHAT_ID = int(os.getenv("TG_EVENT_MANAGER_CHAT_ID", 0))
 
-
 router = Router()
 logger = logging.getLogger(__name__)
+
 
 class EventCertificateForm(StatesGroup):
     waiting_for_name = State()
@@ -29,7 +30,6 @@ class EventCertificateForm(StatesGroup):
 
 
 class EventQuestionForm(StatesGroup):
-    waiting_for_category = State()
     waiting_for_question = State()
 
 
@@ -42,21 +42,18 @@ class EventTicketForm(StatesGroup):
     waiting_for_country = State()
 
 
-async def get_selected_conference_text(user_id: int) -> str:
-    """Получить текст с выбранной конференцией"""
-    selected_conf = await db.get_selected_conference(user_id)
-    if selected_conf:
-        return f"\n\n📌 *Текущая конференция:* {selected_conf}"
-    return ""
-
+# ============================================
+# ПРАВИЛА КОНФЕРЕНЦИИ
+# ============================================
 
 @router.callback_query(F.data == "event_rules_pdf")
 async def show_event_rules_pdf(callback: CallbackQuery):
     """Отправка PDF с правилами поведения в зависимости от компании"""
+    user_id = callback.from_user.id
     username = callback.from_user.username
 
     # Получаем компанию пользователя
-    user_data = await db.get_user_data(callback.from_user.id)
+    user_data = await db.get_user_data(user_id)
     company = user_data.get('company', '') if user_data else ''
 
     # Пути к PDF файлам правил
@@ -83,18 +80,10 @@ async def show_event_rules_pdf(callback: CallbackQuery):
     # Если файлов нет, отправляем текстовую версию
     if not file_to_send:
         await callback.message.edit_text(
-            "📋 **Правила поведения на конференции**\n\n"
-            "1. Будьте вежливы и уважительны к другим участникам\n"
-            "2. Соблюдайте дресс-код: Business casual\n"
-            "3. Не опаздывайте на сессии и встречи\n"
-            "4. Выключайте звук мобильных устройств во время выступлений\n"
-            "5. Соблюдайте чистоту в конференц-зонах\n"
-            "6. Фото и видео съемка разрешена только с согласия участников\n"
-            "7. Запрещено распространение материалов без разрешения\n\n"
-            "Нарушение правил может привести к ограничению доступа.",
+            await t(user_id, 'rules_text'),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="✅ Я ознакомился(ась)", callback_data="accept_rules")],
-                [InlineKeyboardButton(text="◀️ Назад", callback_data="menu_event")]
+                [InlineKeyboardButton(text=await t(user_id, 'accept_rules'), callback_data="accept_rules")],
+                [InlineKeyboardButton(text=await t(user_id, 'back_to_event'), callback_data="menu_event")]
             ]),
             parse_mode="Markdown"
         )
@@ -102,8 +91,8 @@ async def show_event_rules_pdf(callback: CallbackQuery):
 
     # Клавиатура для подтверждения после PDF
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Я ознакомился(ась) с правилами", callback_data="accept_rules")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="menu_event")]
+        [InlineKeyboardButton(text=await t(user_id, 'accept_rules'), callback_data="accept_rules")],
+        [InlineKeyboardButton(text=await t(user_id, 'back_to_event'), callback_data="menu_event")]
     ])
 
     # Отправляем PDF
@@ -114,45 +103,50 @@ async def show_event_rules_pdf(callback: CallbackQuery):
 
     await callback.message.answer_document(
         document=file_to_send,
-        caption="📋 **Правила поведения на конференции**\n\nПожалуйста, ознакомьтесь с правилами.",
+        caption=await t(user_id, 'rules_pdf_caption'),
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
 
+
 @router.callback_query(F.data == "accept_rules")
 async def accept_rules(callback: CallbackQuery):
     """Логирование согласия с правилами"""
+    user_id = callback.from_user.id
     try:
         await db.log_user_action(
-            user_id=callback.from_user.id,
+            user_id=user_id,
             username=callback.from_user.username,
             action="rules_accepted",
             details={"version": "1.0"}
         )
-        user_id = int(callback.from_user.id)
-        await callback.answer("✅ Правила приняты")
+        await callback.answer(await t(user_id, 'rules_accepted'))
 
         # Пробуем отредактировать, если не получается - отправляем новое сообщение
         try:
             await callback.message.edit_text(
-                "✅ Правила приняты\n\nМеню EVENT:",
+                f"{await t(user_id, 'rules_accepted')}\n\n{await t(user_id, 'event_title')}:",
                 reply_markup=await get_event_menu_keyboard(user_id)
             )
         except:
-            # Если редактирование не удалось, отправляем новое сообщение
             await callback.message.answer(
-                "✅ Правила приняты\n\nМеню EVENT:",
+                f"{await t(user_id, 'rules_accepted')}\n\n{await t(user_id, 'event_title')}:",
                 reply_markup=await get_event_menu_keyboard(user_id)
             )
 
     except Exception as e:
-        logger.error(f"Ошибка в accept_rules: {e}")
-        await callback.answer("❌ Произошла ошибка", show_alert=True)
+        logger.error(f"Error in accept_rules: {e}")
+        await callback.answer("❌ Error occurred", show_alert=True)
 
+
+# ============================================
+# ИНФОРМАЦИЯ О КОНФЕРЕНЦИИ
+# ============================================
 
 @router.callback_query(F.data == "event_info")
 async def show_event_info(callback: CallbackQuery):
     """Общая информация о мероприятии - из БД"""
+    user_id = callback.from_user.id
     username = callback.from_user.username
 
     # Получаем конференции пользователя
@@ -160,11 +154,10 @@ async def show_event_info(callback: CallbackQuery):
 
     if not conferences:
         await callback.message.edit_text(
-            "ℹ️ Информация о конференции не найдена.\n\n"
-            "Пожалуйста, обратитесь к организаторам.",
+            await t(user_id, 'no_conference_info'),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="◀️ Назад в EVENT", callback_data="menu_event")],
-                [InlineKeyboardButton(text="🏠 Главное меню", callback_data="menu_main")]
+                [InlineKeyboardButton(text=await t(user_id, 'back_to_event'), callback_data="menu_event")],
+                [InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")]
             ])
         )
         return
@@ -174,22 +167,26 @@ async def show_event_info(callback: CallbackQuery):
 
     # Формируем текст из данных БД
     info_text = (
-        f"ℹ️ Общая информация о конференции:\n\n"
-        f"📅 Название: {conference.get('conference_name', 'Не указано')}\n"
-        f"📍 Город: {conference.get('city', 'Не указано')}\n"
-        f"📅 Даты конференции: {conference.get('conference_start_date', 'Не указано')} - {conference.get('conference_end_date', 'Не указано')}\n"
-        f"✈️ Даты поездки: {conference.get('trip_start_date', 'Не указано')} - {conference.get('trip_end_date', 'Не указано')}\n"
-        f"🤖 Бот конференции: {conference.get('bot_link', 'Не указан')}\n\n"
-        f"ℹ️ Дополнительная информация: {conference.get('additional_info', 'Уточняйте у организаторов')}"
+        f"{await t(user_id, 'conference_info_title')}\n\n"
+        f"<b>{await t(user_id, 'conference_name')}:</b> {conference.get('conference_name', await t(user_id, 'not_specified_info'))}\n"
+        f"<b>{await t(user_id, 'conference_city')}:</b> {conference.get('city', await t(user_id, 'not_specified_info'))}\n"
+        f"<b>{await t(user_id, 'conference_dates')}:</b> {conference.get('conference_start_date', await t(user_id, 'not_specified_info'))} - {conference.get('conference_end_date', await t(user_id, 'not_specified_info'))}\n"
+        f"<b>{await t(user_id, 'trip_dates')}:</b> {conference.get('trip_start_date', await t(user_id, 'not_specified_info'))} - {conference.get('trip_end_date', await t(user_id, 'not_specified_info'))}\n"
+        f"<b>{await t(user_id, 'bot_link')}:</b> {conference.get('bot_link', await t(user_id, 'not_specified_info'))}\n\n"
+        f"<b>{await t(user_id, 'additional_info')}:</b> {conference.get('additional_info', await t(user_id, 'not_specified_info'))}"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="◀️ Назад в EVENT", callback_data="menu_event")],
-        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="menu_main")]
+        [InlineKeyboardButton(text=await t(user_id, 'back_to_event'), callback_data="menu_event")],
+        [InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")]
     ])
 
-    await callback.message.edit_text(info_text, reply_markup=keyboard)
+    await callback.message.edit_text(info_text, reply_markup=keyboard, parse_mode="HTML")
 
+
+# ============================================
+# ФОРМА ЗАКАЗА БИЛЕТА
+# ============================================
 
 @router.callback_query(F.data == "event_ticket")
 async def start_ticket_form(callback: CallbackQuery, state: FSMContext):
@@ -209,107 +206,105 @@ async def start_ticket_form(callback: CallbackQuery, state: FSMContext):
 @router.message(EventTicketForm.waiting_for_full_name)
 async def process_ticket_full_name(message: Message, state: FSMContext):
     """Шаг 1: ФИО"""
+    user_id = message.from_user.id
     if len(message.text.strip()) < 3:
-        await message.answer("❌ Пожалуйста, введите корректные имя и фамилию (минимум 3 символа):")
+        await message.answer("❌ " + await t(user_id, 'error_invalid_name'))
         return
 
     await state.update_data(full_name=message.text.strip())
     await state.set_state(EventTicketForm.waiting_for_position)
 
     await message.answer(
-        await t(message.from_user.id, 'ticket_step', step=2, total=6) + "\n\n" + await t(message.from_user.id,
-                                                                                         'ticket_position'),
-        reply_markup=await get_back_next_keyboard(back_to="event_ticket", user_id=message.from_user.id)
+        await t(user_id, 'ticket_step', step=2, total=6) + "\n\n" + await t(user_id, 'ticket_position'),
+        reply_markup=await get_back_next_keyboard(back_to="event_ticket", user_id=user_id)
     )
 
 
 @router.message(EventTicketForm.waiting_for_position)
 async def process_ticket_position(message: Message, state: FSMContext):
     """Шаг 2: Должность"""
+    user_id = message.from_user.id
     if len(message.text.strip()) < 2:
-        await message.answer("❌ Пожалуйста, введите корректную должность:")
+        await message.answer("❌ " + await t(user_id, 'error_invalid_position'))
         return
 
     await state.update_data(position=message.text.strip())
     await state.set_state(EventTicketForm.waiting_for_company)
 
     await message.answer(
-        "Шаг 3 из 6\n\n"
-        "🏢 Название партнерской программы/компании:",
-        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step2")
+        await t(user_id, 'ticket_step', step=3, total=6) + "\n\n" + await t(user_id, 'ticket_company'),
+        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step2", user_id=user_id)
     )
 
 
 @router.message(EventTicketForm.waiting_for_company)
 async def process_ticket_company(message: Message, state: FSMContext):
     """Шаг 3: Компания"""
+    user_id = message.from_user.id
     if len(message.text.strip()) < 2:
-        await message.answer("❌ Пожалуйста, введите название компании:")
+        await message.answer("❌ " + await t(user_id, 'error_invalid_company'))
         return
 
     await state.update_data(company=message.text.strip())
     await state.set_state(EventTicketForm.waiting_for_email)
 
     await message.answer(
-        "Шаг 4 из 6\n\n"
-        "📧 Ваш email (на него придет билет):",
-        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step3")
+        await t(user_id, 'ticket_step', step=4, total=6) + "\n\n" + await t(user_id, 'ticket_email'),
+        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step3", user_id=user_id)
     )
 
 
 @router.message(EventTicketForm.waiting_for_email)
 async def process_ticket_email(message: Message, state: FSMContext):
     """Шаг 4: Email с валидацией"""
+    user_id = message.from_user.id
     email = message.text.strip()
 
     # Простая валидация email
-    import re
     email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 
     if not re.match(email_pattern, email):
-        await message.answer("❌ Пожалуйста, введите корректный email (пример: name@domain.com):")
+        await message.answer("❌ " + await t(user_id, 'error_invalid_email'))
         return
 
     await state.update_data(email=email)
     await state.set_state(EventTicketForm.waiting_for_phone)
 
     await message.answer(
-        "Шаг 5 из 6\n\n"
-        "📱 Ваш номер телефона (для связи):",
-        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step4")
+        await t(user_id, 'ticket_step', step=5, total=6) + "\n\n" + await t(user_id, 'ticket_phone'),
+        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step4", user_id=user_id)
     )
 
 
 @router.message(EventTicketForm.waiting_for_phone)
 async def process_ticket_phone(message: Message, state: FSMContext):
     """Шаг 5: Телефон"""
+    user_id = message.from_user.id
     phone = message.text.strip()
 
     # Простая валидация телефона
     digits = re.sub(r'\D', '', phone)
     if len(digits) < 10:
-        await message.answer("❌ Пожалуйста, введите корректный номер телефона (минимум 10 цифр):")
+        await message.answer("❌ " + await t(user_id, 'error_invalid_phone'))
         return
 
     await state.update_data(phone=phone)
     await state.set_state(EventTicketForm.waiting_for_country)
 
-    # Клавиатура выбора страны
+    # Клавиатура выбора страны с локализацией
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🇷🇺 Россия", callback_data="ticket_country_russia")],
-        [InlineKeyboardButton(text="🇦🇪 ОАЭ", callback_data="ticket_country_uae")],
-        [InlineKeyboardButton(text="🇰🇿 Казахстан", callback_data="ticket_country_kazakhstan")],
-        [InlineKeyboardButton(text="🇺🇿 Узбекистан", callback_data="ticket_country_uzbekistan")],
-        [InlineKeyboardButton(text="🇨🇳 Китай", callback_data="ticket_country_china")],
-        [InlineKeyboardButton(text="🇮🇳 Индия", callback_data="ticket_country_india")],
-        [InlineKeyboardButton(text="🌍 Другая", callback_data="ticket_country_other")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="ticket_back_step5")]
+        [InlineKeyboardButton(text="🇷🇺 Russia", callback_data="ticket_country_russia")],
+        [InlineKeyboardButton(text="🇦🇪 UAE", callback_data="ticket_country_uae")],
+        [InlineKeyboardButton(text="🇰🇿 Kazakhstan", callback_data="ticket_country_kazakhstan")],
+        [InlineKeyboardButton(text="🇺🇿 Uzbekistan", callback_data="ticket_country_uzbekistan")],
+        [InlineKeyboardButton(text="🇨🇳 China", callback_data="ticket_country_china")],
+        [InlineKeyboardButton(text="🇮🇳 India", callback_data="ticket_country_india")],
+        [InlineKeyboardButton(text="🌍 Other", callback_data="ticket_country_other")],
+        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="ticket_back_step5")]
     ])
 
     await message.answer(
-        "Шаг 6 из 6\n\n"
-        "🌍 Какую страну указывать для регистрации билета?\n\n"
-        "Выберите из списка:",
+        await t(user_id, 'ticket_step', step=6, total=6) + "\n\n" + await t(user_id, 'ticket_country'),
         reply_markup=keyboard
     )
 
@@ -317,14 +312,15 @@ async def process_ticket_phone(message: Message, state: FSMContext):
 @router.callback_query(F.data.startswith("ticket_country_"), EventTicketForm.waiting_for_country)
 async def process_ticket_country(callback: CallbackQuery, state: FSMContext):
     """Шаг 6: Выбор страны и сохранение заявки"""
+    user_id = callback.from_user.id
     country_map = {
-        "russia": "Россия",
-        "uae": "ОАЭ (Объединенные Арабские Эмираты)",
-        "kazakhstan": "Казахстан",
-        "uzbekistan": "Узбекистан",
-        "china": "Китай",
-        "india": "Индия",
-        "other": "Другая"
+        "russia": "Russia",
+        "uae": "UAE (United Arab Emirates)",
+        "kazakhstan": "Kazakhstan",
+        "uzbekistan": "Uzbekistan",
+        "china": "China",
+        "india": "India",
+        "other": "Other"
     }
 
     country_key = callback.data.replace("ticket_country_", "")
@@ -333,8 +329,7 @@ async def process_ticket_country(callback: CallbackQuery, state: FSMContext):
     if country_key == "other":
         await state.update_data(waiting_for_custom_country=True)
         await callback.message.edit_text(
-            "Шаг 6 из 6\n\n"
-            "🌍 Пожалуйста, напишите название вашей страны:"
+            await t(user_id, 'ticket_step', step=6, total=6) + "\n\n🌍 " + await t(user_id, 'ticket_country_other_prompt')
         )
         return
 
@@ -345,12 +340,13 @@ async def process_ticket_country(callback: CallbackQuery, state: FSMContext):
 @router.message(EventTicketForm.waiting_for_country)
 async def process_ticket_custom_country(message: Message, state: FSMContext):
     """Обработка ручного ввода страны"""
+    user_id = message.from_user.id
     data = await state.get_data()
     if data.get('waiting_for_custom_country'):
         await state.update_data(country=message.text.strip(), waiting_for_custom_country=False)
         await save_ticket_request(message, state)
     else:
-        await message.answer("Пожалуйста, выберите страну из кнопок выше.")
+        await message.answer(await t(user_id, 'error_select_country'))
 
 
 async def save_ticket_request(update, state: FSMContext):
@@ -391,14 +387,13 @@ async def save_ticket_request(update, state: FSMContext):
         await message_obj.answer(
             await t(user_id, 'ticket_success', email=data.get('email')),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="menu_event")],
+                [InlineKeyboardButton(text=await t(user_id, 'back_to_event'), callback_data="menu_event")],
                 [InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")]
             ])
         )
     else:
         await message_obj.answer(
-            "❌ **Ошибка при отправке заявки**\n\n"
-            "Пожалуйста, попробуйте позже или обратитесь к администратору."
+            "❌ " + await t(user_id, 'error_saving_request')
         )
 
     await state.clear()
@@ -407,76 +402,53 @@ async def save_ticket_request(update, state: FSMContext):
 # Обработчики кнопок "Назад" для формы билета
 @router.callback_query(F.data == "ticket_back_step2")
 async def ticket_back_to_name(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
     await state.set_state(EventTicketForm.waiting_for_full_name)
     await callback.message.edit_text(
-        "Шаг 1 из 6\n\n✍️ Укажите ваши имя и фамилию (как в паспорте):",
-        reply_markup=await get_back_next_keyboard(back_to="menu_event", next_disabled=True)
+        await t(user_id, 'ticket_step', step=1, total=6) + "\n\n" + await t(user_id, 'ticket_full_name'),
+        reply_markup=await get_back_next_keyboard(back_to="menu_event", next_disabled=True, user_id=user_id)
     )
 
 
 @router.callback_query(F.data == "ticket_back_step3")
 async def ticket_back_to_position(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
     await state.set_state(EventTicketForm.waiting_for_position)
     data = await state.get_data()
+    current = data.get('position', await t(user_id, 'not_specified'))
     await callback.message.edit_text(
-        f"Шаг 2 из 6\n\n💼 Ваша должность:\n(текущее: {data.get('position', 'не указано')})",
-        reply_markup=await get_back_next_keyboard(back_to="event_ticket")
+        await t(user_id, 'ticket_step', step=2, total=6) + "\n\n" + await t(user_id, 'ticket_position') + f"\n(текущее: {current})",
+        reply_markup=await get_back_next_keyboard(back_to="event_ticket", user_id=user_id)
     )
 
 
 @router.callback_query(F.data == "ticket_back_step4")
 async def ticket_back_to_company(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
     await state.set_state(EventTicketForm.waiting_for_company)
     data = await state.get_data()
+    current = data.get('company', await t(user_id, 'not_specified'))
     await callback.message.edit_text(
-        f"Шаг 3 из 6\n\n🏢 Название партнерской программы:\n(текущее: {data.get('company', 'не указано')})",
-        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step2")
+        await t(user_id, 'ticket_step', step=3, total=6) + "\n\n" + await t(user_id, 'ticket_company') + f"\n(текущее: {current})",
+        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step2", user_id=user_id)
     )
 
 
 @router.callback_query(F.data == "ticket_back_step5")
 async def ticket_back_to_email(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
     await state.set_state(EventTicketForm.waiting_for_email)
     data = await state.get_data()
+    current = data.get('email', await t(user_id, 'not_specified'))
     await callback.message.edit_text(
-        f"Шаг 4 из 6\n\n📧 Ваш email:\n(текущий: {data.get('email', 'не указан')})",
-        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step3")
+        await t(user_id, 'ticket_step', step=4, total=6) + "\n\n" + await t(user_id, 'ticket_email') + f"\n(текущий: {current})",
+        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step3", user_id=user_id)
     )
 
 
-@router.callback_query(F.data == "ticket_sent")
-async def ticket_sent_handler(callback: CallbackQuery):
-    """Администратор отправил билет"""
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Я получил билет", callback_data="ticket_received")],
-        [InlineKeyboardButton(text="❌ Я не получил билет", callback_data="ticket_not_received")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="menu_event")],
-        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="menu_main")]
-    ])
-    await callback.message.edit_text(
-        "🎫 Билет отправлен на ваш email.\n"
-        "Пожалуйста, подтвердите получение:",
-        reply_markup=keyboard
-    )
-
-@router.callback_query(F.data == "ticket_not_received")
-async def ticket_not_received_handler(callback: CallbackQuery, state: FSMContext):
-    """Форма для проблем с получением билета"""
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Проверить email", callback_data="check_email")],
-        [InlineKeyboardButton(text="Проверить спам", callback_data="check_spam")],
-        [InlineKeyboardButton(text="Отправить повторно", callback_data="resend_ticket")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="event_ticket")],
-        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="menu_main")]
-    ])
-    await callback.message.edit_text(
-        "❌ Вы не получили билет?\n\n"
-        "1. Проверьте правильность email\n"
-        "2. Проверьте папку 'Спам'\n"
-        "3. Запросите повторную отправку",
-        reply_markup=keyboard
-    )
-
+# ============================================
+# ФОРМА СПРАВКИ-ВЫЗОВА
+# ============================================
 
 @router.callback_query(F.data == "event_certificate")
 async def start_certificate_form(callback: CallbackQuery, state: FSMContext):
@@ -494,33 +466,45 @@ async def start_certificate_form(callback: CallbackQuery, state: FSMContext):
 @router.message(EventCertificateForm.waiting_for_name)
 async def process_certificate_name(message: Message, state: FSMContext):
     """Обработка ФИО для справки"""
+    user_id = message.from_user.id
+    if len(message.text.strip()) < 3:
+        await message.answer("❌ " + await t(user_id, 'error_invalid_name'))
+        return
     await state.update_data(full_name=message.text)
     await state.set_state(EventCertificateForm.waiting_for_position)
     await message.answer(
-        "Шаг 2 из 6\nУкажите должность:",
-        reply_markup=await get_back_next_keyboard(back_to="certificate_step1")
+        f"2/6 {await t(user_id, 'event_certificate_step2')}",
+        reply_markup=await get_back_next_keyboard(back_to="certificate_step1", user_id=user_id)
     )
 
 
 @router.message(EventCertificateForm.waiting_for_position)
 async def process_certificate_position(message: Message, state: FSMContext):
     """Обработка должности"""
+    user_id = message.from_user.id
+    if len(message.text.strip()) < 2:
+        await message.answer("❌ " + await t(user_id, 'error_invalid_position'))
+        return
     await state.update_data(position=message.text)
     await state.set_state(EventCertificateForm.waiting_for_company)
     await message.answer(
-        "Шаг 3 из 6\nНазвание компании:",
-        reply_markup=await get_back_next_keyboard(back_to="certificate_step2")
+        f"3/6 {await t(user_id, 'event_certificate_step3')}",
+        reply_markup=await get_back_next_keyboard(back_to="certificate_step2", user_id=user_id)
     )
 
 
 @router.message(EventCertificateForm.waiting_for_company)
 async def process_certificate_company(message: Message, state: FSMContext):
     """Обработка компании"""
+    user_id = message.from_user.id
+    if len(message.text.strip()) < 2:
+        await message.answer("❌ " + await t(user_id, 'error_invalid_company'))
+        return
     await state.update_data(company=message.text)
     await state.set_state(EventCertificateForm.waiting_for_company_legal)
     await message.answer(
-        "Шаг 4 из 6\nЮридические данные компании (ИНН, ОГРН и т.д.):",
-        reply_markup=await get_back_next_keyboard(back_to="certificate_step3")
+        f"4/6 {await t(user_id, 'event_certificate_step4')}",
+        reply_markup=await get_back_next_keyboard(back_to="certificate_step3", user_id=user_id)
     )
 
 
@@ -529,9 +513,10 @@ async def process_certificate_legal(message: Message, state: FSMContext):
     """Обработка юр. данных"""
     await state.update_data(company_legal=message.text)
     await state.set_state(EventCertificateForm.waiting_for_addressee)
+    user_id = message.from_user.id
     await message.answer(
-        "Шаг 5 из 6\nКому адресовать справку? (ФИО, должность):",
-        reply_markup=await get_back_next_keyboard(back_to="certificate_step4")
+        f"5/6 {await t(user_id, 'event_certificate_step5')}",
+        reply_markup=await get_back_next_keyboard(back_to="certificate_step4", user_id=user_id)
     )
 
 
@@ -540,22 +525,30 @@ async def process_certificate_addressee(message: Message, state: FSMContext):
     """Обработка адресата"""
     await state.update_data(addressee=message.text)
     await state.set_state(EventCertificateForm.waiting_for_dates)
+    user_id = message.from_user.id
     await message.answer(
-        "Шаг 6 из 6\nДаты участия (например: 15.11.2024 - 17.11.2024):",
-        reply_markup=await get_back_next_keyboard(back_to="certificate_step5")
+        f"6/6 {await t(user_id, 'event_certificate_step6')}",
+        reply_markup=await get_back_next_keyboard(back_to="certificate_step5", user_id=user_id)
     )
 
 
 @router.message(EventCertificateForm.waiting_for_dates)
 async def process_certificate_dates(message: Message, state: FSMContext):
     """Обработка дат и сохранение заявки"""
+    user_id = message.from_user.id
+    # Валидация формата дат
+    date_pattern = r'^\d{2}\.\d{2}\.\d{4}\s*-\s*\d{2}\.\d{2}\.\d{4}$'
+    if not re.match(date_pattern, message.text.strip()):
+        await message.answer("❌ " + await t(user_id, 'error_wrong_date_format_range'))
+        return
+
     await state.update_data(dates=message.text)
     data = await state.get_data()
 
     # Сохранение в БД
     certificate_data = {
         'username': message.from_user.username,
-        'user_id': message.from_user.id,
+        'user_id': user_id,
         'full_name': data.get('full_name', ''),
         'position': data.get('position', ''),
         'company': data.get('company', ''),
@@ -566,32 +559,35 @@ async def process_certificate_dates(message: Message, state: FSMContext):
 
     if await db.save_certificate_request(certificate_data):
         await db.log_user_action(
-            user_id=message.from_user.id,
+            user_id=user_id,
             username=message.from_user.username,
             action="certificate_request_submitted",
             details={"data": certificate_data}
         )
 
     await message.answer(
-        "✅ Заявка на справку-вызов отправлена!\n\n"
-        "Благодарим за ответ, наша команда получила твой запрос. "
-        "Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи."
+        await t(user_id, 'event_certificate_success')
     )
     await state.clear()
 
 
+# ============================================
+# ВОПРОС К EVENT-МЕНЕДЖЕРУ
+# ============================================
+
 @router.callback_query(F.data == "event_question")
 async def start_event_question(callback: CallbackQuery, state: FSMContext):
     """Вопрос EVENT без категорий - сразу ввод текста"""
+    user_id = callback.from_user.id
     await state.set_state(EventQuestionForm.waiting_for_question)
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="menu_event")]
+        [InlineKeyboardButton(text=await t(user_id, 'cancel_button'), callback_data="menu_event")]
     ])
 
     await callback.message.edit_text(
-        "❓ **Вопрос к EVENT-менеджеру**\n\n"
-        "Напишите ваш вопрос (максимум 500 символов):\n\n",
+        f"**{await t(user_id, 'event_question')}**\n\n"
+        f"{await t(user_id, 'event_question_prompt')}\n\n",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -599,12 +595,13 @@ async def start_event_question(callback: CallbackQuery, state: FSMContext):
 
 @router.message(EventQuestionForm.waiting_for_question, F.text.len() <= 500)
 async def process_event_question(message: Message, state: FSMContext):
-    """Обработка вопроса EVENT (без категорий)"""
+    """Обработка вопроса EVENT"""
+    user_id = message.from_user.id
     question_text = message.text
 
     event_question_data = {
         'username': message.from_user.username,
-        'user_id': message.from_user.id,
+        'user_id': user_id,
         'category': 'general',
         'question': question_text
     }
@@ -619,42 +616,106 @@ async def process_event_question(message: Message, state: FSMContext):
         )
 
         await db.log_user_action(
-            user_id=message.from_user.id,
+            user_id=user_id,
             username=message.from_user.username,
             action="event_question_submitted",
             details={"data": event_question_data}
         )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="◀️ Назад в EVENT", callback_data="menu_event")]
+        [InlineKeyboardButton(text=await t(user_id, 'back_to_event'), callback_data="menu_event")]
     ])
 
     await message.answer(
-        "✅ **Вопрос отправлен!**\n\n"
-        "Благодарим за вопрос. Наша EVENT-команда свяжется с вами в ближайшее время.",
+        await t(user_id, 'question_sent'),
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
     await state.clear()
 
 
-@router.callback_query(F.data == "event_booth")
-async def show_booth_info(callback: CallbackQuery):
-    """Показать информацию о стенде"""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text="◀️ Назад в EVENT", callback_data="menu_event"),
-        InlineKeyboardButton(text="🏠 Главная", callback_data="menu_main")
-    )
-
-    text = (
-        "ℹ️ Информация о стенде\n\n"
-    )
-
-    await callback.message.edit_text(text, reply_markup=builder.as_markup())
-
-
 @router.message(EventQuestionForm.waiting_for_question, F.text.len() > 500)
 async def process_event_question_too_long(message: Message):
     """Вопрос слишком длинный"""
-    await message.answer("❌ Вопрос слишком длинный. Максимум 500 символов.")
+    user_id = message.from_user.id
+    await message.answer(await t(user_id, 'question_too_long'))
+
+
+# ============================================
+# ИНФОРМАЦИЯ О СТЕНДЕ
+# ============================================
+
+@router.callback_query(F.data == "event_booth")
+async def show_booth_info(callback: CallbackQuery):
+    """Показать информацию о стенде"""
+    user_id = callback.from_user.id
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text=await t(user_id, 'back_to_event'), callback_data="menu_event"),
+        InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")
+    )
+
+    text = (
+        "ℹ️ **" + await t(user_id, 'event_booth') + "**\n\n"
+        "📍 " + await t(user_id, 'booth_location') + "\n"
+        "🕐 " + await t(user_id, 'booth_hours') + "\n"
+        "📞 " + await t(user_id, 'booth_contact') + "\n\n"
+        "_" + await t(user_id, 'booth_info_note') + "_"
+    )
+
+    await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+
+
+# ============================================
+# ОБРАБОТЧИКИ КНОПОК НАЗАД
+# ============================================
+
+@router.callback_query(F.data == "certificate_step1")
+async def back_to_name_from_position(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    await state.set_state(EventCertificateForm.waiting_for_name)
+    await callback.message.edit_text(
+        f"{await t(user_id, 'event_certificate_form_title')}\n\n"
+        f"1/6 {await t(user_id, 'event_certificate_step1')}",
+        reply_markup=await get_back_next_keyboard(back_to="menu_event", next_disabled=True, user_id=user_id)
+    )
+
+
+@router.callback_query(F.data == "certificate_step2")
+async def back_to_name_from_position(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    await state.set_state(EventCertificateForm.waiting_for_position)
+    await callback.message.edit_text(
+        f"2/6 {await t(user_id, 'event_certificate_step2')}",
+        reply_markup=await get_back_next_keyboard(back_to="certificate_step1", user_id=user_id)
+    )
+
+
+@router.callback_query(F.data == "certificate_step3")
+async def back_to_position_from_company(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    await state.set_state(EventCertificateForm.waiting_for_company)
+    await callback.message.edit_text(
+        f"3/6 {await t(user_id, 'event_certificate_step3')}",
+        reply_markup=await get_back_next_keyboard(back_to="certificate_step2", user_id=user_id)
+    )
+
+
+@router.callback_query(F.data == "certificate_step4")
+async def back_to_company_from_legal(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    await state.set_state(EventCertificateForm.waiting_for_company_legal)
+    await callback.message.edit_text(
+        f"4/6 {await t(user_id, 'event_certificate_step4')}",
+        reply_markup=await get_back_next_keyboard(back_to="certificate_step3", user_id=user_id)
+    )
+
+
+@router.callback_query(F.data == "certificate_step5")
+async def back_to_legal_from_addressee(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    await state.set_state(EventCertificateForm.waiting_for_addressee)
+    await callback.message.edit_text(
+        f"5/6 {await t(user_id, 'event_certificate_step5')}",
+        reply_markup=await get_back_next_keyboard(back_to="certificate_step4", user_id=user_id)
+    )

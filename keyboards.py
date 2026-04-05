@@ -67,7 +67,7 @@ async def get_pr_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text=get_text_sync(lang, 'pr_conference_bot'), callback_data="pr_conference_bot")
     )
     builder.row(
-        InlineKeyboardButton(text=get_text_sync(lang, 'pr_question'), callback_data="pr_question"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'question_button'), callback_data="pr_question"),
         InlineKeyboardButton(text=get_text_sync(lang, 'pr_conference_rules'), callback_data="pr_conference_rules")
     )
     builder.row(
@@ -88,7 +88,7 @@ async def get_event_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
     )
     builder.row(
         InlineKeyboardButton(text=get_text_sync(lang, 'event_info'), callback_data="event_info"),
-        InlineKeyboardButton(text=get_text_sync(lang, 'event_question'), callback_data="event_question")
+        InlineKeyboardButton(text=get_text_sync(lang, 'question_button'), callback_data="event_question")
     )
     builder.row(
         InlineKeyboardButton(text=get_text_sync(lang, 'back'), callback_data="menu_main")
@@ -113,7 +113,7 @@ async def get_travel_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
     )
     builder.row(
         InlineKeyboardButton(text=get_text_sync(lang, 'travel_my_requests'), callback_data="travel_my_requests"),
-        InlineKeyboardButton(text=get_text_sync(lang, 'travel_question'), callback_data="travel_question")
+        InlineKeyboardButton(text=get_text_sync(lang, 'question_button'), callback_data="travel_question")
     )
     builder.row(
         InlineKeyboardButton(text=get_text_sync(lang, 'back'), callback_data="menu_main")

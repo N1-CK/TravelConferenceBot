@@ -25,6 +25,7 @@ COMMON_TEXTS = {
         'new_request': "📝 Новая заявка",
         'lang_ru': "🇷🇺 Русский",
         'lang_en': "🇬🇧 English",
+        'question_button': "❓ Вопрос",
 
         # ============================================
         # ВЫБОР ЯЗЫКА И РЕГИСТРАЦИЯ
@@ -182,7 +183,7 @@ COMMON_TEXTS = {
         'event_ticket': "🎫 Билет на конференцию",
         'event_booth': "ℹ️ О стенде",
         'event_info': "ℹ️ О конференции",
-        'event_question': "❓ Вопрос",
+        'event_question': "❓ Вопрос Event департаменту",
         'event_certificate_form_title': "📄 Справка-вызов",
         'event_certificate_step1': "Укажите ФИО:",
         'event_certificate_step2': "Укажите должность:",
@@ -202,6 +203,55 @@ COMMON_TEXTS = {
         'ticket_country': "🌍 Какую страну указывать для регистрации билета?\n\nВыберите из списка:",
         'ticket_success': "✅ **Заявка на билет отправлена!**\n\n📧 Билет будет отправлен на email: {email}\n\nБлагодарим за ответ! Наша команда обработает ваш запрос и отправит билет в ближайшее время.\n\nСледите за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
 
+
+        # В секцию EVENT (после event_question):
+        'event_rules': "📋 Правила поведения",
+        'event_rules_pdf': "📋 Правила поведения (PDF)",
+        'accept_rules': "✅ Я ознакомился(ась)",
+        'back_to_event': "◀️ Назад в EVENT",
+        'event_certificate': "📄 Справка-вызов",
+        'event_certificate_success': "✅ Заявка на справку-вызов отправлена!\n\nБлагодарим за ответ, наша команда получила твой запрос. Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
+
+        # Информация о конференции
+        'conference_info_title': "ℹ️ Общая информация о конференции:",
+        'conference_name': "📅 Название",
+        'conference_city': "📍 Город",
+        'conference_dates': "📅 Даты конференции",
+        'trip_dates': "✈️ Даты поездки",
+        'bot_link': "🤖 Бот конференции",
+        'additional_info': "ℹ️ Дополнительная информация",
+        'not_specified_info': "Не указано",
+        'no_conference_info': "ℹ️ Информация о конференции не найдена.\n\nПожалуйста, обратитесь к организаторам.",
+
+        # Правила поведения (текстовая версия)
+        'rules_text': (
+            "📋 **Правила поведения на конференции**\n\n"
+            "1. Будьте вежливы и уважительны к другим участникам\n"
+            "2. Соблюдайте дресс-код: Business casual\n"
+            "3. Не опаздывайте на сессии и встречи\n"
+            "4. Выключайте звук мобильных устройств во время выступлений\n"
+            "5. Соблюдайте чистоту в конференц-зонах\n"
+            "6. Фото и видео съемка разрешена только с согласия участников\n"
+            "7. Запрещено распространение материалов без разрешения\n\n"
+            "Нарушение правил может привести к ограничению доступа."
+        ),
+        'rules_pdf_caption': "📋 **Правила поведения на конференции**\n\nПожалуйста, ознакомьтесь с правилами.",
+        'rules_accepted': "✅ Правила приняты",
+
+        # Для ticket формы
+        'ticket_country_other_prompt': "Пожалуйста, напишите название вашей страны:",
+        'error_select_country': "Пожалуйста, выберите страну из кнопок выше.",
+        'error_invalid_email': "Пожалуйста, введите корректный email (пример: name@domain.com):",
+        'error_invalid_phone': "Пожалуйста, введите корректный номер телефона (минимум 10 цифр):",
+        'error_wrong_date_format_range': "Неверный формат дат. Используйте: ДД.ММ.ГГГГ - ДД.ММ.ГГГГ",
+
+        # Для booth информации
+        'booth_location': "Стенд находится в главном холле конференц-центра",
+        'booth_hours': "Часы работы: 9:00 - 18:00",
+        'booth_contact': "Контакты: +7 (999) 123-45-67",
+        'booth_info_note': "По всем вопросам обращайтесь к сотрудникам на стенде",
+
+        'event_question_prompt': "Напишите ваш вопрос (максимум 500 символов):",
         # ============================================
         # TRAVEL РАЗДЕЛ
         # ============================================
@@ -329,6 +379,7 @@ COMMON_TEXTS = {
         'new_request': "📝 New request",
         'lang_ru': "🇷🇺 Russian",
         'lang_en': "🇬🇧 English",
+        'question_button': "❓ Вопрос",
 
         # ============================================
         # LANGUAGE SELECTION AND REGISTRATION
@@ -403,7 +454,7 @@ COMMON_TEXTS = {
         'pr_dinner': "🍽 Partner Dinner",
         'pr_conference_bot': "🤖 Conference Bot",
         'pr_conference_rules': "📝 Behaviour rules",
-        'pr_question': "❓ Question to PR",
+        'pr_question': "❓ Question to PR Department",
         'pr_banner_form_title': "🎨 Banner request for social networks",
         'pr_banner_step1': "Step 1 of 7\nEnter your full name:",
         'pr_banner_step2': "Step 2 of 7\nEnter your job title:",
@@ -492,9 +543,9 @@ COMMON_TEXTS = {
         # ============================================
         'event_title': "🎪 EVENT Section",
         'event_ticket': "🎫 Conference Ticket",
-        'event_booth': "ℹ️ About Booth",
-        'event_info': "ℹ️ About Conference",
-        'event_question': "❓ Question",
+        'event_booth': "ℹ️ Booth information",
+        'event_info': "ℹ️ Event info",
+        'event_question': "❓Question to Event Department",
         'event_certificate_form_title': "📄 Certificate Request",
         'event_certificate_step1': "Enter your full name:",
         'event_certificate_step2': "Enter your position:",
@@ -514,6 +565,52 @@ COMMON_TEXTS = {
         'ticket_country': "🌍 Which country should be used for ticket registration?\n\nSelect from the list:",
         'ticket_success': "✅ **Ticket request submitted!**\n\n📧 Ticket will be sent to: {email}\n\nThank you for your response! Our team will process your request and send the ticket shortly.\n\nFollow notifications for updates on your request status.",
 
+        'event_rules': "📋 Code of Conduct",
+        'event_rules_pdf': "📋 Code of Conduct (PDF)",
+        'accept_rules': "✅ I have read and agree",
+        'back_to_event': "◀️ Back to EVENT",
+        'event_certificate': "📄 Certificate Request",
+        'event_certificate_success': "✅ Certificate request submitted!\n\nThank you for your response! Our team has received your request. Follow notifications for updates.",
+
+        # Conference info
+        'conference_info_title': "ℹ️ Conference Information:",
+        'conference_name': "📅 Name",
+        'conference_city': "📍 City",
+        'conference_dates': "📅 Conference dates",
+        'trip_dates': "✈️ Trip dates",
+        'bot_link': "🤖 Conference bot",
+        'additional_info': "ℹ️ Additional information",
+        'not_specified_info': "Not specified",
+        'no_conference_info': "ℹ️ Conference information not found.\n\nPlease contact the organizers.",
+
+        # Rules text
+        'rules_text': (
+            "📋 **Conference Code of Conduct**\n\n"
+            "1. Be polite and respectful to other participants\n"
+            "2. Follow the dress code: Business casual\n"
+            "3. Don't be late for sessions and meetings\n"
+            "4. Silence mobile devices during presentations\n"
+            "5. Keep conference areas clean\n"
+            "6. Photo and video recording only with participants' consent\n"
+            "7. Distribution of materials without permission is prohibited\n\n"
+            "Violation of rules may lead to access restriction."
+        ),
+        'rules_pdf_caption': "📋 **Conference Code of Conduct**\n\nPlease read the rules carefully.",
+        'rules_accepted': "✅ Rules accepted",
+
+        # For ticket form
+        'ticket_country_other_prompt': "Please write your country name:",
+        'error_select_country': "Please select a country from the buttons above.",
+        'error_invalid_email': "Please enter a valid email address (e.g., name@domain.com):",
+        'error_invalid_phone': "Please enter a valid phone number (minimum 10 digits):",
+        'error_wrong_date_format_range': "Invalid date format. Use: DD.MM.YYYY - DD.MM.YYYY",
+
+        # For booth information
+        'booth_location': "Booth is located in the main hall of the conference center",
+        'booth_hours': "Working hours: 9:00 - 18:00",
+        'booth_contact': "Contacts: +7 (999) 123-45-67",
+        'booth_info_note': "For any questions, please contact the staff at the booth",
+        'event_question_prompt': "Write your question (max 500 characters):",
         # ============================================
         # TRAVEL SECTION
         # ============================================
@@ -525,7 +622,7 @@ COMMON_TEXTS = {
         'travel_hotel': "🏨 Hotel",
         'travel_per_diem': "💰 Daily allowance",
         'travel_my_requests': "📋 My requests",
-        'travel_question': "❓ Question",
+        'travel_question': "Question to Travel Department",
         'travel_back_to_menu': "◀️ Back to TRAVEL",
 
         # Visa support
