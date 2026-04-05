@@ -25,7 +25,7 @@ COMMON_TEXTS = {
         'new_request': "📝 Новая заявка",
         'lang_ru': "🇷🇺 Русский",
         'lang_en': "🇬🇧 English",
-        'question_button': "❓ Вопрос",
+        'question_button': "❓Вопрос",
 
         # ============================================
         # ВЫБОР ЯЗЫКА И РЕГИСТРАЦИЯ
@@ -90,6 +90,10 @@ COMMON_TEXTS = {
         'profile_updated': "✅ {field} успешно обновлено!",
         'profile_update_error': "❌ Ошибка при обновлении {field}. Попробуйте позже.",
         'cancel_edit': "❌ Редактирование отменено.",
+        'field_name': "Имя",
+        'field_position': "Должность",
+        'field_company': "Компания",
+        'field_language': "Язык",
 
         # ============================================
         # PR РАЗДЕЛ
@@ -379,7 +383,7 @@ COMMON_TEXTS = {
         'new_request': "📝 New request",
         'lang_ru': "🇷🇺 Russian",
         'lang_en': "🇬🇧 English",
-        'question_button': "❓ Вопрос",
+        'question_button': "❓Question",
 
         # ============================================
         # LANGUAGE SELECTION AND REGISTRATION
@@ -444,6 +448,10 @@ COMMON_TEXTS = {
         'profile_updated': "✅ {field} updated successfully!",
         'profile_update_error': "❌ Error updating {field}. Please try again later.",
         'cancel_edit': "❌ Edit cancelled.",
+        'field_name': "Name",
+        'field_position': "Position",
+        'field_company': "Company",
+        'field_language': "Language",
 
         # ============================================
         # PR SECTION

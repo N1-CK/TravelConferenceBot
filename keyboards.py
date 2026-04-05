@@ -222,7 +222,6 @@ def get_profile_edit_keyboard() -> InlineKeyboardMarkup:
     )
     return builder.as_markup()
 
-
 def get_language_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура выбора языка"""
     from aiogram.types import InlineKeyboardButton
@@ -233,7 +232,5 @@ def get_language_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🇷🇺 Русский", callback_data="lang_ru"),
         InlineKeyboardButton(text="🇬🇧 English", callback_data="lang_en")
     )
-    builder.row(
-        InlineKeyboardButton(text="◀️ Назад к профилю", callback_data="menu_profile")
-    )
+    # Убрали кнопку "Назад" - она будет отдельно в контексте
     return builder.as_markup()

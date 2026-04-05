@@ -1,3 +1,5 @@
+# handlers/menu.py - ИСПРАВЛЕННАЯ ВЕРСИЯ
+
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
@@ -118,6 +120,7 @@ async def show_profile(callback: CallbackQuery):
     """Показать профиль пользователя с данными из БД"""
     user_id = callback.from_user.id
     username = callback.from_user.username
+    lang = await get_user_lang(user_id)
 
     # Получаем данные пользователя из БД
     user_data = await db.get_user_data(user_id)
@@ -127,8 +130,8 @@ async def show_profile(callback: CallbackQuery):
             'user_id': user_id,
             'username': username,
             'full_name': callback.from_user.full_name,
-            'position': 'Не указано',
-            'company': 'Не указано',
+            'position': get_text_sync(lang, 'not_specified'),
+            'company': get_text_sync(lang, 'not_specified'),
             'language': 'ru'
         }
         await db.save_user_registration(user_data)
@@ -137,7 +140,7 @@ async def show_profile(callback: CallbackQuery):
     profile_text = await t(
         user_id,
         'profile_template',
-        userid = user_id,
+        userid=user_id,
         username=username,
         full_name=user_data.get('full_name', get_text_sync(lang, 'not_specified')),
         position=user_data.get('position', get_text_sync(lang, 'not_specified')),
@@ -147,18 +150,19 @@ async def show_profile(callback: CallbackQuery):
             'registered_at') else get_text_sync(lang, 'not_specified')
     )
 
+    # Локализованные кнопки профиля
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="✏️ Изменить имя", callback_data="profile_edit_name"),
-        InlineKeyboardButton(text="✏️ Изменить должность", callback_data="profile_edit_position")
+        InlineKeyboardButton(text=get_text_sync(lang, 'edit_name'), callback_data="profile_edit_name"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'edit_position'), callback_data="profile_edit_position")
     )
     builder.row(
-        InlineKeyboardButton(text="✏️ Изменить компанию", callback_data="profile_edit_company"),
-        InlineKeyboardButton(text="🌐 Сменить язык", callback_data="profile_edit_language")
+        InlineKeyboardButton(text=get_text_sync(lang, 'edit_company'), callback_data="profile_edit_company"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'edit_language'), callback_data="profile_edit_language")
     )
     builder.row(
-        InlineKeyboardButton(text="🔄 Обновить профиль", callback_data="profile_refresh"),
-        InlineKeyboardButton(text="◀️ Главное меню", callback_data="menu_main")
+        InlineKeyboardButton(text=get_text_sync(lang, 'refresh_profile'), callback_data="profile_refresh"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'back'), callback_data="menu_main")
     )
 
     try:
@@ -175,6 +179,7 @@ async def show_profile(callback: CallbackQuery):
             parse_mode="Markdown"
         )
     await callback.answer()
+
 
 @router.callback_query(F.data == "profile_refresh")
 async def refresh_profile(callback: CallbackQuery):
@@ -198,18 +203,22 @@ async def show_help(callback: CallbackQuery):
     )
 
 
+# ============================================
+# РЕДАКТИРОВАНИЕ ИМЕНИ (ЛОКАЛИЗОВАННОЕ)
+# ============================================
+
 @router.callback_query(F.data == "profile_edit_name")
 async def edit_name_start(callback: CallbackQuery, state: FSMContext):
     """Начало редактирования имени"""
+    user_id = callback.from_user.id
     await state.set_state(ProfileEditStates.waiting_for_fullname)
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="menu_profile")]
+        [InlineKeyboardButton(text=await t(user_id, 'cancel'), callback_data="menu_profile")]
     ])
 
     await callback.message.edit_text(
-        "✏️ *Редактирование имени*\n\n"
-        "Введите ваше имя и фамилию:",
+        await t(user_id, 'edit_name_title'),
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -224,8 +233,7 @@ async def process_name_edit(message: Message, state: FSMContext):
     # Валидация
     if len(new_name) < 2 or len(new_name) > 100:
         await message.answer(
-            "❌ Имя должно содержать от 2 до 100 символов.\n"
-            "Попробуйте еще раз или нажмите /cancel"
+            f"❌ {await t(user_id, 'error_invalid_name')}"
         )
         return
 
@@ -246,34 +254,36 @@ async def process_name_edit(message: Message, state: FSMContext):
             details={"field": "full_name", "new_value": new_name}
         )
 
-        await message.answer("✅ Имя успешно обновлено!")
+        field_name = await t(user_id, 'field_name')
+        await message.answer(await t(user_id, 'profile_updated', field=field_name))
 
-        # Возвращаемся к профилю (отправляем новое сообщение)
+        # Возвращаемся к профилю
         await show_profile_as_new_message(message)
 
     except Exception as e:
         logger.error(f"Error updating name: {e}")
-        await message.answer("❌ Ошибка при обновлении имени. Попробуйте позже.")
+        field_name = await t(user_id, 'field_name')
+        await message.answer(await t(user_id, 'profile_update_error', field=field_name))
 
     await state.clear()
 
 
 # ============================================
-# РЕДАКТИРОВАНИЕ ДОЛЖНОСТИ
+# РЕДАКТИРОВАНИЕ ДОЛЖНОСТИ (ЛОКАЛИЗОВАННОЕ)
 # ============================================
 
 @router.callback_query(F.data == "profile_edit_position")
 async def edit_position_start(callback: CallbackQuery, state: FSMContext):
     """Начало редактирования должности"""
+    user_id = callback.from_user.id
     await state.set_state(ProfileEditStates.waiting_for_position)
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="menu_profile")]
+        [InlineKeyboardButton(text=await t(user_id, 'cancel'), callback_data="menu_profile")]
     ])
 
     await callback.message.edit_text(
-        "✏️ *Редактирование должности*\n\n"
-        "Введите вашу должность:",
+        await t(user_id, 'edit_position_title'),
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -287,8 +297,7 @@ async def process_position_edit(message: Message, state: FSMContext):
 
     if len(new_position) < 2 or len(new_position) > 100:
         await message.answer(
-            "❌ Должность должна содержать от 2 до 100 символов.\n"
-            "Попробуйте еще раз или нажмите /cancel"
+            f"❌ {await t(user_id, 'error_invalid_position')}"
         )
         return
 
@@ -307,32 +316,34 @@ async def process_position_edit(message: Message, state: FSMContext):
             details={"field": "position", "new_value": new_position}
         )
 
-        await message.answer("✅ Должность успешно обновлена!")
+        field_name = await t(user_id, 'field_position')
+        await message.answer(await t(user_id, 'profile_updated', field=field_name))
         await show_profile_as_new_message(message)
 
     except Exception as e:
         logger.error(f"Error updating position: {e}")
-        await message.answer("❌ Ошибка при обновлении должности.")
+        field_name = await t(user_id, 'field_position')
+        await message.answer(await t(user_id, 'profile_update_error', field=field_name))
 
     await state.clear()
 
 
 # ============================================
-# РЕДАКТИРОВАНИЕ КОМПАНИИ
+# РЕДАКТИРОВАНИЕ КОМПАНИИ (ЛОКАЛИЗОВАННОЕ)
 # ============================================
 
 @router.callback_query(F.data == "profile_edit_company")
 async def edit_company_start(callback: CallbackQuery, state: FSMContext):
     """Начало редактирования компании"""
+    user_id = callback.from_user.id
     await state.set_state(ProfileEditStates.waiting_for_company)
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="menu_profile")]
+        [InlineKeyboardButton(text=await t(user_id, 'cancel'), callback_data="menu_profile")]
     ])
 
     await callback.message.edit_text(
-        "✏️ *Редактирование компании*\n\n"
-        "Введите название вашей компании или партнерской программы:",
+        await t(user_id, 'edit_company_title'),
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -347,8 +358,7 @@ async def process_company_edit(message: Message, state: FSMContext):
 
     if len(new_company) < 2 or len(new_company) > 100:
         await message.answer(
-            "❌ Название компании должно содержать от 2 до 100 символов.\n"
-            "Попробуйте еще раз или нажмите /cancel"
+            f"❌ {await t(user_id, 'error_invalid_company')}"
         )
         return
 
@@ -378,31 +388,33 @@ async def process_company_edit(message: Message, state: FSMContext):
             details={"field": "company", "new_value": new_company}
         )
 
-        await message.answer("✅ Компания успешно обновлена!")
+        field_name = await t(user_id, 'field_company')
+        await message.answer(await t(user_id, 'profile_updated', field=field_name))
         await show_profile_as_new_message(message)
 
     except Exception as e:
         logger.error(f"Error updating company: {e}")
-        await message.answer("❌ Ошибка при обновлении компании.")
+        field_name = await t(user_id, 'field_company')
+        await message.answer(await t(user_id, 'profile_update_error', field=field_name))
 
     await state.clear()
 
 
 # ============================================
-# РЕДАКТИРОВАНИЕ ЯЗЫКА
+# РЕДАКТИРОВАНИЕ ЯЗЫКА (ЛОКАЛИЗОВАННОЕ)
 # ============================================
 
 @router.callback_query(F.data == "profile_edit_language")
 async def edit_language_start(callback: CallbackQuery, state: FSMContext):
     """Начало редактирования языка"""
+    user_id = callback.from_user.id
     await state.set_state(ProfileEditStates.waiting_for_language)
 
     # Клавиатура выбора языка
     from keyboards import get_language_keyboard
 
     await callback.message.edit_text(
-        "🌐 *Выберите язык интерфейса*\n\n"
-        "Выберите предпочитаемый язык:",
+        await t(user_id, 'edit_language_title'),
         reply_markup=get_language_keyboard(),
         parse_mode="Markdown"
     )
@@ -438,7 +450,7 @@ async def process_language_edit(callback: CallbackQuery, state: FSMContext):
 
     except Exception as e:
         logger.error(f"Error updating language: {e}")
-        await callback.message.edit_text("❌ Ошибка при обновлении языка.")
+        await callback.message.edit_text(f"❌ {await t(user_id, 'profile_update_error', field=await t(user_id, 'field_language'))}")
 
     await state.clear()
 
@@ -451,26 +463,28 @@ async def show_profile_as_new_message(message: Message):
     """Показать профиль как новое сообщение (когда нельзя отредактировать)"""
     user_id = message.from_user.id
     username = message.from_user.username
+    lang = await get_user_lang(user_id)
 
     user_data = await db.get_user_data(user_id)
 
     if not user_data:
         user_data = {
             'full_name': message.from_user.full_name,
-            'position': 'Не указано',
-            'company': 'Не указано',
+            'position': get_text_sync(lang, 'not_specified'),
+            'company': get_text_sync(lang, 'not_specified'),
             'language': 'ru'
         }
 
-    profile_text = (
-        "👤 *Ваш профиль*\n\n"
-        f"*ID:* `{user_id}`\n"
-        f"*Username:* @{username}\n"
-        f"*Имя:* {user_data.get('full_name', 'Не указано')}\n"
-        f"*Должность:* {user_data.get('position', 'Не указано')}\n"
-        f"*Компания:* {user_data.get('company', 'Не указано')}\n"
-        f"*Язык:* {'🇷🇺 Русский' if user_data.get('language') == 'ru' else '🇬🇧 English'}\n\n"
-        "Выберите действие:"
+    profile_text = await t(
+        user_id,
+        'profile_template',
+        userid=user_id,
+        username=username,
+        full_name=user_data.get('full_name', get_text_sync(lang, 'not_specified')),
+        position=user_data.get('position', get_text_sync(lang, 'not_specified')),
+        company=user_data.get('company', get_text_sync(lang, 'not_specified')),
+        language='🇷🇺 Русский' if user_data.get('language') == 'ru' else '🇬🇧 English',
+        registered_at=user_data.get('registered_at', '').strftime('%d.%m.%Y') if user_data.get('registered_at') else get_text_sync(lang, 'not_specified')
     )
 
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -478,16 +492,16 @@ async def show_profile_as_new_message(message: Message):
 
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="✏️ Изменить имя", callback_data="profile_edit_name"),
-        InlineKeyboardButton(text="✏️ Изменить должность", callback_data="profile_edit_position")
+        InlineKeyboardButton(text=get_text_sync(lang, 'edit_name'), callback_data="profile_edit_name"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'edit_position'), callback_data="profile_edit_position")
     )
     builder.row(
-        InlineKeyboardButton(text="✏️ Изменить компанию", callback_data="profile_edit_company"),
-        InlineKeyboardButton(text="🌐 Сменить язык", callback_data="profile_edit_language")
+        InlineKeyboardButton(text=get_text_sync(lang, 'edit_company'), callback_data="profile_edit_company"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'edit_language'), callback_data="profile_edit_language")
     )
     builder.row(
-        InlineKeyboardButton(text="🔄 Обновить", callback_data="profile_refresh"),
-        InlineKeyboardButton(text="◀️ Главное меню", callback_data="menu_main")
+        InlineKeyboardButton(text=get_text_sync(lang, 'refresh_profile'), callback_data="profile_refresh"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'back'), callback_data="menu_main")
     )
 
     await message.answer(
@@ -504,6 +518,6 @@ async def cancel_edit(message: Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state is not None:
         await state.clear()
-        await message.answer("❌ Редактирование отменено.")
+        await message.answer(await t(message.from_user.id, 'cancel_edit'))
         # Показываем профиль
         await show_profile_as_new_message(message)
