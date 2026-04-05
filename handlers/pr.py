@@ -75,9 +75,7 @@ async def submit_business_cards_request(update, state: FSMContext):
         )
 
     await message_obj.answer(
-        "✅ Заявка на визитки отправлена!\n\n"
-        "Благодарим за ответ, наша команда получила твой запрос. "
-        "Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи."
+        await t(user_id, 'business_cards_success')
     )
     await state.clear()
 
@@ -88,16 +86,15 @@ async def show_conference_bot_links(callback: CallbackQuery):
     from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     username = callback.from_user.username
+    user_id = callback.from_user.id
 
-    # Получаем конференции пользователя
     conferences = await db.get_user_active_conferences(username)
 
     if not conferences:
         await callback.message.edit_text(
-            "🤖 Бот на конференцию\n\n"
-            "У вас нет активных конференций. Обратитесь к администратору.",
+            await t(callback.from_user.id, 'pr_conference_bot_title'),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="◀️ Назад", callback_data="pr_menu")]
+                [InlineKeyboardButton(text=await t(user_id, 'back_to_pr'), callback_data="pr_menu")]
             ])
         )
         return
@@ -107,29 +104,25 @@ async def show_conference_bot_links(callback: CallbackQuery):
 
     # Ссылки на ботов для разных конференций (настройте под свои)
     BOT_LINKS = {
-        "Conference 2024": "https://t.me/conference2024_bot",
-        "Summit Dubai": "https://t.me/summit_dubai_bot",
-        "Business Forum": "https://t.me/business_forum_bot",
+        "Conference 2024": "",
+        "Summit Dubai": "",
+        "Business Forum": "",
     }
 
     for conf in conferences:
-        bot_link = BOT_LINKS.get(conf, "https://t.me/conference_bot")
+        bot_link = BOT_LINKS.get(conf, "")
         builder.row(InlineKeyboardButton(
             text=f"🤖 {conf}",
             url=bot_link
         ))
 
     builder.row(
-        InlineKeyboardButton(text="◀️ Назад в PR", callback_data="pr_menu"),
-        InlineKeyboardButton(text="🏠 Главная", callback_data="menu_main")
+        InlineKeyboardButton(text=await t(user_id, 'back_to_pr'), callback_data="pr_menu"),
+        InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")
     )
 
     await callback.message.edit_text(
-        "🤖 **Бот на конференцию**\n\n"
-        "Выберите конференцию, чтобы перейти в её бота:\n\n"
-        "📌 *Примечание:* Боты содержат актуальную информацию о расписании,\n"
-        "спикерах, локациях и другие важные материалы.\n\n"
-        "👇 Нажмите на кнопку с нужной конференцией:",
+        await t(user_id, 'pr_conference_bot_description'),
         reply_markup=builder.as_markup(),
         parse_mode="Markdown"
     )
@@ -137,9 +130,10 @@ async def show_conference_bot_links(callback: CallbackQuery):
 @router.callback_query(F.data == "pr_business_cards")
 async def start_business_cards_form(callback: CallbackQuery, state: FSMContext):
     await state.set_state(BusinessCardsForm.waiting_for_name)
+    user_id = callback.from_user.id
     await callback.message.edit_text(
-        "📇 Заказ визиток\n\nШаг 1 из 5\nУкажите имя и фамилию для визитки:",
-        reply_markup=await get_back_next_keyboard(back_to="pr_menu", next_disabled=True, user_id=callback.from_user.id)
+        await t(user_id, 'business_cards_title') + "\n\n" + await t(user_id, 'business_cards_step1'),
+        reply_markup=await get_back_next_keyboard(back_to="pr_menu", next_disabled=True, user_id=user_id)
     )
 
 
@@ -170,10 +164,10 @@ async def process_name(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
     await state.set_state(PRBannerForm.waiting_for_position)
 
+    user_id = message.from_user.id
     await message.answer(
-        "Шаг 2 из 6\n"
-        "Напишите свою должность/роль:",
-        reply_markup=await get_back_next_keyboard(back_to="banner_step1")
+        await t(user_id, 'banner_step2'),
+        reply_markup=await get_back_next_keyboard(back_to="banner_step1", user_id=user_id)
     )
 
 
@@ -183,10 +177,10 @@ async def process_position(message: Message, state: FSMContext):
     await state.update_data(position=message.text)
     await state.set_state(PRBannerForm.waiting_for_company)
 
+    user_id = message.from_user.id
     await message.answer(
-        "Шаг 3 из 6\n"
-        "Название компании/партнерской программы:",
-        reply_markup=await get_back_next_keyboard(back_to="banner_step2")
+        await t(user_id, 'banner_step3'),
+        reply_markup=await get_back_next_keyboard(back_to="banner_step2", user_id=user_id)
     )
 
 
@@ -196,51 +190,127 @@ async def process_company(message: Message, state: FSMContext):
     await state.update_data(company=message.text)
     await state.set_state(PRBannerForm.waiting_for_language)
 
-    # Клавиатура с выбором языка
-    from aiogram.types import KeyboardButton
-    from aiogram.utils.keyboard import ReplyKeyboardBuilder
-
-    builder = ReplyKeyboardBuilder()
-    builder.row(KeyboardButton(text="🇷🇺 Русский"))
-    builder.row(KeyboardButton(text="🇬🇧 English"))
-
-    await message.answer(
-        "Шаг 4 из 6\n"
-        "Выберите желаемый язык баннера:",
-        reply_markup=builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
-    )
-
-
-@router.message(PRBannerForm.waiting_for_language)
-async def process_language(message: Message, state: FSMContext):
-    """Обработка языка"""
-    await state.update_data(language=message.text)
-    await state.set_state(PRBannerForm.waiting_for_photo_choice)
-
-    # Кнопки Да/Нет
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-
+    # Inline-клавиатура для выбора языка
+    user_id = message.from_user.id
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=await t(message.from_user.id, 'yes'), callback_data="banner_photo_yes"),
-         InlineKeyboardButton(text=await t(message.from_user.id, 'no'), callback_data="banner_photo_no")],
-        [InlineKeyboardButton(text=await t(message.from_user.id, 'back'), callback_data="banner_back_step4")]
+        [InlineKeyboardButton(text=await t(user_id, 'lang_ru'), callback_data="banner_lang_ru")],
+        [InlineKeyboardButton(text=await t(user_id, 'lang_en'), callback_data="banner_lang_en")],
+        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="banner_back_step3")]
     ])
 
     await message.answer(
-        "Шаг 5 из 6\n"
-        "Добавить фотографию в баннер?",
+        await t(user_id, 'banner_step4'),
         reply_markup=keyboard
     )
+
+
+
+@router.callback_query(F.data == "banner_back_step4")
+async def back_to_language_selection(callback: CallbackQuery, state: FSMContext):
+    """Назад к выбору языка"""
+    await state.set_state(PRBannerForm.waiting_for_language)
+    user_id = callback.from_user.id
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=await t(user_id, 'lang_ru'), callback_data="banner_lang_ru")],
+        [InlineKeyboardButton(text=await t(user_id, 'lang_en'), callback_data="banner_lang_en")],
+        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="banner_back_step3")]
+    ])
+
+    await callback.message.edit_text(
+        await t(user_id, 'banner_step4'),
+        reply_markup=keyboard
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "banner_back_step5")
+async def back_to_photo_choice_from_comments(callback: CallbackQuery, state: FSMContext):
+    """Назад к выбору фото (из комментариев)"""
+    await state.set_state(PRBannerForm.waiting_for_photo_choice)
+    user_id = callback.from_user.id
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=await t(user_id, 'yes'), callback_data="banner_photo_yes"),
+         InlineKeyboardButton(text=await t(user_id, 'no'), callback_data="banner_photo_no")],
+        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="banner_back_step4")]
+    ])
+
+    await callback.message.edit_text(
+        await t(user_id, 'banner_step5'),
+        reply_markup=keyboard
+    )
+
+
+@router.callback_query(F.data == "banner_back_step3")
+async def back_to_company(callback: CallbackQuery, state: FSMContext):
+    """Назад к вводу компании"""
+    await state.set_state(PRBannerForm.waiting_for_company)
+    user_id = callback.from_user.id
+
+    await callback.message.edit_text(
+        await t(user_id, 'banner_step3'),
+        reply_markup=await get_back_next_keyboard(back_to="banner_step2", user_id=user_id)
+    )
+
+
+@router.callback_query(F.data == "banner_step1")
+async def back_to_name_from_position(callback: CallbackQuery, state: FSMContext):
+    """Назад к вводу имени (из шага должность)"""
+    await state.set_state(PRBannerForm.waiting_for_name)
+    user_id = callback.from_user.id
+
+    await callback.message.edit_text(
+        await t(user_id, 'pr_banner_step1'),
+        reply_markup=await get_back_next_keyboard(back_to="pr_menu", next_disabled=True, user_id=user_id)
+    )
+
+
+@router.callback_query(F.data == "banner_step2")
+async def back_to_position_from_company(callback: CallbackQuery, state: FSMContext):
+    """Назад к вводу должности (из шага компания)"""
+    await state.set_state(PRBannerForm.waiting_for_position)
+    user_id = callback.from_user.id
+
+    await callback.message.edit_text(
+        await t(user_id, 'banner_step2'),
+        reply_markup=await get_back_next_keyboard(back_to="banner_step1", user_id=user_id)
+    )
+
+@router.callback_query(F.data.startswith("banner_lang_"), PRBannerForm.waiting_for_language)
+async def process_language(callback: CallbackQuery, state: FSMContext):
+    """Обработка выбора языка (Inline)"""
+    lang_map = {
+        "banner_lang_ru": "🇷🇺 Русский",
+        "banner_lang_en": "🇬🇧 English"
+    }
+    language = lang_map.get(callback.data, callback.data)
+    await state.update_data(language=language)
+    await state.set_state(PRBannerForm.waiting_for_photo_choice)
+
+    # Кнопки Да/Нет
+    user_id = callback.from_user.id
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=await t(user_id, 'yes'), callback_data="banner_photo_yes"),
+         InlineKeyboardButton(text=await t(user_id, 'no'), callback_data="banner_photo_no")],
+        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="banner_back_step4")]
+    ])
+
+    await callback.message.edit_text(
+        await t(user_id, 'banner_step5'),
+        reply_markup=keyboard
+    )
+    await callback.answer()
 
 
 @router.callback_query(F.data == "banner_photo_yes", PRBannerForm.waiting_for_photo_choice)
 async def process_photo_yes(callback: CallbackQuery, state: FSMContext):
     """Пользователь хочет добавить фото"""
     await state.set_state(PRBannerForm.waiting_for_photo)
+    user_id = callback.from_user.id
     await callback.message.edit_text(
-        "Шаг 6 из 6\n"
-        "Пожалуйста, прикрепите изображение",
-        reply_markup=await get_back_next_keyboard(back_to="banner_step5")
+        await t(user_id, 'banner_step6'),
+        reply_markup=await get_back_next_keyboard(back_to="banner_step5", user_id=user_id)
     )
 
 
@@ -259,16 +329,14 @@ async def process_photo_no(callback: CallbackQuery, state: FSMContext):
     await state.update_data(photo_required=False, photo_id=None)
     await state.set_state(PRBannerForm.waiting_for_comments)
 
+    user_id = callback.from_user.id
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=await t(user_id, 'skip'), callback_data="banner_skip_comments")],
+        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="banner_back_step6")]
+    ])
     await callback.message.edit_text(
-        "Шаг 7 из 7\n\n"
-        "📝 Ваши комментарии (необязательно)\n\n"
-        "Если у вас есть дополнительные пожелания к баннеру, "
-        "напишите их ниже.\n\n"
-        "Или нажмите 'Пропустить':",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="⏭️ Пропустить", callback_data="banner_skip_comments")],
-            [InlineKeyboardButton(text="◀️ Назад", callback_data="banner_back_step6")]
-        ])
+        await t(user_id, 'banner_step7'),
+        reply_markup=keyboard
     )
 
 
@@ -290,32 +358,105 @@ async def skip_banner_comments(callback: CallbackQuery, state: FSMContext):
 async def back_to_photo_choice(callback: CallbackQuery, state: FSMContext):
     """Назад к выбору фото"""
     await state.set_state(PRBannerForm.waiting_for_photo_choice)
+    user_id = callback.from_user.id
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=await t(callback.from_user.id, 'yes'), callback_data="banner_photo_yes"),
-         InlineKeyboardButton(text=await t(callback.from_user.id, 'no'), callback_data="banner_photo_no")],
-        [InlineKeyboardButton(text=await t(callback.from_user.id, 'back'), callback_data="banner_back_step5")]
+        [InlineKeyboardButton(text=await t(user_id, 'yes'), callback_data="banner_photo_yes"),
+         InlineKeyboardButton(text=await t(user_id, 'no'), callback_data="banner_photo_no")],
+        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="banner_back_step4")]
     ])
 
     await callback.message.edit_text(
-        "Шаг 5 из 7\nДобавить фотографию в баннер?",
+        await t(user_id, 'banner_step5'),
         reply_markup=keyboard
     )
+
+
+@router.callback_query(F.data == "business_cards_back_step2")
+async def back_to_name_bc(callback: CallbackQuery, state: FSMContext):
+    """Назад к вводу имени (с шага 2 на шаг 1)"""
+    await state.set_state(BusinessCardsForm.waiting_for_name)
+    user_id = callback.from_user.id
+    await callback.message.edit_text(
+        await t(user_id, 'business_cards_title') + "\n\n" + await t(user_id, 'business_cards_step1'),
+        reply_markup=await get_back_next_keyboard(back_to="pr_menu", next_disabled=True, user_id=user_id)
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "business_cards_back_step3")
+async def back_to_position_from_company_bc(callback: CallbackQuery, state: FSMContext):
+    """Назад к вводу должности (с шага 3 на шаг 2)"""
+    await state.set_state(BusinessCardsForm.waiting_for_position_en)
+    user_id = callback.from_user.id
+    await callback.message.edit_text(
+        await t(user_id, 'business_cards_step2'),
+        reply_markup=await get_back_next_keyboard(back_to="business_cards_back_step2", user_id=user_id)
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "business_cards_back_step4")
+async def back_to_contacts_from_style(callback: CallbackQuery, state: FSMContext):
+    """Назад к вводу контактов (с шага 5 на шаг 4)"""
+    await state.set_state(BusinessCardsForm.waiting_for_contacts)
+    user_id = callback.from_user.id
+    await callback.message.edit_text(
+        await t(user_id, 'business_cards_step4'),
+        reply_markup=await get_back_next_keyboard(back_to="business_cards_back_step3", user_id=user_id)
+    )
+    await callback.answer()
+
+#TODO: Переход с Step 4 на Step 3 по кнопке Back
+
+@router.callback_query(F.data == "business_cards_back_step5")
+async def back_to_style_from_comments(callback: CallbackQuery, state: FSMContext):
+    """Назад к выбору стиля (с шага 6 на шаг 5)"""
+    await state.set_state(BusinessCardsForm.waiting_for_brand_style)
+    user_id = callback.from_user.id
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_yes'), callback_data="brand_style_yes"),
+         InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_no'), callback_data="brand_style_no")],
+        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="business_cards_back_step4")]  # ← ведёт на шаг 4
+    ])
+    await callback.message.edit_text(
+        await t(user_id, 'business_cards_step5'),
+        reply_markup=keyboard
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "business_cards_back_step3_company")  # ← новое имя
+async def back_to_company_from_contacts_bc(callback: CallbackQuery, state: FSMContext):
+    """Назад к вводу компании (с шага 4 на шаг 3)"""
+    await state.set_state(BusinessCardsForm.waiting_for_company)
+    user_id = callback.from_user.id
+    await callback.message.edit_text(
+        await t(user_id, 'business_cards_step3'),
+        reply_markup=await get_back_next_keyboard(back_to="business_cards_back_step3", user_id=user_id)
+    )
+    await callback.answer()
 
 @router.message(BusinessCardsForm.waiting_for_name)
 async def process_business_cards_name(message: Message, state: FSMContext):
     await state.update_data(name=message.text)
     await state.set_state(BusinessCardsForm.waiting_for_position_en)
-    await message.answer(await t(message.from_user.id, 'banner_step2'))
+    user_id = message.from_user.id
+    await message.answer(
+        await t(user_id, 'business_cards_step2'),
+        reply_markup=await get_back_next_keyboard(back_to="business_cards_back_step2", user_id=user_id)
+    )
 
 
 @router.message(BusinessCardsForm.waiting_for_position_en)
 async def process_business_cards_position(message: Message, state: FSMContext):
     await state.update_data(position_en=message.text)
     await state.set_state(BusinessCardsForm.waiting_for_company)
+    user_id = message.from_user.id
     await message.answer(
-        "Шаг 3 из 5\nНазвание компании/партнерской программы:",
-        reply_markup=await get_back_next_keyboard(back_to="business_cards_back_step2")
+        await t(user_id, 'business_cards_step3'),
+        reply_markup=await get_back_next_keyboard(back_to="business_cards_back_step3", user_id=user_id)
     )
 
 
@@ -323,9 +464,10 @@ async def process_business_cards_position(message: Message, state: FSMContext):
 async def process_business_cards_company(message: Message, state: FSMContext):
     await state.update_data(company=message.text)
     await state.set_state(BusinessCardsForm.waiting_for_contacts)
+    user_id = message.from_user.id
     await message.answer(
-        "Шаг 4 из 5\nУкажите контакты для связи (Telegram/email):",
-        reply_markup=await get_back_next_keyboard(back_to="business_cards_back_step3")
+        await t(user_id, 'business_cards_step4'),
+        reply_markup=await get_back_next_keyboard(back_to="business_cards_back_step4", user_id=user_id)
     )
 
 
@@ -334,38 +476,30 @@ async def process_business_cards_contacts(message: Message, state: FSMContext):
     await state.update_data(contacts=message.text)
     await state.set_state(BusinessCardsForm.waiting_for_brand_style)
 
+    user_id = message.from_user.id
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Да", callback_data="brand_style_yes")],
-        [InlineKeyboardButton(text="❌ Нет", callback_data="brand_style_no")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="business_cards_back_step4")]
+        [InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_yes'), callback_data="brand_style_yes"),
+         InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_no'), callback_data="brand_style_no")],
+        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="business_cards_back_step4")]
     ])
-    await message.answer(
-        "Шаг 5 из 5\nНужно ли придерживаться фирменного стиля?",
-        reply_markup=keyboard
-    )
+    await message.answer(await t(user_id, 'business_cards_step5'), reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith("brand_style_"), BusinessCardsForm.waiting_for_brand_style)
 async def process_business_cards_brand_style(callback: CallbackQuery, state: FSMContext):
-    """Обработка выбора фирменного стиля и переход к комментариям"""
     brand_style = callback.data == "brand_style_yes"
     await state.update_data(brand_style=brand_style)
     await state.set_state(BusinessCardsForm.waiting_for_comments)
 
+    user_id = callback.from_user.id
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=await t(user_id, 'skip'), callback_data="cards_skip_comments")],
+        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="business_cards_back_step5")]
+    ])
     await callback.message.edit_text(
-        "Шаг 6 из 6\n\n"
-        "📝 Ваши комментарии (необязательно)\n\n"
-        "Если у вас есть дополнительные пожелания к дизайну визиток, "
-        "напишите их ниже.\n\n"
-        "Или нажмите 'Пропустить':",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="⏭️ Пропустить", callback_data="cards_skip_comments")],
-            [InlineKeyboardButton(text="◀️ Назад", callback_data="cards_back_step5")]
-        ])
+        await t(user_id, 'business_cards_step6'),
+        reply_markup=keyboard
     )
-
-
-# handlers/pr.py - обновить функцию submit_banner_request
 
 async def submit_banner_request(update, state: FSMContext):
     """Отправка заявки на баннер с комментариями"""
@@ -375,7 +509,7 @@ async def submit_banner_request(update, state: FSMContext):
         username = update.from_user.username
         user_id = update.from_user.id
         message_obj = update
-    else:  # CallbackQuery
+    else:
         username = update.from_user.username
         user_id = update.from_user.id
         message_obj = update.message
@@ -389,7 +523,7 @@ async def submit_banner_request(update, state: FSMContext):
         'language': data.get('language', ''),
         'photo_required': data.get('photo_required', False),
         'photo_file_id': data.get('photo_id', ''),
-        'comments': data.get('comments', '')  # НОВОЕ ПОЛЕ
+        'comments': data.get('comments', '')
     }
 
     # Сохраняем в БД
@@ -402,10 +536,10 @@ async def submit_banner_request(update, state: FSMContext):
         )
 
     await message_obj.answer(
-        await t(message_obj.from_user.id, 'banner_success'),
+        await t(user_id, 'banner_success'),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=await t(message_obj.from_user.id, 'back'), callback_data="pr_menu")],
-            [InlineKeyboardButton(text=await t(message_obj.from_user.id, 'main_menu'), callback_data="menu_main")]
+            [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="pr_menu")],
+            [InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")]
         ])
     )
     await state.clear()
@@ -430,14 +564,16 @@ async def back_to_brand_style(callback: CallbackQuery, state: FSMContext):
     """Назад к выбору фирменного стиля"""
     await state.set_state(BusinessCardsForm.waiting_for_brand_style)
 
+    user_id = callback.from_user.id
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Да", callback_data="brand_style_yes")],
-        [InlineKeyboardButton(text="❌ Нет", callback_data="brand_style_no")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="business_cards_back_step4")]
+        [InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_yes'),
+                              callback_data="brand_style_yes")],
+        [InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_no'), callback_data="brand_style_no")],
+        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="business_cards_back_step5")]
     ])
 
     await callback.message.edit_text(
-        "Шаг 5 из 6\nНужно ли придерживаться фирменного стиля?",
+        await t(user_id, 'business_cards_step5'),
         reply_markup=keyboard
     )
 
@@ -446,17 +582,18 @@ async def handle_banner_back(callback: CallbackQuery, state: FSMContext):
     """Обработка кнопки Назад в форме баннера"""
     step = callback.data.split("_")[-1]
 
+    user_id = callback.from_user.id
     if step == "step1":
         await state.set_state(PRBannerForm.waiting_for_name)
         await callback.message.edit_text(
-            "Шаг 1 из 6\nУкажите ваше имя и фамилию:",
-            reply_markup=await get_back_next_keyboard(back_to="pr_menu", next_disabled=True)
+            await t(user_id, 'pr_banner_step1'),
+            reply_markup=await get_back_next_keyboard(back_to="pr_menu", next_disabled=True, user_id=user_id)
         )
     elif step == "step2":
         await state.set_state(PRBannerForm.waiting_for_position)
         await callback.message.edit_text(
-            "Шаг 2 из 6\nНапишите свою должность/роль:",
-            reply_markup=await get_back_next_keyboard(back_to="banner_step1")
+            await t(user_id, 'banner_step2'),
+            reply_markup=await get_back_next_keyboard(back_to="banner_step1", user_id=user_id)
         )
 
 
@@ -466,7 +603,7 @@ async def back_to_pr_menu(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     user_id = callback.from_user.id
     await callback.message.edit_text(
-        "📢 Раздел PR\n\nВыберите опцию:",
+        await t(user_id, 'pr_menu_title'),
         reply_markup=await get_pr_menu_keyboard(user_id)
     )
 
@@ -476,13 +613,13 @@ async def start_pr_question(callback: CallbackQuery, state: FSMContext):
     """Вопрос PR без категорий - сразу ввод текста"""
     await state.set_state(PRQuestionForm.waiting_for_question)
 
+    user_id = callback.from_user.id
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="pr_menu")]
+        [InlineKeyboardButton(text=await t(user_id, 'cancel_button'), callback_data="pr_menu")]
     ])
 
     await callback.message.edit_text(
-        "❓ **Вопрос к PR-отделу**\n\n"
-        "Напишите ваш вопрос (максимум 500 символов):\n\n",
+        f"{await t(user_id, 'pr_question_title')}\n\n{await t(user_id, 'pr_question_prompt')}\n\n",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -515,13 +652,13 @@ async def process_pr_question(message: Message, state: FSMContext):
             details={"data": pr_question_data}
         )
 
+    user_id = message.from_user.id
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="◀️ Назад в PR", callback_data="pr_menu")]
+        [InlineKeyboardButton(text=await t(user_id, 'back_to_pr'), callback_data="pr_menu")]
     ])
 
     await message.answer(
-        "✅ **Вопрос отправлен!**\n\n"
-        "Благодарим за вопрос. Наша PR-команда свяжется с вами в ближайшее время.",
+        await t(message.from_user.id, 'pr_question_success'),
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -531,11 +668,8 @@ async def process_pr_question(message: Message, state: FSMContext):
 @router.message(PRQuestionForm.waiting_for_question, F.text.len() > 500)
 async def process_pr_question_too_long(message: Message):
     """Вопрос слишком длинный"""
-    await message.answer(
-        "❌ **Вопрос слишком длинный**\n\n"
-        "Максимальная длина вопроса - 500 символов.\n"
-        "Пожалуйста, сократите ваш вопрос и попробуйте снова."
-    )
+    await message.answer(await t(message.from_user.id, 'pr_question_too_long'))
+
 
 @router.callback_query(F.data == "cancel_form")
 async def cancel_form(callback: CallbackQuery, state: FSMContext):
@@ -543,15 +677,9 @@ async def cancel_form(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     user_id = callback.from_user.id
 
-    # Пытаемся отредактировать, если не получается - отправляем новое
+    cancel_text = await t(user_id, 'form_cancelled_message')
     try:
-        await callback.message.edit_text(
-            "❌ Cancelled.\n\nBack to PR menu:",
-            reply_markup=await get_pr_menu_keyboard(user_id)  # Добавлен user_id
-        )
+        await callback.message.edit_text(cancel_text, reply_markup=await get_pr_menu_keyboard(user_id))
     except:
-        await callback.message.answer(
-            "❌ Cancelled.\n\nBack to PR menu:",
-            reply_markup=await get_pr_menu_keyboard(user_id)  # Добавлен user_id
-        )
+        await callback.message.answer(cancel_text, reply_markup=await get_pr_menu_keyboard(user_id))
     await callback.answer()

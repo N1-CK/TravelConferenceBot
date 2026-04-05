@@ -389,10 +389,10 @@ async def save_ticket_request(update, state: FSMContext):
         )
 
         await message_obj.answer(
-            await t(message_obj.from_user.id, 'ticket_success', email=data.get('email')),
+            await t(user_id, 'ticket_success', email=data.get('email')),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text=await t(message_obj.from_user.id, 'back'), callback_data="menu_event")],
-                [InlineKeyboardButton(text=await t(message_obj.from_user.id, 'main_menu'), callback_data="menu_main")]
+                [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="menu_event")],
+                [InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")]
             ])
         )
     else:

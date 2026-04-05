@@ -1,3 +1,4 @@
+# utility/lang_utils.py
 from typing import Optional
 import logging
 
@@ -6,7 +7,9 @@ logger = logging.getLogger(__name__)
 # Общие тексты для всего бота
 COMMON_TEXTS = {
     'ru': {
-        # Навигация
+        # ============================================
+        # НАВИГАЦИЯ
+        # ============================================
         'next': "➡️ Далее",
         'back': "◀️ Назад",
         'main_menu': "🏠 Главное меню",
@@ -14,40 +17,82 @@ COMMON_TEXTS = {
         'submit': "✅ Отправить",
         'skip': "⏭️ Пропустить",
         'confirm': "✅ Подтвердить",
-        'select_conference': "Выберите конференцию:",
-        'conference_selected': "Выбрана конференция: *{conference}*",
-        'switch_conference': "🔄 Сменить конференцию",
-        'select_conference_button': "🎯 Выбрать конференцию",
-        'my_profile': "👤 Профиль",
-        'help': "❓ Помощь",
         'yes': "✅ Да",
         'no': "❌ Нет",
+        'confirm_data_storage': "✅ Подтвердить хранение данных",
+        'dont_store': "❌ Не хранить",
+        'check_again': "🔄 Проверить снова",
+        'new_request': "📝 Новая заявка",
+        'lang_ru': "🇷🇺 Русский",
+        'lang_en': "🇬🇧 English",
 
-        # Выбор языка
+        # ============================================
+        # ВЫБОР ЯЗЫКА И РЕГИСТРАЦИЯ
+        # ============================================
         'choose_lang': "Пожалуйста, выберите язык / please choose your language:",
         'language_selected': "🇷🇺 Выбран русский язык",
-
-        # Start.py, если пользователь в белом списке
         'ask_fullname': "Пожалуйста, введите ваше имя и фамилию:",
         'ask_position': "Укажите вашу должность:",
         'ask_company': "Укажите название вашей компании / партнерской программы:",
         'welcome': "Добро пожаловать в Travel Conference Bot!",
         'main_menu_title': "Главное меню. Выберите раздел:",
+        'select_conference': "Выберите вашу конференцию:",
+        'select_conference_button': "Выбрать конференцию",
+        'switch_conference': "🔄 Сменить конференцию",
+        'conference_selected': "Выбрана конференция: *{conference}*",
+        'back_to_conferences': "◀️ Назад к списку конференций",
+        'conference_details_template': "📋 *{name}*\n\n📍 Город: {city}\n📅 Даты конференции: {conf_start} - {conf_end}\n✈️ Даты поездки: {trip_start} - {trip_end}",
+
+        # ============================================
+        # ОШИБКИ
+        # ============================================
         'error_invalid_name': "❌ Пожалуйста, введите корректное имя (от 3 до 100 символов).",
         'error_invalid_position': "❌ Пожалуйста, введите корректную должность.",
         'error_invalid_company': "❌ Пожалуйста, введите корректное название компании.",
         'error_registration_failed': "❌ Произошла ошибка при регистрации. Пожалуйста, попробуйте позже.",
-        'back_to_conferences': "◀️ Назад к списку конференций",
-        'conference_details_template': "📋 *{name}*\n\n📍 Город: {city}\n📅 Даты конференции: {conf_start} - {conf_end}\n✈️ Даты поездки: {trip_start} - {trip_end}",
+        'error_not_whitelisted': "⛔ Извините, у вас нет доступа к боту конференции.\n\nОбратитесь к своему руководителю.",
+        'error_validation': "❌ Пожалуйста, введите корректные данные.",
+        'error_no_username': "❌ Пожалуйста, установите username в Telegram.",
+        'error_no_conferences': "❌ Для вашего аккаунта не найдено конференций.",
+        'error_wrong_time_format': "❌ Неверный формат времени. Используйте ЧЧ:ММ (например, 14:30)",
+        'error_wrong_date_format': "❌ Неверный формат даты. Используйте ДД.ММ.ГГГГ",
+        'error_invalid_card': "❌ Неверный номер карты. Попробуйте снова:",
+        'error_invalid_address': "❌ Адрес слишком короткий. Попробуйте снова:",
+        'error_saving_request': "❌ Ошибка сохранения заявки. Пожалуйста, попробуйте позже.",
+        'error_loading_requests': "❌ Ошибка загрузки ваших заявок.",
+        'form_cancelled': "❌ Заполнение формы отменено.",
 
-
-
-        # Главное меню
+        # ============================================
+        # ГЛАВНОЕ МЕНЮ
+        # ============================================
         'pr': "📢 PR",
         'event': "🎪 EVENT",
         'travel': "✈️ TRAVEL",
+        'help': "❓ Помощь",
+        'my_profile': "👤 Профиль",
+        'help_text': "🆘 Помощь по боту:\n\n• Для возврата в главное меню нажмите кнопку ниже\n• По вопросам доступа обращайтесь к администратору\n• Технические проблемы: support@conference.com",
 
-        # PR раздел
+        # ============================================
+        # ПРОФИЛЬ
+        # ============================================
+        'not_specified': "Не указано",
+        'profile_template': "👤 *Ваш профиль*\n\n*ID:* `{userid}`\n*Username:* @{username}\n*Имя:* {full_name}\n*Должность:* {position}\n*Компания:* {company}\n*Язык:* {language}\n*Дата регистрации:* {registered_at}\n\nВыберите действие:",
+        'edit_name': "✏️ Изменить имя",
+        'edit_position': "✏️ Изменить должность",
+        'edit_company': "✏️ Изменить компанию",
+        'edit_language': "🌐 Сменить язык",
+        'refresh_profile': "🔄 Обновить профиль",
+        'edit_name_title': "✏️ *Редактирование имени*\n\nВведите ваше имя и фамилию:",
+        'edit_position_title': "✏️ *Редактирование должности*\n\nВведите вашу должность:",
+        'edit_company_title': "✏️ *Редактирование компании*\n\nВведите название вашей компании или партнерской программы:",
+        'edit_language_title': "🌐 *Выберите язык интерфейса*\n\nВыберите предпочитаемый язык:",
+        'profile_updated': "✅ {field} успешно обновлено!",
+        'profile_update_error': "❌ Ошибка при обновлении {field}. Попробуйте позже.",
+        'cancel_edit': "❌ Редактирование отменено.",
+
+        # ============================================
+        # PR РАЗДЕЛ
+        # ============================================
         'pr_title': "📢 Раздел PR",
         'pr_banner': "🎨 Баннер",
         'pr_business_cards': "📇 Визитки",
@@ -64,8 +109,74 @@ COMMON_TEXTS = {
         'pr_banner_step7': "📝 Ваши комментарии (необязательно):",
         'banner_success': "✅ Заявка на баннер отправлена!\n\nБлагодарим за ответ, наша команда получила твой запрос. Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
 
+        # PR Business Cards Form (визитки)
+        'business_cards_success': "✅ Заявка на визитки отправлена!\n\nБлагодарим за ответ, наша команда получила твой запрос. Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
 
-        # EVENT раздел
+        'business_cards_title': "📇 Заказ визиток",
+        'business_cards_step1': "Шаг 1 из 6\nУкажите имя и фамилию для визитки:",
+        'business_cards_step2': "Шаг 2 из 6\nУкажите должность на английском (как будет на визитке):",
+        'business_cards_step3': "Шаг 3 из 6\nНазвание компании/партнерской программы:",
+        'business_cards_step4': "Шаг 4 из 6\nУкажите контакты для связи (Telegram/email):",
+        'business_cards_step5': "Шаг 5 из 6\nНужно ли придерживаться фирменного стиля?",
+        'business_cards_step6': "Шаг 6 из 6\n📝 Ваши комментарии (необязательно)\n\nЕсли у вас есть дополнительные пожелания к дизайну визиток, напишите их ниже.\n\nИли нажмите 'Пропустить':",
+        'business_cards_brand_style_yes': "✅ Да, придерживаться",
+        'business_cards_brand_style_no': "❌ Нет, не нужно",
+        'business_cards_back_step2': "business_cards_back_step2",
+        'business_cards_back_step3': "business_cards_back_step3",
+        'business_cards_back_step4': "business_cards_back_step4",
+        'business_cards_skip_comments': "⏭️ Пропустить",
+        'business_cards_back_to_brand_style': "◀️ Назад",
+
+        # PR Question Form
+        'pr_question_title': "❓ Вопрос к PR-отделу",
+        'pr_question_prompt': "Напишите ваш вопрос (максимум 500 символов):",
+        'pr_question_success': "✅ **Вопрос отправлен!**\n\nБлагодарим за вопрос. Наша PR-команда свяжется с вами в ближайшее время.",
+        'pr_question_too_long': "❌ **Вопрос слишком длинный**\n\nМаксимальная длина вопроса - 500 символов.\nПожалуйста, сократите ваш вопрос и попробуйте снова.",
+
+        # PR Conference Bot
+        'pr_conference_bot_title': "🤖 Бот на конференцию",
+        'pr_conference_bot_no_conferences': "У вас нет активных конференций. Обратитесь к администратору.",
+        'pr_conference_bot_description': "Выберите конференцию, чтобы перейти в её бота:\n\n📌 *Примечание:* Боты содержат актуальную информацию о расписании,\nспикерах, локациях и другие важные материалы.\n\n👇 Нажмите на кнопку с нужной конференцией:",
+        'pr_conference_bot_button': "🤖 {conference}",
+
+        # Cancel form
+        'form_cancelled_message': "❌ Отменено.\n\nВозврат в меню PR:",
+
+        # PR Banner Form (остальные шаги)
+        'banner_step2': "Напишите свою должность/роль:",
+        'banner_step3': "Название компании/партнерской программы:",
+        'banner_step4': "Выберите желаемый язык баннера:",
+        'banner_step5': "Добавить фотографию в баннер?",
+        'banner_step6': "Пожалуйста, прикрепите изображение",
+        'banner_step7': "📝 Ваши комментарии (необязательно)\n\nЕсли у вас есть дополнительные пожелания к баннеру, напишите их ниже.\n\nИли нажмите 'Пропустить':",
+        'banner_skip_comments': "⏭️ Пропустить",
+        'banner_back_step4': "banner_back_step4",
+        'banner_back_step5': "banner_back_step5",
+        'banner_back_step6': "banner_back_step6",
+
+        # PR Menu back
+        'pr_menu_title': "📢 Раздел PR\n\nВыберите опцию:",
+        'cards_back_step5': "cards_back_step5",
+        'back_to_pr': "◀️ Назад в PR",
+
+        # Кнопки для визиток (callback_data)
+        'business_cards_back_step2_cb': "business_cards_back_step2",
+        'business_cards_back_step3_cb': "business_cards_back_step3",
+        'business_cards_back_step4_cb': "business_cards_back_step4",
+        'cards_back_step5_cb': "cards_back_step5",
+
+        # Кнопки для баннера (callback_data)
+        'banner_back_step4_cb': "banner_back_step4",
+        'banner_back_step5_cb': "banner_back_step5",
+        'banner_back_step6_cb': "banner_back_step6",
+        'banner_skip_comments_cb': "banner_skip_comments",
+
+        # Кнопки для вопросов
+        'cancel_button': "❌ Отмена",
+
+        # ============================================
+        # EVENT РАЗДЕЛ
+        # ============================================
         'event_title': "🎪 Раздел EVENT",
         'event_ticket': "🎫 Билет на конференцию",
         'event_booth': "ℹ️ О стенде",
@@ -78,45 +189,21 @@ COMMON_TEXTS = {
         'event_certificate_step4': "Юридические данные компании (ИНН, ОГРН и т.д.):",
         'event_certificate_step5': "Кому адресовать справку? (ФИО, должность):",
         'event_certificate_step6': "Даты участия (например: 15.11.2024 - 17.11.2024):",
+        'success_certificate': "✅ Заявка на справку-вызов отправлена!\n\nБлагодарим за ответ, наша команда получила твой запрос. Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
 
-
-        # Формы
+        # Билеты
         'ticket_step': "Шаг {step} из {total}",
-        'ticket_full_name': "Укажите ваши имя и фамилию (как в паспорте):",
-        'ticket_position': "Ваша должность:",
-        'ticket_company': "Название партнерской программы/компании:",
-        'ticket_email': "Ваш email (на него придет билет):",
-        'ticket_phone': "Ваш номер телефона (для связи):",
-        'ticket_country': "Какую страну указывать для регистрации билета?\n\nВыберите из списка:",
+        'ticket_full_name': "✍️ Укажите ваши имя и фамилию (как в паспорте):",
+        'ticket_position': "💼 Ваша должность:",
+        'ticket_company': "🏢 Название партнерской программы/компании:",
+        'ticket_email': "📧 Ваш email (на него придет билет):",
+        'ticket_phone': "📱 Ваш номер телефона (для связи):",
+        'ticket_country': "🌍 Какую страну указывать для регистрации билета?\n\nВыберите из списка:",
         'ticket_success': "✅ **Заявка на билет отправлена!**\n\n📧 Билет будет отправлен на email: {email}\n\nБлагодарим за ответ! Наша команда обработает ваш запрос и отправит билет в ближайшее время.\n\nСледите за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
 
-        # Успешные сообщения
-        'success_certificate': "✅ Заявка на справку-вызов отправлена!\n\nБлагодарим за ответ, наша команда получила твой запрос. Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
-        'success_question': "✅ **Вопрос отправлен!**\n\nБлагодарим за вопрос. Наша команда свяжется с вами в ближайшее время.",
-        'success_rules': "✅ Правила приняты",
-
-        'error_not_whitelisted': "⛔ Извините, у вас нет доступа к боту конференции.\n\nОбратитесь к своему руководителю.",
-        'error_validation': "❌ Пожалуйста, введите корректные данные.",
-
-        # Профиль
-        'not_specified': "Не указано",
-        'profile_template': "👤 *Ваш профиль*\n\n*ID:* `{userid}`\n*Username:* @{username}\n*Имя:* {full_name}\n*Должность:* {position}\n*Компания:* {company}\n*Язык:* {language}\n*Дата регистрации:* {registered_at}\n\nВыберите действие:",
-        'edit_name': "✏️ Изменить имя",
-        'edit_position': "✏️ Изменить должность",
-        'edit_company': "✏️ Изменить компанию",
-        'edit_language': "🌐 Сменить язык",
-        'refresh_profile': "🔄 Обновить профиль",
-        'edit_name_title': "✏️ *Редактирование имени*\n\nВведите ваше имя и фамилию:",
-        'edit_position_title': "✏️ *Редактирование должности*\n\nВведите вашу должность:",
-        'edit_company_title': "✏️ *Редактирование компании*\n\nВведите название вашей компании или партнерской программы:",
-        'edit_language_title': "🌐 *Выберите язык интерфейса*\n\nВыберите предпочитаемый язык:",
-        'profile_updated': "✅ {field} успешно обновлено!",
-        'profile_update_error': "❌ Ошибка при обновлении {field}. Попробуйте позже.",
-        'cancel_edit': "❌ Редактирование отменено.",
-        'help_text': "🆘 Помощь по боту:\n\n• Для возврата в главное меню нажмите кнопку ниже\n• По вопросам доступа обращайтесь к администратору\n• Технические проблемы: support@conference.com",
-
-        # ========== TRAVEL РАЗДЕЛ ==========
-        # Главное меню
+        # ============================================
+        # TRAVEL РАЗДЕЛ
+        # ============================================
         'travel_welcome': "✈️ TRAVEL\nВыберите опцию:",
         'travel_title': "✈️ TRAVEL",
         'travel_flight_request': "✈️ Заявка на авиабилет",
@@ -128,27 +215,6 @@ COMMON_TEXTS = {
         'travel_question': "❓ Вопрос",
         'travel_back_to_menu': "◀️ Назад в TRAVEL",
 
-        'travel_flight_form_title': "✈️ Заявка на авиабилет",
-        'travel_passport_step1': "Имя (как в паспорте):",
-        'travel_passport_step2': "Фамилия (как в паспорте):",
-        'travel_passport_step3': "Номер телефона:",
-        'travel_passport_step4': "Номер паспорта:",
-        'travel_passport_step5': "Дата рождения (ДД.ММ.ГГГГ):",
-        'travel_passport_step6': "Страна выдачи паспорта:",
-        'travel_passport_step7': "Дата выдачи паспорта (ДД.ММ.ГГГГ):",
-        'travel_passport_step8': "Срок действия паспорта (ДД.ММ.ГГГГ):",
-        'travel_passport_step9': "Откуда планируете вылетать?",
-        'travel_passport_step10': "Куда планируете возвращаться?",
-        'travel_baggage_question': "Нужен ли багаж?",
-        'travel_hotel_question': "Нужен ли отель для этой конференции?\n\n*Примечание:* Компания не возмещает расходы за самостоятельно забронированные отели или брони для сопровождающих лиц.",
-
-        'flight_info_title': "✈️ Информация о рейсах\n\nВыберите конференцию:",
-        'hotel_info_title': "🏨 Информация об отеле\n\nВыберите конференцию:",
-        'no_flights': "❌ Информация о рейсах для этой конференции не найдена.",
-        'no_hotel': "❌ Информация об отеле для этой конференции не найдена.",
-        'form_cancelled': "❌ Заполнение формы отменено.",
-        'back_to_travel': "◀️ Назад в TRAVEL",
-
         # Визовая поддержка
         'visa_support_title': "🛂 Визовая поддержка\n\nВыберите ваш статус:",
         'visa_have': "✅ У меня есть виза",
@@ -156,6 +222,8 @@ COMMON_TEXTS = {
         'visa_special': "🔄 Особый случай",
         'visa_need_help': "✅ Да, нужна помощь с билетами/отелем",
         'visa_bought_myself': "🛒 Я купил всё сам",
+        'special_case_processing': "🔄 Обработка особого случая...",
+        'thanks_for_info': "✅ Спасибо за информацию!\n\nОтлично, что вы организовали поездку самостоятельно.\nЕсли у вас есть вопросы, обратитесь к travel-команде.",
 
         # Паспортные данные
         'passport_consent': "📋 **Согласие на хранение данных**\n\nРазрешаете ли вы хранить ваши паспортные данные для будущих бронирований в течение 6 месяцев?",
@@ -182,16 +250,17 @@ COMMON_TEXTS = {
         'hotel_question': "🏨 **Нужен ли отель?**\n\nБудет ли вам нужен отель для этой конференции?\n\n*Примечание:* Компания не возмещает расходы за самостоятельно забронированные отели или брони для сопровождающих лиц.",
         'hotel_needed_yes': "✅ Да, нужен отель",
         'hotel_needed_no': "❌ Нет, отель не нужен",
+        'hotel_booking_note': "🏨 **Бронирование отеля**\n\nЕсли вам нужен отель, пожалуйста, заполните форму заявки на авиабилет. Там будет вопрос о необходимости отеля.\n\nПосле отправки заявки наш travel-менеджер свяжется с вами для уточнения деталей.",
 
         # Выбор рейса
         'flight_choice': "✈️ **Выберите ваш рейс**\n\nПожалуйста, выберите наиболее удобный рейс:",
         'flight_no_suitable': "❌ Ни один из рейсов не подходит. Свяжитесь со мной",
         'select_conference_for_flight': "✈️ Информация о рейсах\n\nВыберите конференцию:",
         'select_conference_for_hotel': "🏨 Информация об отеле\n\nВыберите конференцию:",
-
-        # Информация о рейсах и отелях
         'no_flights_found': "❌ Информация о рейсах для этой конференции не найдена.",
         'no_hotel_found': "❌ Информация об отеле для этой конференции не найдена.",
+
+        # Информация о рейсах и отелях
         'flight_info_template': "*Рейс {fl_num}*\n\nНомер рейса: {flight_number}\nНомер бронирования: *{book_number}*\n\n📍 *Маршрут*\n{departure_from} → {arrival_city}\n\n🏷 *Дата и время*\nДата: {departure_date}\nВылет: {departure_time}\nПрилет: {arrival_time}\n\n🧳 *Багаж*\nРучная кладь: {carry_luggage} кг\nБагаж: {luggage} кг\n\n🛩️ Авиакомпания: *{airline}*",
         'hotel_info_template': "🏨 *{hotel_name}*\n\n📍 _{hotel_address}_\n\n{hotel_link}\n\nЗабронировано для конференции: *{conference}*",
         'registration_info': "📌 *Регистрация на рейс*\n\nВы можете зарегистрироваться на рейс *за 24 часа до вылета* по этой ссылке:\n",
@@ -214,6 +283,8 @@ COMMON_TEXTS = {
         'question_to_manager': "❓ Вопрос travel-менеджеру\n\nНапишите ваш вопрос (максимум 500 символов):",
         'question_sent': "✅ **Вопрос отправлен!**\n\nБлагодарим за вопрос. Наша travel-команда свяжется с вами в ближайшее время.",
         'question_too_long': "❌ Вопрос слишком длинный. Максимум 500 символов.",
+        'success_question': "✅ **Вопрос отправлен!**\n\nБлагодарим за вопрос. Наша команда свяжется с вами в ближайшее время.",
+        'success_rules': "✅ Правила приняты",
 
         # Мои заявки
         'my_requests_title': "📋 *Ваши travel-заявки*\n\n",
@@ -224,34 +295,25 @@ COMMON_TEXTS = {
         'per_diem_status_pending': "💰 *Суточные:* ⏳ В обработке\n   Отправлено: {submitted}\n\n",
         'per_diem_status_no': "💰 *Суточные:* 📝 Нет заявок\n\n",
         'status_footer': "_Вы получите уведомления при изменении статуса._",
-        'check_again': "🔄 Проверить снова",
-        'new_request': "📝 Новая заявка",
-        'error_loading_requests': "❌ Ошибка загрузки ваших заявок.",
 
         # Успешная отправка формы
         'form_complete': "✅ **Заявка успешно отправлена!**\n\n📋 *Следующие шаги:*\n• Следите за уведомлениями в Telegram\n• Если нужна виза: начните сбор документов\n• Проверяйте email для подтверждения билетов\n• Нажмите 'Мои заявки' для проверки статуса\n\n⏰ *Ожидаемые сроки:*\n• Авиабилеты: 1-3 рабочих дня\n• Визовая поддержка: 5-10 рабочих дней\n• Бронирование отеля: 2-4 рабочих дня\n\n_Наша travel-команда скоро свяжется с вами._",
 
-        # Ошибки
-        'error_no_username': "❌ Пожалуйста, установите username в Telegram.",
-        'error_no_conferences': "❌ Для вашего аккаунта не найдено конференций.",
-        'error_wrong_time_format': "❌ Неверный формат времени. Используйте ЧЧ:ММ (например, 14:30)",
-        'error_wrong_date_format': "❌ Неверный формат даты. Используйте ДД.ММ.ГГГГ",
-        'error_invalid_card': "❌ Неверный номер карты. Попробуйте снова:",
-        'error_invalid_address': "❌ Адрес слишком короткий. Попробуйте снова:",
-        'error_saving_request': "❌ Ошибка сохранения заявки. Пожалуйста, попробуйте позже.",
-
-        # Кнопки
-        'confirm_data_storage': "✅ Подтвердить хранение данных",
-        'dont_store': "❌ Не хранить",
-
         # Дополнительные фразы
-        'special_case_processing': "🔄 Обработка особого случая...",
-        'thanks_for_info': "✅ Спасибо за информацию!\n\nОтлично, что вы организовали поездку самостоятельно.\nЕсли у вас есть вопросы, обратитесь к travel-команде.",
-        'hotel_booking_note': "🏨 **Бронирование отеля**\n\nЕсли вам нужен отель, пожалуйста, заполните форму заявки на авиабилет. Там будет вопрос о необходимости отеля.\n\nПосле отправки заявки наш travel-менеджер свяжется с вами для уточнения деталей.",
-
+        'back_to_travel': "◀️ Назад в TRAVEL",
+        'travel_flight_form_title': "✈️ Заявка на авиабилет",
+        'travel_baggage_question': "Нужен ли багаж?",
+        'travel_hotel_question': "Нужен ли отель для этой конференции?\n\n*Примечание:* Компания не возмещает расходы за самостоятельно забронированные отели или брони для сопровождающих лиц.",
+        'flight_info_title': "✈️ Информация о рейсах\n\nВыберите конференцию:",
+        'hotel_info_title': "🏨 Информация об отеле\n\nВыберите конференцию:",
+        'no_flights': "❌ Информация о рейсах для этой конференции не найдена.",
+        'no_hotel': "❌ Информация об отеле для этой конференции не найдена.",
     },
     'en': {
-        # Navigation
+        # ============================================
+        # NAVIGATION
+        # ============================================
+        'next': "➡️ Next",
         'back': "◀️ Back",
         'main_menu': "🏠 Main Menu",
         'cancel': "❌ Cancel",
@@ -260,70 +322,62 @@ COMMON_TEXTS = {
         'confirm': "✅ Confirm",
         'yes': "✅ Yes",
         'no': "❌ No",
+        'confirm_data_storage': "✅ Confirm data storage",
+        'dont_store': "❌ Don't store",
+        'check_again': "🔄 Check again",
+        'new_request': "📝 New request",
+        'lang_ru': "🇷🇺 Russian",
+        'lang_en': "🇬🇧 English",
 
-        # Главное меню
-        'pr': "📢 PR",
-        'event': "🎪 EVENT",
-        'travel': "✈️ TRAVEL",
-
-        #start.py
-        'choose_lang': "Пожалуйста, выберите язык / please choose your language:",
+        # ============================================
+        # LANGUAGE SELECTION AND REGISTRATION
+        # ============================================
+        'choose_lang': "Please choose your language:",
         'language_selected': "🇬🇧 English selected",
         'ask_fullname': "Please enter your full name:",
         'ask_position': "Enter your job title:",
         'ask_company': "Enter your company/partner program name:",
         'welcome': "Welcome to Travel Conference Bot!",
         'main_menu_title': "Main menu. Select a section:",
+        'select_conference': "Select your conference:",
+        'select_conference_button': "Select conference",
+        'switch_conference': "🔄 Switch conference",
+        'conference_selected': "Selected conference: *{conference}*",
+        'back_to_conferences': "◀️ Back to conferences",
+        'conference_details_template': "📋 *{name}*\n\n📍 City: {city}\n📅 Conference dates: {conf_start} - {conf_end}\n✈️ Trip dates: {trip_start} - {trip_end}",
+
+        # ============================================
+        # ERRORS
+        # ============================================
         'error_invalid_name': "❌ Please enter a valid name (3-100 characters).",
         'error_invalid_position': "❌ Please enter a valid job title.",
         'error_invalid_company': "❌ Please enter a valid company name.",
         'error_registration_failed': "❌ Registration error. Please try again later.",
-        'back_to_conferences': "◀️ Back to conferences",
-        'conference_details_template': "📋 *{name}*\n\n📍 City: {city}\n📅 Conference dates: {conf_start} - {conf_end}\n✈️ Trip dates: {trip_start} - {trip_end}",
-
-
-        'select_conference': "Choose your conference:",
-        'conference_selected': "Chosen conference is: *{conference}*",
-        'switch_conference': "🔄 Choose another conference",
-        'select_conference_button': "Choose your conference",
-
-        # PR section
-        'pr_title': "📢 PR Section",
-        'pr_banner': "🎨 Banner",
-        'pr_business_cards': "📇 Business Cards",
-        'pr_dinner': "🍽 Partner Dinner",
-        'pr_conference_bot': "🤖 Conference Bot",
-        'pr_question': "❓ Question to PR",
-        'banner_success': "✅ Banner request submitted!\n\nThank you for your response! Our team has received your request. Follow notifications for updates.",
-
-
-        # EVENT section
-        'event_title': "🎪 EVENT Section",
-        'event_ticket': "🎫 Conference Ticket",
-        'event_booth': "ℹ️ About Booth",
-        'event_info': "ℹ️ About Conference",
-        'event_question': "❓ Question",
-
-        # Forms
-        'ticket_step': "Step {step} of {total}",
-        'ticket_full_name': "✍️ Please enter your full name (as in passport):",
-        'ticket_position': "💼 Your position:",
-        'ticket_company': "🏢 Partner program/company name:",
-        'ticket_email': "📧 Your email (ticket will be sent here):",
-        'ticket_phone': "📱 Your phone number (for contact):",
-        'ticket_country': "🌍 Which country should be used for ticket registration?\n\nSelect from the list:",
-        'ticket_success': "✅ **Ticket request submitted!**\n\n📧 Ticket will be sent to: {email}\n\nThank you for your response! Our team will process your request and send the ticket shortly.\n\nFollow notifications for updates on your request status.",
-
-        # Success messages
-        'success_certificate': "✅ Certificate request submitted!\n\nThank you for your response! Our team has received your request. Follow notifications for updates.",
-        'success_question': "✅ **Question sent!**\n\nThank you for your question. Our team will contact you shortly.",
-        'success_rules': "✅ Rules accepted",
-
-        # Errors
         'error_not_whitelisted': "⛔ Sorry, you do not have access to this conference bot.\n\nPlease contact your manager.",
         'error_validation': "❌ Please enter valid data.",
+        'error_no_username': "❌ Please set your Telegram username first.",
+        'error_no_conferences': "❌ No conferences found for your account.",
+        'error_wrong_time_format': "❌ Wrong time format. Use HH:MM (e.g., 14:30)",
+        'error_wrong_date_format': "❌ Wrong date format. Use DD.MM.YYYY",
+        'error_invalid_card': "❌ Invalid card number. Try again:",
+        'error_invalid_address': "❌ Address too short. Try again:",
+        'error_saving_request': "❌ Error saving request. Please try again later.",
+        'error_loading_requests': "❌ Error loading your requests.",
+        'form_cancelled': "❌ Form cancelled.",
 
-        # Profile
+        # ============================================
+        # MAIN MENU
+        # ============================================
+        'pr': "📢 PR",
+        'event': "🎪 EVENT",
+        'travel': "✈️ TRAVEL",
+        'help': "❓ Help",
+        'my_profile': "👤 Profile",
+        'help_text': "🆘 Bot help:\n\n• To return to main menu press the button below\n• For access issues contact administrator\n• Technical problems: support@conference.com",
+
+        # ============================================
+        # PROFILE
+        # ============================================
         'not_specified': "Not specified",
         'profile_template': "👤 *Your Profile*\n\n*ID:* `{userid}`\n*Username:* @{username}\n*Full name:* {full_name}\n*Position:* {position}\n*Company:* {company}\n*Language:* {language}\n*Registered:* {registered_at}\n\nSelect action:",
         'edit_name': "✏️ Edit name",
@@ -338,13 +392,130 @@ COMMON_TEXTS = {
         'profile_updated': "✅ {field} updated successfully!",
         'profile_update_error': "❌ Error updating {field}. Please try again later.",
         'cancel_edit': "❌ Edit cancelled.",
-        'help_text': "🆘 Bot help:\n\n• To return to main menu press the button below\n• For access issues contact administrator\n• Technical problems: support@conference.com",
-        'help': "❓ Help",
-        'my_profile': "👤 Profile",
 
-        # ========== TRAVEL SECTION ==========
-        # Main menu
-        'travel_welcome': "✈️ TRAVEL SECTION\n\nChoose an option:",
+        # ============================================
+        # PR SECTION
+        # ============================================
+        'pr_title': "📢 PR Section",
+        'pr_banner': "🎨 Banner",
+        'pr_business_cards': "📇 Business Cards",
+        'pr_dinner': "🍽 Partner Dinner",
+        'pr_conference_bot': "🤖 Conference Bot",
+        'pr_question': "❓ Question to PR",
+        'pr_banner_form_title': "🎨 Banner request for social networks",
+        'pr_banner_step1': "Step 1 of 7\nEnter your full name:",
+        'pr_banner_step2': "Step 2 of 7\nEnter your job title:",
+        'pr_banner_step3': "Step 3 of 7\nEnter the name of your partner program / company name:",
+        'pr_banner_step4': "Step 4 of 7\nChoose the language for the banner:",
+        'pr_banner_step5': "Step 5 of 7\nAdd a photo to the banner?",
+        'pr_banner_step6': "Step 6 of 7\nPlease attach the image",
+        'pr_banner_step7': "Step 7 of 7\nYour comments (optional)"
+                                "\n\nOr click 'Skip':",
+        'banner_success': "✅ Banner request submitted!\n\nThank you for your response. "
+                          "Our team has received your request. "
+                          "Keep an eye on notifications so you don’t miss any updates on the task status.",
+
+        # PR Business Cards Form
+        'business_cards_title': "📇 Business Card Order",
+        'business_cards_step1': "Step 1 of 6\nEnter your name for the business card:",
+        'business_cards_step2': "Step 2 of 6\nEnter your job title/role:",
+        'business_cards_step3': "Step 3 of 6\nCompany / partner program name:",
+        'business_cards_step4': "Step 4 of 6\nEnter contact information (Telegram/email):",
+        'business_cards_step5': "Step 5 of 6\nShould the corporate style be followed?",
+        'business_cards_step6': "Step 6 of 6\nYour comments (optional)"
+                                "\n\nOr click 'Skip':",
+        'business_cards_brand_style_yes': "✅ Yes, brand style",
+        'business_cards_brand_style_no': "❌ No, not needed",
+        'business_cards_back_step2': "business_cards_back_step2",
+        'business_cards_back_step3': "business_cards_back_step3",
+        'business_cards_back_step4': "business_cards_back_step4",
+        'business_cards_skip_comments': "⏭️ Skip",
+        'business_cards_back_to_brand_style': "◀️ Back",
+        'business_cards_success': "✅ Your business card request has been submitted!\n\n"
+                                  "Thank you for your response. Our team has received your request. "
+                                  "Keep an eye on notifications so you don’t miss any updates on the task status",
+
+        # PR Question Form
+        'pr_question_title': "❓ Question to PR Department",
+        'pr_question_prompt': "Write your question (max 500 characters):",
+        'pr_question_success': "✅ **Question sent!**\n\nThank you for your question. Our PR team will contact you shortly.",
+        'pr_question_too_long': "❌ **Question too long**\n\nMaximum question length is 500 characters.\nPlease shorten your question and try again.",
+
+        # PR Conference Bot
+        'pr_conference_bot_title': "🤖 Conference Bot",
+        'pr_conference_bot_no_conferences': "You have no active conferences. Please contact the administrator.",
+        'pr_conference_bot_description': "Select a conference to go to its bot:\n\n📌 "
+                                         "*Note:* Bots contain up-to-date information about the schedule,"
+                                         "\nspeakers, locations and other important materials.\n\n👇 "
+                                         "Click the button with the desired conference:",
+        'pr_conference_bot_button': "🤖 {conference}",
+
+        # Cancel form
+        'form_cancelled_message': "❌ Cancelled.\n\nReturning to PR menu:",
+
+        'banner_step2': "Enter your position/role:",
+        'banner_step3': "Company/partner program name:",
+        'banner_step4': "Select banner language:",
+        'banner_step5': "Add photo to banner?",
+        'banner_step6': "Please attach the image",
+        'banner_step7': "📝 Your comments (optional)\n\nOr click 'Skip':",
+        'banner_skip_comments': "⏭️ Skip",
+        'banner_back_step4': "banner_back_step4",
+        'banner_back_step5': "banner_back_step5",
+        'banner_back_step6': "banner_back_step6",
+
+        # PR Menu back
+        'pr_menu_title': "📢 PR Section\n\nSelect an option:",
+        'cards_back_step5': "cards_back_step5",
+        # Buttons for conferences
+        'back_to_pr': "◀️ Back to PR",
+
+        # Business cards buttons (callback_data)
+        'business_cards_back_step2_cb': "business_cards_back_step2",
+        'business_cards_back_step3_cb': "business_cards_back_step3",
+        'business_cards_back_step4_cb': "business_cards_back_step4",
+        'cards_back_step5_cb': "cards_back_step5",
+
+        # Banner buttons (callback_data)
+        'banner_back_step4_cb': "banner_back_step4",
+        'banner_back_step5_cb': "banner_back_step5",
+        'banner_back_step6_cb': "banner_back_step6",
+        'banner_skip_comments_cb': "banner_skip_comments",
+
+        # Question buttons
+        'cancel_button': "❌ Cancel",
+
+        # ============================================
+        # EVENT SECTION
+        # ============================================
+        'event_title': "🎪 EVENT Section",
+        'event_ticket': "🎫 Conference Ticket",
+        'event_booth': "ℹ️ About Booth",
+        'event_info': "ℹ️ About Conference",
+        'event_question': "❓ Question",
+        'event_certificate_form_title': "📄 Certificate Request",
+        'event_certificate_step1': "Enter your full name:",
+        'event_certificate_step2': "Enter your position:",
+        'event_certificate_step3': "Company name:",
+        'event_certificate_step4': "Company legal data (INN, OGRN, etc.):",
+        'event_certificate_step5': "Who should the certificate be addressed to? (Full name, position):",
+        'event_certificate_step6': "Participation dates (e.g., 15.11.2024 - 17.11.2024):",
+        'success_certificate': "✅ Certificate request submitted!\n\nThank you for your response! Our team has received your request. Follow notifications for updates.",
+
+        # Tickets
+        'ticket_step': "Step {step} of {total}",
+        'ticket_full_name': "✍️ Please enter your full name (as in passport):",
+        'ticket_position': "💼 Your position:",
+        'ticket_company': "🏢 Partner program/company name:",
+        'ticket_email': "📧 Your email (ticket will be sent here):",
+        'ticket_phone': "📱 Your phone number (for contact):",
+        'ticket_country': "🌍 Which country should be used for ticket registration?\n\nSelect from the list:",
+        'ticket_success': "✅ **Ticket request submitted!**\n\n📧 Ticket will be sent to: {email}\n\nThank you for your response! Our team will process your request and send the ticket shortly.\n\nFollow notifications for updates on your request status.",
+
+        # ============================================
+        # TRAVEL SECTION
+        # ============================================
+        'travel_welcome': "✈️ TRAVEL\nSelect an option:",
         'travel_title': "✈️ TRAVEL",
         'travel_flight_request': "✈️ Flight Request",
         'travel_visa_support': "🛂 Visa Support",
@@ -362,6 +533,8 @@ COMMON_TEXTS = {
         'visa_special': "🔄 Special case",
         'visa_need_help': "✅ Yes, need help with tickets/hotel",
         'visa_bought_myself': "🛒 I bought everything myself",
+        'special_case_processing': "🔄 Processing special case...",
+        'thanks_for_info': "✅ Thank you for the information!\n\nGreat that you've organized your travel independently.\nIf you have questions, contact travel team.",
 
         # Passport data
         'passport_consent': "📋 **Data Storage Consent**\n\nDo you allow us to store your passport data for future bookings within 6 months?",
@@ -388,16 +561,17 @@ COMMON_TEXTS = {
         'hotel_question': "🏨 **Hotel needed?**\n\nWill you need a hotel for this conference?\n\n*Note:* Company does not reimburse independent bookings or +1 accompanying persons.",
         'hotel_needed_yes': "✅ Yes, need hotel",
         'hotel_needed_no': "❌ No, don't need hotel",
+        'hotel_booking_note': "🏨 **Hotel Booking**\n\nIf you need a hotel, please fill out the flight request form. There will be a question about hotel needs.\n\nAfter submitting the request, our travel manager will contact you to clarify the details.",
 
         # Flight selection
         'flight_choice': "✈️ **Choose your flight**\n\nPlease select the most convenient flight:",
         'flight_no_suitable': "❌ None of the flights are suitable. Contact me",
         'select_conference_for_flight': "✈️ Flight Information\n\nSelect the conference:",
         'select_conference_for_hotel': "🏨 Hotel Information\n\nSelect the conference:",
-
-        # Flight and hotel info
         'no_flights_found': "❌ No flight information found for this conference.",
         'no_hotel_found': "❌ Hotel information not found for this conference.",
+
+        # Flight and hotel info
         'flight_info_template': "*Flight {fl_num}*\n\nFlight number: {flight_number}\nBooking number: *{book_number}*\n\n📍 *Route*\n{departure_from} → {arrival_city}\n\n🏷 *Date & Time*\nDate: {departure_date}\nDeparture: {departure_time}\nArrival: {arrival_time}\n\n🧳 *Luggage*\nCarry-on: {carry_luggage} kg\nChecked: {luggage} kg\n\n🛩️ Airline: *{airline}*",
         'hotel_info_template': "🏨 *{hotel_name}*\n\n📍 _{hotel_address}_\n\n{hotel_link}\n\nBooked for conference: *{conference}*",
         'registration_info': "📌 *Check-in*\n\nYou can check in for your flight *24 hours before departure* using this link:\n",
@@ -405,7 +579,7 @@ COMMON_TEXTS = {
         'final_text': "\n_Wish you a great flight!_ 🔥",
 
         # Daily allowance
-        'per_diem_question': "💰 Daily allowance\n\nWhere would you like to receive the Daily allowance?",
+        'per_diem_question': "💰 Daily allowance\n\nWhere would you like to receive the daily allowance?",
         'per_diem_card': "💳 Bank card",
         'per_diem_crypto': "🪙 Crypto wallet",
         'network_trc20': "TRC20 (USDT)",
@@ -420,6 +594,8 @@ COMMON_TEXTS = {
         'question_to_manager': "❓ Question to Travel Manager\n\nPlease write your question (max 500 characters):",
         'question_sent': "✅ **Question sent!**\n\nThank you for your question. Our travel team will contact you soon.",
         'question_too_long': "❌ Question is too long. Maximum 500 characters.",
+        'success_question': "✅ **Question sent!**\n\nThank you for your question. Our team will contact you shortly.",
+        'success_rules': "✅ Rules accepted",
 
         # My requests
         'my_requests_title': "📋 *Your Travel Requests*\n\n",
@@ -430,30 +606,19 @@ COMMON_TEXTS = {
         'per_diem_status_pending': "💰 *Daily allowance:* ⏳ Processing\n   Submitted: {submitted}\n\n",
         'per_diem_status_no': "💰 *Daily allowance:* 📝 No requests yet\n\n",
         'status_footer': "_You will receive notifications when status changes._",
-        'check_again': "🔄 Check again",
-        'new_request': "📝 New request",
-        'error_loading_requests': "❌ Error loading your requests.",
 
         # Form success
         'form_complete': "✅ **Request submitted successfully!**\n\n📋 *Next steps:*\n• Check Telegram notifications for updates\n• If visa needed: start document collection\n• Monitor email for ticket confirmations\n• Click 'My Requests' to check status\n\n⏰ *Expected timeline:*\n• Flight tickets: 1-3 business days\n• Visa processing: 5-10 business days\n• Hotel booking: 2-4 business days\n\n_Our travel team will contact you soon._",
 
-        # Errors
-        'error_no_username': "❌ Please set your Telegram username first.",
-        'error_no_conferences': "❌ No conferences found for your account.",
-        'error_wrong_time_format': "❌ Wrong time format. Use HH:MM (e.g., 14:30)",
-        'error_wrong_date_format': "❌ Wrong date format. Use DD.MM.YYYY",
-        'error_invalid_card': "❌ Invalid card number. Try again:",
-        'error_invalid_address': "❌ Address too short. Try again:",
-        'error_saving_request': "❌ Error saving request. Please try again later.",
-
-        # Buttons
-        'confirm_data_storage': "✅ Confirm data storage",
-        'dont_store': "❌ Don't store",
-
         # Additional phrases
-        'special_case_processing': "🔄 Processing special case...",
-        'thanks_for_info': "✅ Thank you for the information!\n\nGreat that you've organized your travel independently.\nIf you have questions, contact travel team.",
-        'hotel_booking_note': "🏨 **Hotel Booking**\n\nIf you need a hotel, please fill out the flight request form. There will be a question about hotel needs.\n\nAfter submitting the request, our travel manager will contact you to clarify the details.",
+        'back_to_travel': "◀️ Back to TRAVEL",
+        'travel_flight_form_title': "✈️ Flight Request",
+        'travel_baggage_question': "Do you need baggage?",
+        'travel_hotel_question': "Do you need a hotel for this conference?\n\n*Note:* Company does not reimburse independent bookings or +1 accompanying persons.",
+        'flight_info_title': "✈️ Flight Information\n\nSelect the conference:",
+        'hotel_info_title': "🏨 Hotel Information\n\nSelect the conference:",
+        'no_flights': "❌ No flight information found for this conference.",
+        'no_hotel': "❌ Hotel information not found for this conference.",
     }
 }
 
@@ -479,6 +644,7 @@ async def t(user_id: int, key: str, **kwargs) -> str:
         except KeyError as e:
             logger.warning(f"Missing format key {e} in text '{key}'")
     return text
+
 
 def get_text_sync(lang: str, key: str, **kwargs) -> str:
     """Синхронная версия для использования в клавиатурах (без await)"""
