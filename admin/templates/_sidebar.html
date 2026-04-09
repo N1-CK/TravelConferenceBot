@@ -1,10 +1,7 @@
-<div class="col-md-3 col-lg-2 px-0 sidebar d-flex flex-column h-100" style="min-height: 100vh; background-color: #f8f9fa;">
+<div class="col-md-3 col-lg-2 px-0 sidebar" style="min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
     <div class="user-info p-3 border-bottom">
         <h5><i class="bi bi-person-circle"></i> {{ session.full_name or session.username }}</h5>
-        <p class="mb-1 text-muted">{{ get_text('role_' + session.role) }}</p>
-        {% if session.login_time %}
-        <p class="mb-0"><small>{{ get_text('login_time') }} {{ session.login_time[:10] }}</small></p>
-        {% endif %}
+        <p class="mb-1">Роль: {{ get_text('role_' + session.role) }}</p>
     </div>
 
     <nav class="nav flex-column p-2 flex-grow-1">
@@ -54,8 +51,8 @@
     </nav>
 
     <div class="p-3 border-top d-flex justify-content-center gap-2">
-        <a href="/set_language/ru" class="btn btn-sm {% if session.get('lang', 'ru') == 'ru' %}btn-primary{% else %}btn-outline-secondary{% endif %}">RU</a>
-        <a href="/set_language/en" class="btn btn-sm {% if session.get('lang') == 'en' %}btn-primary{% else %}btn-outline-secondary{% endif %}">EN</a>
+        <a href="/set_language/ru" class="btn btn-sm {% if session.get('lang', 'ru') == 'ru' %}btn-primary{% else %}btn-outline-light{% endif %}">RU</a>
+        <a href="/set_language/en" class="btn btn-sm {% if session.get('lang') == 'en' %}btn-primary{% else %}btn-outline-light{% endif %}">EN</a>
     </div>
 
     <form id="logout-form" action="/logout" method="GET" style="display: none;"></form>

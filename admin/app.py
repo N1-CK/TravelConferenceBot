@@ -43,6 +43,10 @@ app.config['UPLOAD_FOLDER'] = '/tmp'
 _loop = None
 _db_initialized = False
 
+@app.context_processor
+def inject_request():
+    return {'request': request}
+
 def get_or_create_event_loop():
     """Получить или создать event loop, не вызывая ошибки"""
     global _loop
@@ -389,7 +393,7 @@ def dashboard():
 @login_required
 def broadcast():
     """Страница рассылки"""
-    companies = run_async(db.get_companies_list())
+    companies = run_async(db.get_all_companies_from_config())
     conferences = run_async(db.get_conferences_list())
     users = run_async(db.get_all_users_with_details())
 
@@ -500,7 +504,7 @@ def users_page():
     """Страница пользователей - админ может добавлять и изменять"""
     try:
         users = run_async(db.get_all_users_with_details())
-        companies = run_async(db.get_companies_list())
+        companies = run_async(db.get_all_companies_from_config())
         conferences = run_async(db.get_conferences_list())
 
         stats = {

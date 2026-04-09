@@ -351,15 +351,6 @@ class Database:
                     ''',
 
                     f'''
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.user_company (
-                        user_id BIGINT PRIMARY KEY,
-                        username TEXT NOT NULL,
-                        company TEXT NOT NULL,
-                        updated_at TIMESTAMP DEFAULT NOW()
-                    )
-                    ''',
-
-                    f'''
                     CREATE TABLE IF NOT EXISTS {self.db_schema}.user_conferences (
                         id SERIAL PRIMARY KEY,
                         username TEXT NOT NULL,
@@ -1228,23 +1219,6 @@ class Database:
             logger.error(f"Error saving daily allowance request: {e}")
             return False
 
-    async def set_user_company(self, user_id: int, username: str, company: str) -> bool:
-        """Установить компанию пользователя"""
-        try:
-            async with self.pool.acquire() as conn:
-                await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.user_company (user_id, username, company, updated_at)
-                    VALUES ($1, $2, $3, NOW())
-                    ON CONFLICT (user_id) DO UPDATE
-                    SET company = EXCLUDED.company,
-                        username = EXCLUDED.username,
-                        updated_at = NOW()
-                """, user_id, username, company)
-                return True
-        except Exception as e:
-            logger.error(f"Error setting user company: {e}")
-            return False
-
     async def get_user_company(self, user_id: int) -> str:
         """Получить компанию пользователя"""
         try:
@@ -1265,14 +1239,14 @@ class Database:
                 if company:
                     query = f"""
                         SELECT user_id, username, company 
-                        FROM {self.db_schema}.user_company
+                        FROM {self.db_schema_config}.user_profiles
                         WHERE company = $1
                     """
                     rows = await conn.fetch(query, company)
                 else:
                     query = f"""
                         SELECT user_id, username, company 
-                        FROM {self.db_schema}.user_company
+                        FROM {self.db_schema_config}.user_profiles
                     """
                     rows = await conn.fetch(query)
                 return [dict(row) for row in rows]
@@ -1286,7 +1260,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
                     SELECT DISTINCT company 
-                    FROM {self.db_schema}.user_company
+                    FROM {self.db_schema_config}.companies
                     ORDER BY company
                 """)
                 return [row['company'] for row in rows]
@@ -1326,23 +1300,13 @@ class Database:
                         company = EXCLUDED.company,
                         updated_at = NOW()
                 """,
-                                   user_data['user_id'],
-                                   user_data['username'],
-                                   user_data.get('language', 'ru'),
-                                   user_data.get('full_name'),
-                                   user_data.get('position'),
-                                   user_data.get('company')
-                                   )
-
-                # Также обновляем user_company для совместимости
-                await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.user_company (user_id, username, company, updated_at)
-                    VALUES ($1, $2, $3, NOW())
-                    ON CONFLICT (user_id) DO UPDATE
-                    SET company = EXCLUDED.company,
-                        username = EXCLUDED.username,
-                        updated_at = NOW()
-                """, user_data['user_id'], user_data['username'], user_data.get('company'))
+                   user_data['user_id'],
+                   user_data['username'],
+                   user_data.get('language', 'ru'),
+                   user_data.get('full_name'),
+                   user_data.get('position'),
+                   user_data.get('company')
+               )
 
                 return True
         except Exception as e:
@@ -2528,7 +2492,7 @@ class Database:
 
                 active_conferences = await conn.fetchval(f"""
                     SELECT COUNT(DISTINCT conference_name)
-                    FROM {self.db_schema}.user_conferences
+                    FROM {self.db_schema_config}.conferences
                 """) or 0
 
                 total_broadcasts = await conn.fetchval(f"""
@@ -2581,14 +2545,14 @@ class Database:
                 if companies:
                     query = f"""
                         SELECT user_id, username, company
-                        FROM {self.db_schema}.user_company
+                        FROM {self.db_schema_config}.user_profiles
                         WHERE company = ANY($1::text[])
                     """
                     rows = await conn.fetch(query, companies)
                 else:
                     query = f"""
                         SELECT user_id, username, company
-                        FROM {self.db_schema}.user_company
+                        FROM {self.db_schema_config}.user_profiles
                     """
                     rows = await conn.fetch(query)
                 return [dict(row) for row in rows]
@@ -2602,7 +2566,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 query = f"""
                     SELECT user_id, username, company
-                    FROM {self.db_schema}.user_company
+                    FROM {self.db_schema_config}.user_profiles
                     WHERE user_id = ANY($1::bigint[])
                 """
                 rows = await conn.fetch(query, user_ids)
@@ -2617,7 +2581,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 query = f"""
                     SELECT DISTINCT uc.user_id, uc.username, uc.company
-                    FROM {self.db_schema}.user_company uc
+                    FROM {self.db_schema_config}.user_profiles uc
                     JOIN {self.db_schema}.user_conferences uconf ON uc.username = uconf.username
                     WHERE uconf.conference_name = ANY($1::text[])
                 """

@@ -80,45 +80,7 @@
 
 <div class="container-fluid">
     <div class="row">
-        <div class="col-md-3 col-lg-2 px-0 sidebar">
-            <div class="user-info">
-                <h5><i class="bi bi-person-circle"></i> {{ session.username }}</h5>
-                <p>PR-менеджер</p>
-            </div>
-
-            <nav class="nav flex-column">
-                <a class="nav-link" href="/">
-                    <i class="bi bi-speedometer2"></i> {{ get_text('dashboard') }}
-                </a>
-
-                {% if session.role == 'admin' or session.role == 'pr' %}
-                <a class="nav-link" href="/broadcast">
-                    <i class="bi bi-megaphone"></i> {{ get_text('broadcast') }}
-                </a>
-                {% endif %}
-
-                {% if session.role == 'admin' or session.role == 'pr' %}
-                <a class="nav-link active" href="/pr">
-                    <i class="bi bi-megaphone"></i> PR-панель
-                </a>
-                {% endif %}
-
-                {% if session.role == 'admin' %}
-                <a class="nav-link" href="/users">
-                    <i class="bi bi-people"></i> {{ get_text('users') }}
-                </a>
-                {% endif %}
-
-                <a class="nav-link" href="/change_password">
-                    <i class="bi bi-key"></i> Сменить пароль
-                </a>
-
-                <a class="nav-link" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                    <i class="bi bi-box-arrow-right"></i> Выход
-                </a>
-            </nav>
-            <form id="logout-form" action="/logout" method="GET" style="display: none;"></form>
-        </div>
+        {% include '_sidebar.html' %}
 
         <!-- Main Content -->
         <div class="col-md-9 col-lg-10 main-content">

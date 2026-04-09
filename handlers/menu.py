@@ -371,15 +371,6 @@ async def process_company_edit(message: Message, state: FSMContext):
                 WHERE user_id = $2
             """, new_company, user_id)
 
-            # Также обновляем в user_company для совместимости
-            await conn.execute(f"""
-                INSERT INTO {db.db_schema}.user_company (user_id, username, company, updated_at)
-                VALUES ($1, $2, $3, NOW())
-                ON CONFLICT (user_id) DO UPDATE
-                SET company = EXCLUDED.company,
-                    username = EXCLUDED.username,
-                    updated_at = NOW()
-            """, user_id, username, new_company)
 
         await db.log_user_action(
             user_id=user_id,
