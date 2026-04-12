@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from typing import Union
+from typing import Union, Dict, Any
 
 from utility.auth import check_whitelist
 from database import db
@@ -22,6 +22,16 @@ class RegistrationStates(StatesGroup):
     waiting_for_position = State()
     waiting_for_company = State()
 
+def get_success_message(request_type: str) -> str:
+    """Получить шаблонное сообщение об успешной отправке"""
+    messages = {
+        'banner': "✅ Заявка на баннер отправлена!\n\nБлагодарим за ответ, наша команда получила твой запрос. Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
+        'business_cards': "✅ Заявка на визитки отправлена!\n\nБлагодарим за ответ, наша команда получила твой запрос. Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
+        'certificate': "✅ Заявка на справку-вызов отправлена!\n\nБлагодарим за ответ, наша команда получила твой запрос. Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
+        'visa': "✅ Заявка на визовую поддержку отправлена!\n\nБлагодарим за ответ, наша команда скоро свяжется с тобой для обсуждения деталей.",
+        'question': "✅ Вопрос отправлен!\n\nБлагодарим за вопрос. Наша команда скоро свяжется с тобой для обсуждения деталей."
+    }
+    return messages.get(request_type, "✅ Ваша заявка отправлена!")
 
 def get_language_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()

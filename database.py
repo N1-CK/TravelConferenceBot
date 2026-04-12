@@ -749,24 +749,21 @@ class Database:
             logger.error(f"Error getting bookings: {e}")
             return []
 
-    async def save_pr_question(self, data: dict) -> bool:
-        """Сохранение вопроса к PR-менеджеру"""
+    async def save_pr_question(self, data: dict) -> tuple:
+        """Сохранение вопроса и возврат ID"""
         try:
             async with self.pool.acquire() as conn:
-                await conn.execute(f"""
+                row = await conn.fetchrow(f"""
                     INSERT INTO {self.db_schema}.pr_questions 
                     (username, user_id, category, question)
                     VALUES ($1, $2, $3, $4)
-                """,
-                                   data['username'],
-                                   data['user_id'],
-                                   data.get('category', ''),
-                                   data.get('question', '')
-                                   )
-                return True
+                    RETURNING id
+                """, data['username'], data['user_id'],
+                                          data.get('category', ''), data.get('question', ''))
+                return True, row['id'] if row else None
         except Exception as e:
             logger.error(f"Error saving PR question: {e}")
-            return False
+            return False, None
 
     async def save_travel_question(self, data: dict) -> bool:
         """Сохранение вопроса к тревел-менеджеру"""
@@ -832,48 +829,6 @@ class Database:
             logger.error(f"Error saving user agreement: {e}")
             return False
 
-    async def get_incomplete_forms(self):
-        """Получение пользователей с незаполненными формами (для напоминаний)"""
-        try:
-            async with self.pool.acquire() as conn:
-                # Здесь логика для проверки незаполненных форм
-                return []
-        except Exception as e:
-            logger.error(f"Error getting incomplete forms: {e}")
-            return []
-
-
-    async def get_user_flights(self, username: str) -> List[str]:
-        """Get user's conferences from database (using travelconference_bot schema)"""
-        try:
-            async with self.pool.acquire() as conn:
-                query = f"""
-                    SELECT DISTINCT conference 
-                    FROM travel_bot.flights 
-                    WHERE telegram_name = $1
-                    ORDER BY conference
-                """
-                result = await conn.fetch(query, username)
-                return [row['conference'] for row in result]
-        except Exception as e:
-            logger.error(f"Error getting user flights: {e}")
-            return []
-
-    async def get_flight_details(self, username: str, conference: str) -> List[Dict]:
-        """Get flight details for specific conference"""
-        try:
-            async with self.pool.acquire() as conn:
-                query = f"""
-                    SELECT * 
-                    FROM travel_bot.flights 
-                    WHERE telegram_name = $1 AND conference = $2
-                    ORDER BY departure_date, departure_time
-                """
-                result = await conn.fetch(query, username, conference)
-                return [dict(row) for row in result]
-        except Exception as e:
-            logger.error(f"Error getting flight details: {e}")
-            return []
 
     async def save_ticket_request(self, data: dict) -> bool:
         """Сохранение заявки на билет конференции"""
@@ -938,36 +893,6 @@ class Database:
         except Exception as e:
             logger.error(f"Error saving flight request: {e}")
             return False
-
-    async def get_hotel_info(self, conference: str) -> Dict:
-        """Get hotel information for conference"""
-        try:
-            async with self.pool.acquire() as conn:
-                query = f"""
-                    SELECT hotel, address, site 
-                    FROM travel_bot.hotels 
-                    WHERE conference = $1
-                """
-                result = await conn.fetchrow(query, conference)
-                return dict(result) if result else {}
-        except Exception as e:
-            logger.error(f"Error getting hotel info: {e}")
-            return {}
-
-    async def get_airline_url(self, airline: str) -> str:
-        """Get check-in URL for airline"""
-        try:
-            async with self.pool.acquire() as conn:
-                query = f"""
-                    SELECT link 
-                    FROM travel_bot.airlines 
-                    WHERE airline= $1
-                """
-                result = await conn.fetchval(query, airline)
-                return result or ""
-        except Exception as e:
-            logger.error(f"Error getting airline URL: {e}")
-            return ""
 
     # Методы для отчетов
     async def save_report(self, report_data: dict) -> bool:
@@ -1334,6 +1259,19 @@ class Database:
         except Exception as e:
             logger.error(f"Error getting user data: {e}")
             return {}
+
+    async def get_all_questions_by_table(self, table: str) -> list:
+        """Получить все вопросы из таблицы"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT * FROM {self.db_schema}.{table}
+                    ORDER BY created_at DESC
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting questions from {table}: {e}")
+            return []
 
     async def sync_whitelist_from_google_sheets(self, spreadsheet_name: str = "Whitelist") -> bool:
         """
@@ -2671,6 +2609,163 @@ class Database:
         except Exception as e:
             logger.error(f"Error getting all users: {e}")
             return []
+
+    # Добавьте эти методы в класс Database
+
+    async def get_user_messages_by_department(self, manager_groups: list, limit: int = 100) -> list:
+        """Получить сообщения пользователей, доступные для групп менеджера"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Карта соответствия групп менеджеров и типов вопросов
+                # travel_questions, pr_questions, event_questions
+                department_map = {
+                    'travel': 'travel_questions',
+                    'pr': 'pr_questions',
+                    'event': 'event_questions'
+                }
+
+                # Определяем, какие таблицы может видеть менеджер
+                visible_tables = []
+                for group in manager_groups:
+                    if group in department_map:
+                        visible_tables.append(department_map[group])
+
+                if not visible_tables:
+                    return []
+
+                # Собираем вопросы из всех доступных таблиц
+                all_questions = []
+                for table in visible_tables:
+                    rows = await conn.fetch(f"""
+                        SELECT 
+                            q.id,
+                            q.username,
+                            q.user_id,
+                            q.category,
+                            q.question,
+                            q.created_at,
+                            'question' as type,
+                            '{table.replace('_questions', '')}' as department
+                        FROM {self.db_schema}.{table} q
+                        ORDER BY q.created_at DESC
+                        LIMIT $1
+                    """, limit)
+                    all_questions.extend([dict(row) for row in rows])
+
+                # Также добавляем обычные сообщения из чатов
+                messages = await conn.fetch(f"""
+                    SELECT 
+                        m.id,
+                        m.user_id,
+                        m.username,
+                        m.message_text,
+                        m.direction,
+                        m.created_at,
+                        'message' as type,
+                        NULL as department,
+                        EXISTS(
+                            SELECT 1 FROM {self.db_schema}.user_messages m2 
+                            WHERE m2.user_id = m.user_id 
+                            AND m2.direction = 'incoming' 
+                            AND m2.read_at IS NULL
+                        ) as has_unread
+                    FROM {self.db_schema}.user_messages m
+                    WHERE m.direction = 'incoming'
+                    ORDER BY m.created_at DESC
+                    LIMIT $1
+                """, limit)
+
+                all_questions.extend([dict(row) for row in messages])
+
+                # Сортируем по дате
+                all_questions.sort(key=lambda x: x['created_at'], reverse=True)
+
+                return all_questions
+        except Exception as e:
+            logger.error(f"Error getting messages by department: {e}")
+            return []
+
+    async def share_question_with_department(self, question_id: int, question_type: str,
+                                             source_department: str, target_department: str,
+                                             shared_by: str) -> bool:
+        """Переслать вопрос в другой отдел"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Определяем таблицы
+                tables = {
+                    'pr': f'{self.db_schema}.pr_questions',
+                    'event': f'{self.db_schema}.event_questions',
+                    'travel': f'{self.db_schema}.travel_questions'
+                }
+
+                # Получаем исходный вопрос
+                source_table = tables.get(source_department)
+                if not source_table:
+                    return False
+
+                question = await conn.fetchrow(f"""
+                    SELECT username, user_id, category, question
+                    FROM {source_table}
+                    WHERE id = $1
+                """, question_id)
+
+                if not question:
+                    return False
+
+                # Создаем копию в таблице целевого отдела
+                target_table = tables.get(target_department)
+                if not target_table:
+                    return False
+
+                await conn.execute(f"""
+                    INSERT INTO {target_table} 
+                    (username, user_id, category, question, created_at)
+                    VALUES ($1, $2, $3, $4, NOW())
+                """, question['username'], question['user_id'],
+                                   f"shared_from_{source_department}",
+                                   f"[Переслано из {source_department}]\n\n{question['question']}")
+
+                # Логируем действие
+                await self.log_user_action(
+                    user_id=0,
+                    username=shared_by,
+                    action="question_shared",
+                    details={
+                        "question_id": question_id,
+                        "source": source_department,
+                        "target": target_department
+                    }
+                )
+
+                return True
+        except Exception as e:
+            logger.error(f"Error sharing question: {e}")
+            return False
+
+    async def get_question_details(self, question_id: int, question_type: str) -> dict:
+        """Получить детали вопроса по ID и типу"""
+        try:
+            async with self.pool.acquire() as conn:
+                tables = {
+                    'pr': f'{self.db_schema}.pr_questions',
+                    'event': f'{self.db_schema}.event_questions',
+                    'travel': f'{self.db_schema}.travel_questions'
+                }
+
+                table = tables.get(question_type)
+                if not table:
+                    return {}
+
+                row = await conn.fetchrow(f"""
+                    SELECT id, username, user_id, category, question, created_at
+                    FROM {table}
+                    WHERE id = $1
+                """, question_id)
+
+                return dict(row) if row else {}
+        except Exception as e:
+            logger.error(f"Error getting question details: {e}")
+            return {}
 
     async def get_user_details_by_id(self, user_id: int) -> dict:
         """Получить детальную информацию о пользователе"""

@@ -1265,6 +1265,61 @@ def api_get_file(file_id):
     return jsonify({'error': 'Not implemented'}), 404
 
 
+# Добавьте эти маршруты в app.py
+
+@app.route('/api/questions/<department>')
+@login_required
+def api_get_questions_by_department(department):
+    """API для получения вопросов по отделу"""
+    manager_groups = session.get('groups', [])
+
+    # Проверяем доступ к отделу
+    if department not in manager_groups and session.get('role') != 'admin':
+        return jsonify({'error': 'Access denied'}), 403
+
+    # Определяем таблицу
+    table_map = {
+        'pr': 'pr_questions',
+        'event': 'event_questions',
+        'travel': 'travel_questions'
+    }
+
+    table = table_map.get(department)
+    if not table:
+        return jsonify({'error': 'Invalid department'}), 400
+
+    questions = run_async(db.get_all_questions_by_table(table))
+    return jsonify(questions)
+
+
+@app.route('/api/questions/share', methods=['POST'])
+@login_required
+def api_share_question():
+    """API для пересылки вопроса в другой отдел"""
+    data = request.get_json()
+    question_id = data.get('question_id')
+    source_department = data.get('source_department')
+    target_department = data.get('target_department')
+
+    if not all([question_id, source_department, target_department]):
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    # Проверяем права
+    manager_groups = session.get('groups', [])
+    if source_department not in manager_groups and session.get('role') != 'admin':
+        return jsonify({'error': 'Access denied'}), 403
+
+    success = run_async(db.share_question_with_department(
+        question_id=question_id,
+        question_type=f"{source_department}_question",
+        source_department=source_department,
+        target_department=target_department,
+        shared_by=session.get('username')
+    ))
+
+    return jsonify({'success': success})
+
+
 # ============================================
 # ЗАПУСК ПРИЛОЖЕНИЯ
 # ============================================
