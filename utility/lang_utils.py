@@ -51,7 +51,8 @@ COMMON_TEXTS = {
         'error_invalid_position': "❌ Пожалуйста, введите корректную должность.",
         'error_invalid_company': "❌ Пожалуйста, введите корректное название компании.",
         'error_registration_failed': "❌ Произошла ошибка при регистрации. Пожалуйста, попробуйте позже.",
-        'error_not_whitelisted': "⛔ Извините, у вас нет доступа к боту конференции.\n\nОбратитесь к своему руководителю.",
+        'error_not_whitelisted': "⛔ Извините, у вас нет доступа к боту конференции.\n\nОбратитесь к своему руководителю.\n\n"
+                                 "⛔ Sorry, you do not have access to this conference bot.\n\nPlease contact your manager.",
         'error_validation': "❌ Пожалуйста, введите корректные данные.",
         'error_no_username': "❌ Пожалуйста, установите username в Telegram.",
         'error_no_conferences': "❌ Для вашего аккаунта не найдено конференций.",
@@ -353,6 +354,7 @@ COMMON_TEXTS = {
         'hotel_info_title': "🏨 Информация об отеле\n\nВыберите конференцию:",
         'no_flights': "❌ Информация о рейсах для этой конференции не найдена.",
         'no_hotel': "❌ Информация об отеле для этой конференции не найдена.",
+
     },
     'en': {
         # ============================================
@@ -711,6 +713,7 @@ COMMON_TEXTS = {
         'hotel_info_title': "🏨 Hotel Information\n\nSelect the conference:",
         'no_flights': "❌ No flight information found for this conference.",
         'no_hotel': "❌ Hotel information not found for this conference.",
+
     }
 }
 

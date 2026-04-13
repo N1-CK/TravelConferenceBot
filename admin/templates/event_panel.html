@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Event-панель | Управление мероприятиями{% endblock %}
+{% block title %}{{ get_text('event_panel_title') }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -16,87 +16,146 @@
         transform: translateY(-3px);
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
     }
-    .conference-card {
-        background: white;
-        border-radius: 12px;
-        padding: 15px;
-        margin-bottom: 15px;
-        border-left: 4px solid #667eea;
+    .status-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-in_progress { background: #cfe2ff; color: #084298; }
+    .status-ready { background: #d4edda; color: #155724; }
+    .filter-badge {
+        cursor: pointer;
         transition: all 0.2s;
     }
-    .conference-card:hover {
-        transform: translateX(5px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    .filter-badge.active {
+        transform: scale(1.05);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .table-header {
+        background: #f8f9fa;
+        font-weight: 600;
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="fade-in">
-    <h2 class="mb-4"><i class="bi bi-calendar-event"></i> Event-панель</h2>
+    <h2 class="mb-4"><i class="bi bi-ticket-perforated"></i> {{ get_text('event_panel_title') }}</h2>
 
+    <!-- Stats Cards -->
     <div class="row mb-4">
-        <div class="col-md-6 mb-3">
+        <div class="col-md-4 mb-3">
             <div class="stat-card">
-                <div class="stat-number text-success">{{ stats.active_conferences }}</div>
-                <div class="stat-label">Активных конференций</div>
+                <div class="stat-number text-warning">{{ stats.ticket_stats.pending }}</div>
+                <div class="stat-label">{{ get_text('tickets_pending') }}</div>
+                <small class="text-muted">{{ get_text('awaiting_processing') }}</small>
             </div>
         </div>
-        <div class="col-md-6 mb-3">
+        <div class="col-md-4 mb-3">
             <div class="stat-card">
-                <div class="stat-number text-info">{{ stats.total_conferences }}</div>
-                <div class="stat-label">Всего конференций</div>
+                <div class="stat-number text-info">{{ stats.ticket_stats.in_progress }}</div>
+                <div class="stat-label">{{ get_text('tickets_in_progress') }}</div>
+                <small class="text-muted">{{ get_text('in_processing') }}</small>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="stat-card">
+                <div class="stat-number text-success">{{ stats.ticket_stats.ready }}</div>
+                <div class="stat-label">{{ get_text('tickets_ready') }}</div>
+                <small class="text-muted">{{ get_text('ready_to_send') }}</small>
             </div>
         </div>
     </div>
 
+    <!-- Ticket Requests Table -->
     <div class="card">
         <div class="card-header">
-            <i class="bi bi-calendar3"></i> Конференции
+            <i class="bi bi-ticket"></i> {{ get_text('ticket_requests') }}
+            <div class="float-end">
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-secondary filter-btn active" data-status="all">{{ get_text('all_statuses') }}</button>
+                    <button type="button" class="btn btn-outline-warning filter-btn" data-status="pending">{{ get_text('status_pending_event') }}</button>
+                    <button type="button" class="btn btn-outline-info filter-btn" data-status="in_progress">{{ get_text('status_in_progress') }}</button>
+                    <button type="button" class="btn btn-outline-success filter-btn" data-status="ready">{{ get_text('status_ready') }}</button>
+                </div>
+            </div>
         </div>
         <div class="card-body">
-            <div class="row">
-                {% for conf in conferences %}
-                <div class="col-md-6">
-                    <div class="conference-card">
-                        <h5><i class="bi bi-calendar-check me-2"></i>{{ conf.name }}</h5>
-                        <p class="text-muted mb-2">
-                            <i class="bi bi-geo-alt"></i> {{ conf.city or 'Город не указан' }}
-                        </p>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-people"></i> {{ conf.user_count }} участников</span>
-                            <span class="badge bg-primary">{{ conf.status|default('active') }}</span>
-                        </div>
-                        <hr class="my-2">
-                        <button class="btn btn-sm btn-outline-primary" onclick="viewConference('{{ conf.name }}')">
-                            <i class="bi bi-eye"></i> Детали
-                        </button>
-                    </div>
-                </div>
-                {% else %}
-                <div class="col-12">
-                    <div class="text-center text-muted py-4">
-                        <i class="bi bi-calendar-x fs-1"></i>
-                        <p class="mt-2">Нет конференций</p>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal для просмотра конференции -->
-<div class="modal fade" id="conferenceModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Детали конференции</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="conferenceModalBody"></div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            <div class="table-responsive">
+                <table id="ticketsTable" class="table table-hover">
+                    <thead class="table-header">
+                        <tr>
+                            <th>{{ get_text('id') }}</th>
+                            <th>{{ get_text('username') }}</th>
+                            <th>{{ get_text('full_name') }}</th>
+                            <th>{{ get_text('position') }}</th>
+                            <th>{{ get_text('company') }}</th>
+                            <th>{{ get_text('email') }}</th>
+                            <th>{{ get_text('phone') }}</th>
+                            <th>{{ get_text('country') }}</th>
+                            <th>{{ get_text('created_at') }}</th>
+                            <th>{{ get_text('status') }}</th>
+                            <th>{{ get_text('actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in ticket_requests %}
+                        <tr data-status="{{ req.status }}">
+                            <td>{{ req.id }}</td>
+                            <td><strong>@{{ req.username }}</strong></td>
+                            <td>{{ req.full_name or '-' }}</td>
+                            <td>{{ req.position or '-' }}</td>
+                            <td>{{ req.company or '-' }}</td>
+                            <td>{{ req.email or '-' }}</td>
+                            <td>{{ req.phone or '-' }}</td>
+                            <td>{{ req.country or '-' }}</td>
+                            <td>{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</td>
+                            <td>
+                                <span class="status-badge status-{{ req.status }}">
+                                    {% if req.status == 'pending' %}
+                                        <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_event') }}
+                                    {% elif req.status == 'in_progress' %}
+                                        <i class="bi bi-arrow-repeat"></i> {{ get_text('status_in_progress') }}
+                                    {% elif req.status == 'ready' %}
+                                        <i class="bi bi-check-lg"></i> {{ get_text('status_ready') }}
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button class="btn btn-sm btn-outline-warning"
+                                            onclick="updateTicketStatus({{ req.id }}, 'pending')"
+                                            {% if req.status == 'pending' %}disabled{% endif %}
+                                            title="{{ get_text('set_pending') }}">
+                                        <i class="bi bi-hourglass-split"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-info"
+                                            onclick="updateTicketStatus({{ req.id }}, 'in_progress')"
+                                            {% if req.status == 'in_progress' %}disabled{% endif %}
+                                            title="{{ get_text('set_in_progress') }}">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success"
+                                            onclick="updateTicketStatus({{ req.id }}, 'ready')"
+                                            {% if req.status == 'ready' %}disabled{% endif %}
+                                            title="{{ get_text('set_ready') }}">
+                                        <i class="bi bi-check-lg"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="11" class="text-center text-muted py-4">
+                                <i class="bi bi-ticket fs-1"></i>
+                                <p class="mt-2">{{ get_text('no_ticket_requests') }}</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -105,22 +164,95 @@
 
 {% block extra_js %}
 <script>
-    function viewConference(name) {
-        fetch(`/api/conferences/${encodeURIComponent(name)}`)
+    $(document).ready(function() {
+        $('#ticketsTable').DataTable({
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/{{ "ru" if session.get("lang", "ru") == "ru" else "en" }}.json'
+            },
+            pageLength: 25,
+            order: [[0, 'desc']]
+        });
+    });
+
+    function updateTicketStatus(requestId, status) {
+        const statusNames = {
+            'pending': '{{ get_text("status_pending_event") }}',
+            'in_progress': '{{ get_text("status_in_progress") }}',
+            'ready': '{{ get_text("status_ready") }}'
+        };
+
+        if (confirm(`{{ get_text("confirm_status_change") }} ${statusNames[status]}?`)) {
+            fetch(`/api/ticket/${requestId}/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `status=${status}`
+            })
             .then(response => response.json())
             .then(data => {
-                let html = `
-                    <h5>${data.name}</h5>
-                    <p><i class="bi bi-geo-alt"></i> Город: ${data.city || '-'}</p>
-                    <p><i class="bi bi-calendar-range"></i> Даты: ${data.start_date || '??'} - ${data.end_date || '??'}</p>
-                    <h6><i class="bi bi-people"></i> Участники:</h6>
-                    <ul>
-                        ${data.users ? data.users.map(u => `<li>@${u.username}</li>`).join('') : '<li>Нет данных</li>'}
-                    </ul>
-                `;
-                document.getElementById('conferenceModalBody').innerHTML = html;
-                new bootstrap.Modal(document.getElementById('conferenceModal')).show();
+                if (data.success) {
+                    showToast(`{{ get_text("status_changed") }} ${statusNames[status]}`, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast('{{ get_text("error_status_change") }}', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('{{ get_text("error_status_change") }}', 'danger');
             });
+        }
+    }
+
+    // Фильтрация таблицы по статусу
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const status = this.dataset.status;
+
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+
+            const table = $('#ticketsTable').DataTable();
+
+            if (status === 'all') {
+                table.search('').columns().search('').draw();
+            } else {
+                table.column(9).search(status).draw();
+            }
+        });
+    });
+
+    function showToast(message, type) {
+        const toastContainer = document.querySelector('.toast-container');
+        const typeMap = {
+            success: 'check-circle-fill text-success',
+            danger: 'exclamation-triangle-fill text-danger',
+            warning: 'exclamation-triangle-fill text-warning',
+            info: 'info-circle-fill text-info'
+        };
+        const typeText = {
+            success: '{{ get_text("operation_success") }}',
+            danger: '{{ get_text("error_occurred") }}',
+            warning: '{{ get_text("warning") }}',
+            info: '{{ get_text("info") }}'
+        };
+
+        const toastHtml = `
+            <div class="toast show" role="alert" data-bs-autohide="true" data-bs-delay="3000">
+                <div class="toast-header">
+                    <i class="bi ${typeMap[type] || typeMap.info} me-2"></i>
+                    <strong class="me-auto">${typeText[type] || typeText.info}</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                </div>
+                <div class="toast-body">${message}</div>
+            </div>
+        `;
+
+        toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+
+        setTimeout(() => {
+            const toast = toastContainer.lastElementChild;
+            if (toast) toast.remove();
+        }, 3000);
     }
 </script>
 {% endblock %}

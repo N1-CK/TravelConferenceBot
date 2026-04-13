@@ -254,7 +254,9 @@ class Database:
                         email TEXT,
                         phone TEXT,
                         country TEXT,
-                        created_at TIMESTAMP DEFAULT NOW()
+                        status TEXT DEFAULT 'pending',
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
                     )
                     ''',
 
@@ -564,6 +566,63 @@ class Database:
             logger.error(f"Error checking duplicate booking: {e}")
             return False
 
+    async def get_all_ticket_requests(self) -> list:
+        """Получить все заявки на билеты"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT * FROM {self.db_schema_event}.event_ticket_requests 
+                    ORDER BY created_at DESC
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting ticket requests: {e}")
+            return []
+
+    async def update_ticket_request_status(self, request_id: int, status: str) -> bool:
+        """Обновить статус заявки на билет"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    UPDATE {self.db_schema_event}.event_ticket_requests 
+                    SET status = $1, updated_at = NOW()
+                    WHERE id = $2
+                """, status, request_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error updating ticket request status: {e}")
+            return False
+
+    async def get_ticket_request_stats(self) -> dict:
+        """Получить статистику по заявкам на билеты"""
+        try:
+            async with self.pool.acquire() as conn:
+                total = await conn.fetchval(f"""
+                    SELECT COUNT(*) FROM {self.db_schema_event}.event_ticket_requests
+                """) or 0
+                pending = await conn.fetchval(f"""
+                    SELECT COUNT(*) FROM {self.db_schema_event}.event_ticket_requests 
+                    WHERE status = 'pending'
+                """) or 0
+                in_progress = await conn.fetchval(f"""
+                    SELECT COUNT(*) FROM {self.db_schema_event}.event_ticket_requests 
+                    WHERE status = 'in_progress'
+                """) or 0
+                ready = await conn.fetchval(f"""
+                    SELECT COUNT(*) FROM {self.db_schema_event}.event_ticket_requests 
+                    WHERE status = 'ready'
+                """) or 0
+
+                return {
+                    'total': total,
+                    'pending': pending,
+                    'in_progress': in_progress,
+                    'ready': ready
+                }
+        except Exception as e:
+            logger.error(f"Error getting ticket stats: {e}")
+            return {'total': 0, 'pending': 0, 'in_progress': 0, 'ready': 0}
+
     async def get_restaurants_by_city(self, city: str) -> list:
         """Получение ресторанов по городу"""
         try:
@@ -804,45 +863,29 @@ class Database:
             logger.error(f"Error saving user agreement: {e}")
             return False
 
-
-    async def save_ticket_request(self, data: dict) -> bool:
-        """Сохранение заявки на билет конференции"""
+    async def save_ticket_request(self, data: dict) -> tuple:
+        """Сохранение заявки на билет и возврат ID"""
         try:
             async with self.pool.acquire() as conn:
-                # Создаем таблицу если нет
-                await conn.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self.db_schema_event}.event_ticket_requests (
-                        id SERIAL PRIMARY KEY,
-                        username TEXT,
-                        user_id BIGINT,
-                        full_name TEXT,
-                        position TEXT,
-                        company TEXT,
-                        email TEXT,
-                        phone TEXT,
-                        country TEXT,
-                        created_at TIMESTAMP DEFAULT NOW()
-                    )
-                """)
-
-                await conn.execute(f"""
+                row = await conn.fetchrow(f"""
                     INSERT INTO {self.db_schema_event}.event_ticket_requests 
-                    (username, user_id, full_name, position, company, email, phone, country)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    (username, user_id, full_name, position, company, email, phone, country, status)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
+                    RETURNING id
                 """,
-                                   data['username'],
-                                   data['user_id'],
-                                   data.get('full_name', ''),
-                                   data.get('position', ''),
-                                   data.get('company', ''),
-                                   data.get('email', ''),
-                                   data.get('phone', ''),
-                                   data.get('country', '')
-                                   )
-                return True
+                                          data['username'],
+                                          data['user_id'],
+                                          data.get('full_name', ''),
+                                          data.get('position', ''),
+                                          data.get('company', ''),
+                                          data.get('email', ''),
+                                          data.get('phone', ''),
+                                          data.get('country', '')
+                                          )
+                return True, row['id'] if row else None
         except Exception as e:
             logger.error(f"Error saving ticket request: {e}")
-            return False
+            return False, None
 
     async def save_flight_request(self, flight_data: Dict) -> bool:
         """Save flight request to database"""
@@ -2509,21 +2552,34 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
-                    SELECT DISTINCT conference_name as name,
-                           COUNT(DISTINCT username) as user_count
-                    FROM {self.db_schema}.user_conferences
-                    GROUP BY conference_name
-                    ORDER BY conference_name
+                    SELECT 
+                        c.conference_name as name,
+                        c.city,
+                        c.start_date,
+                        c.end_date,
+                        COUNT(DISTINCT uc.username) as user_count
+                    FROM {self.db_schema_config}.conferences c
+                    LEFT JOIN {self.db_schema}.user_conferences uc ON c.conference_name = uc.conference_name
+                    GROUP BY c.conference_name, c.city, c.start_date, c.end_date
+                    ORDER BY c.start_date DESC
                 """)
-                if rows:
-                    return [dict(row) for row in rows]
-
-                # Fallback: из company
-                companies = await self.get_companies_list()
-                return [{'name': c, 'user_count': 0} for c in companies]
+                return [dict(row) for row in rows] if rows else []
         except Exception as e:
             logger.error(f"Error getting conferences: {e}")
             return []
+
+    async def get_ticket_request_by_id(self, request_id: int) -> dict:
+        """Получить заявку на билет по ID"""
+        try:
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(f"""
+                    SELECT * FROM {self.db_schema_event}.event_ticket_requests 
+                    WHERE id = $1
+                """, request_id)
+                return dict(row) if row else {}
+        except Exception as e:
+            logger.error(f"Error getting ticket request by id: {e}")
+            return {}
 
     async def get_all_users_with_details(self) -> list:
         """Получить всех пользователей с деталями"""

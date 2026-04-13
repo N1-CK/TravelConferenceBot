@@ -11,10 +11,12 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 
+
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from utility.notifications import notify_ticket_status_change
 from database import db
 
 from locales import get_text
@@ -665,15 +667,15 @@ def api_users_count():
 @group_required(['event', 'admin'])
 def event_panel():
     """Панель Event-менеджера"""
-    conferences = run_async(db.get_conferences_list())
+    ticket_requests = run_async(db.get_all_ticket_requests())
+    ticket_stats = run_async(db.get_ticket_request_stats())
 
     stats = {
-        'active_conferences': len([c for c in conferences if c.get('user_count', 0) > 0]),
-        'total_conferences': len(conferences)
+        'ticket_stats': ticket_stats
     }
 
     return render_template('event_panel.html',
-                           conferences=conferences,
+                           ticket_requests=ticket_requests,
                            stats=stats,
                            username=session.get('username'))
 
@@ -1128,6 +1130,54 @@ def api_get_questions_by_department(department):
     questions = run_async(db.get_all_questions_by_table(table))
     return jsonify(questions)
 
+
+@app.route('/api/ticket/<int:request_id>/status', methods=['POST'])
+@login_required
+def api_update_ticket_status(request_id):
+    """API для обновления статуса заявки на билет с уведомлением"""
+    # Проверяем права доступа
+    user_groups = session.get('groups', [])
+    role = session.get('role')
+
+    if role != 'admin' and 'event' not in user_groups:
+        return jsonify({'error': 'Access denied'}), 403
+
+    status = request.form.get('status')
+    if status not in ['pending', 'in_progress', 'ready']:
+        return jsonify({'error': 'Invalid status'}), 400
+
+    # Получаем текущий статус до обновления
+    current_request = run_async(db.get_ticket_request_by_id(request_id))
+    old_status = current_request.get('status') if current_request else None
+
+    success = run_async(db.update_ticket_request_status(request_id, status))
+
+    if success:
+        # Отправляем уведомление пользователю (синхронно через run_async)
+        if current_request:
+            # Используем run_async вместо create_task
+            run_async(notify_ticket_status_change(
+                user_id=current_request.get('user_id'),
+                request_id=request_id,
+                old_status=old_status or 'pending',
+                new_status=status,
+                username=current_request.get('username')
+            ))
+
+        # Логируем действие
+        run_async(db.log_user_action(
+            user_id=session.get('manager_id', 0),
+            username=session.get('username'),
+            action="ticket_status_changed",
+            details={
+                "request_id": request_id,
+                "new_status": status,
+                "old_status": old_status
+            }
+        ))
+        return jsonify({'success': True})
+
+    return jsonify({'error': 'Failed to update status'}), 500
 
 @app.route('/api/questions/share', methods=['POST'])
 @login_required
