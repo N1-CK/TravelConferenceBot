@@ -136,8 +136,8 @@ COMMON_TEXTS = {
         # PR Question Form
         'pr_question_title': "❓ Вопрос к PR-отделу",
         'pr_question_prompt': "Напишите ваш вопрос (максимум 500 символов):",
-        'pr_question_success': "✅ **Вопрос отправлен!**\n\nБлагодарим за вопрос. Наша PR-команда свяжется с вами в ближайшее время.",
-        'pr_question_too_long': "❌ **Вопрос слишком длинный**\n\nМаксимальная длина вопроса - 500 символов.\nПожалуйста, сократите ваш вопрос и попробуйте снова.",
+        'pr_question_success': "✅ *Вопрос отправлен!*\n\nБлагодарим за вопрос. Наша PR-команда свяжется с вами в ближайшее время.",
+        'pr_question_too_long': "❌ *Вопрос слишком длинный*\n\nМаксимальная длина вопроса - 500 символов.\nПожалуйста, сократите ваш вопрос и попробуйте снова.",
 
         # PR Conference Bot
         'pr_conference_bot_title': "🤖 Бот на конференцию",
@@ -198,15 +198,17 @@ COMMON_TEXTS = {
         'success_certificate': "✅ Заявка на справку-вызов отправлена!\n\nБлагодарим за ответ, наша команда получила твой запрос. Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
 
         # Билеты
+        'start_event_text': "Для покупки билета, пожалуйста, предоставьте следующую информацию\n\n",
         'ticket_step': "Шаг {step} из {total}",
-        'ticket_full_name': "✍️ Укажите ваши имя и фамилию (как в паспорте):",
-        'ticket_position': "💼 Ваша должность:",
-        'ticket_company': "🏢 Название партнерской программы/компании:",
-        'ticket_email': "📧 Ваш email (на него придет билет):",
-        'ticket_phone': "📱 Ваш номер телефона (для связи):",
-        'ticket_country': "🌍 Какую страну указывать для регистрации билета?\n\nВыберите из списка:",
-        'ticket_success': "✅ **Заявка на билет отправлена!**\n\n📧 Билет будет отправлен на email: {email}\n\nБлагодарим за ответ! Наша команда обработает ваш запрос и отправит билет в ближайшее время.\n\nСледите за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
-
+        'ticket_full_name': "Укажите ваши имя и фамилию:",
+        'ticket_position': "Ваша должность:",
+        'ticket_company': "Название партнерской программы/компании:",
+        'ticket_email': "Ваш email (на него придет билет):",
+        'ticket_phone': "Ваш номер телефона (для связи):",
+        'ticket_country': "Какую страну указывать для регистрации билета?",
+        'ticket_success': "✅ Заявка на билет отправлена!\n\nБилет будет отправлен на email: {email}\n\nБлагодарим за ответ! Наша команда обработает ваш запрос и отправит билет в ближайшее время.\n\nСледите за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
+        'ticket_country_prompt': "Пожалуйста, напишите название вашей страны:",
+        'error_invalid_country': "❌ Пожалуйста, введите корректное название страны (минимум 2 символа)",
 
         # В секцию EVENT (после event_question):
         'event_rules': "📋 Правила поведения",
@@ -229,7 +231,7 @@ COMMON_TEXTS = {
 
         # Правила поведения (текстовая версия)
         'rules_text': (
-            "📋 **Правила поведения на конференции**\n\n"
+            "📋 *Правила поведения на конференции*\n\n"
             "1. Будьте вежливы и уважительны к другим участникам\n"
             "2. Соблюдайте дресс-код: Business casual\n"
             "3. Не опаздывайте на сессии и встречи\n"
@@ -239,15 +241,13 @@ COMMON_TEXTS = {
             "7. Запрещено распространение материалов без разрешения\n\n"
             "Нарушение правил может привести к ограничению доступа."
         ),
-        'rules_pdf_caption': "📋 **Правила поведения на конференции**\n\nПожалуйста, ознакомьтесь с правилами.",
+        'rules_pdf_caption': "📋 *Правила поведения на конференции*\n\nПожалуйста, ознакомьтесь с правилами.",
         'rules_accepted': "✅ Правила приняты",
 
         # Для ticket формы
-        'ticket_country_other_prompt': "Пожалуйста, напишите название вашей страны:",
-        'error_select_country': "Пожалуйста, выберите страну из кнопок выше.",
-        'error_invalid_email': "Пожалуйста, введите корректный email (пример: name@domain.com):",
-        'error_invalid_phone': "Пожалуйста, введите корректный номер телефона (минимум 10 цифр):",
-        'error_wrong_date_format_range': "Неверный формат дат. Используйте: ДД.ММ.ГГГГ - ДД.ММ.ГГГГ",
+        'error_invalid_email': "❌ Пожалуйста, введите корректный email (пример: name@domain.com):",
+        'error_invalid_phone': "❌ Пожалуйста, введите корректный номер телефона (минимум 10 цифр):",
+        'error_wrong_date_format_range': "❌ Неверный формат дат. Используйте: ДД.ММ.ГГГГ - ДД.ММ.ГГГГ",
 
         # Для booth информации
         'booth_location': "Стенд находится в главном холле конференц-центра",
@@ -281,10 +281,10 @@ COMMON_TEXTS = {
         'thanks_for_info': "✅ Спасибо за информацию!\n\nОтлично, что вы организовали поездку самостоятельно.\nЕсли у вас есть вопросы, обратитесь к travel-команде.",
 
         # Паспортные данные
-        'passport_consent': "📋 **Согласие на хранение данных**\n\nРазрешаете ли вы хранить ваши паспортные данные для будущих бронирований в течение 6 месяцев?",
+        'passport_consent': "📋 *Согласие на хранение данных*\n\nРазрешаете ли вы хранить ваши паспортные данные для будущих бронирований в течение 6 месяцев?",
         'use_saved_data': "✅ Использовать сохраненные данные",
         'enter_new_data': "✏️ Ввести новые данные",
-        'saved_passport_found': "📋 **Найдены сохраненные паспортные данные**\n\nИмя: {first_name} {last_name}\nПаспорт: {passport_number}\n\nИспользовать сохраненные данные?",
+        'saved_passport_found': "📋 *Найдены сохраненные паспортные данные*\n\nИмя: {first_name} {last_name}\nПаспорт: {passport_number}\n\nИспользовать сохраненные данные?",
 
         # Форма паспортных данных
         'passport_step1': "Шаг 1 из 10\nВаше имя (как в паспорте):",
@@ -302,13 +302,13 @@ COMMON_TEXTS = {
         'baggage_question': "Шаг 11 из 12\nНужен ли зарегистрированный багаж?",
         'baggage_yes': "✅ Да, нужен багаж",
         'baggage_no': "❌ Нет, только ручная кладь",
-        'hotel_question': "🏨 **Нужен ли отель?**\n\nБудет ли вам нужен отель для этой конференции?\n\n*Примечание:* Компания не возмещает расходы за самостоятельно забронированные отели или брони для сопровождающих лиц.",
+        'hotel_question': "🏨 *Нужен ли отель?*\n\nБудет ли вам нужен отель для этой конференции?\n\n*Примечание:* Компания не возмещает расходы за самостоятельно забронированные отели или брони для сопровождающих лиц.",
         'hotel_needed_yes': "✅ Да, нужен отель",
         'hotel_needed_no': "❌ Нет, отель не нужен",
-        'hotel_booking_note': "🏨 **Бронирование отеля**\n\nЕсли вам нужен отель, пожалуйста, заполните форму заявки на авиабилет. Там будет вопрос о необходимости отеля.\n\nПосле отправки заявки наш travel-менеджер свяжется с вами для уточнения деталей.",
+        'hotel_booking_note': "🏨 *Бронирование отеля*\n\nЕсли вам нужен отель, пожалуйста, заполните форму заявки на авиабилет. Там будет вопрос о необходимости отеля.\n\nПосле отправки заявки наш travel-менеджер свяжется с вами для уточнения деталей.",
 
         # Выбор рейса
-        'flight_choice': "✈️ **Выберите ваш рейс**\n\nПожалуйста, выберите наиболее удобный рейс:",
+        'flight_choice': "✈️ *Выберите ваш рейс*\n\nПожалуйста, выберите наиболее удобный рейс:",
         'flight_no_suitable': "❌ Ни один из рейсов не подходит. Свяжитесь со мной",
         'select_conference_for_flight': "✈️ Информация о рейсах\n\nВыберите конференцию:",
         'select_conference_for_hotel': "🏨 Информация об отеле\n\nВыберите конференцию:",
@@ -331,14 +331,14 @@ COMMON_TEXTS = {
         'network_bep20': "BEP20 (USDT/BUSD)",
         'enter_card_number': "💳 Введите номер вашей карты:",
         'enter_crypto_address': "🪙 Введите адрес вашего криптокошелька ({network}):",
-        'per_diem_consent': "📝 **Подтверждение**\n\nЯ даю согласие на обработку персональных данных",
-        'per_diem_success': "✅ **Заявка на суточные отправлена!**\n\nБлагодарим за запрос. Наша финансовая команда обработает ваши платежные данные и свяжется с вами при необходимости.\n\nПо вопросам обращайтесь к travel-команде через бота.",
+        'per_diem_consent': "📝 *Подтверждение*\n\nЯ даю согласие на обработку персональных данных",
+        'per_diem_success': "✅ *Заявка на суточные отправлена!*\n\nБлагодарим за запрос. Наша финансовая команда обработает ваши платежные данные и свяжется с вами при необходимости.\n\nПо вопросам обращайтесь к travel-команде через бота.",
 
         # Вопросы
         'question_to_manager': "❓ Вопрос travel-менеджеру\n\nНапишите ваш вопрос (максимум 500 символов):",
-        'question_sent': "✅ **Вопрос отправлен!**\n\nБлагодарим за вопрос. Наша travel-команда свяжется с вами в ближайшее время.",
+        'question_sent': "✅ *Вопрос отправлен!*\n\nБлагодарим за вопрос. Наша travel-команда свяжется с вами в ближайшее время.",
         'question_too_long': "❌ Вопрос слишком длинный. Максимум 500 символов.",
-        'success_question': "✅ **Вопрос отправлен!**\n\nБлагодарим за вопрос. Наша команда свяжется с вами в ближайшее время.",
+        'success_question': "✅ *Вопрос отправлен!*\n\nБлагодарим за вопрос. Наша команда свяжется с вами в ближайшее время.",
         'success_rules': "✅ Правила приняты",
 
         # Мои заявки
@@ -352,7 +352,7 @@ COMMON_TEXTS = {
         'status_footer': "_Вы получите уведомления при изменении статуса._",
 
         # Успешная отправка формы
-        'form_complete': "✅ **Заявка успешно отправлена!**\n\n📋 *Следующие шаги:*\n• Следите за уведомлениями в Telegram\n• Если нужна виза: начните сбор документов\n• Проверяйте email для подтверждения билетов\n• Нажмите 'Мои заявки' для проверки статуса\n\n⏰ *Ожидаемые сроки:*\n• Авиабилеты: 1-3 рабочих дня\n• Визовая поддержка: 5-10 рабочих дней\n• Бронирование отеля: 2-4 рабочих дня\n\n_Наша travel-команда скоро свяжется с вами._",
+        'form_complete': "✅ *Заявка успешно отправлена!*\n\n📋 *Следующие шаги:*\n• Следите за уведомлениями в Telegram\n• Если нужна виза: начните сбор документов\n• Проверяйте email для подтверждения билетов\n• Нажмите 'Мои заявки' для проверки статуса\n\n⏰ *Ожидаемые сроки:*\n• Авиабилеты: 1-3 рабочих дня\n• Визовая поддержка: 5-10 рабочих дней\n• Бронирование отеля: 2-4 рабочих дня\n\n_Наша travel-команда скоро свяжется с вами._",
 
         # Дополнительные фразы
         'back_to_travel': "◀️ Назад в TRAVEL",
@@ -398,7 +398,7 @@ COMMON_TEXTS = {
         'select_conference': "Select your conference:",
         'select_conference_button': "Select conference",
         'switch_conference': "🔄 Switch conference",
-        'conference_selected': "Selected conference: *{conference}*",
+        'conference_selected': "Selected conference: {conference}",
         'back_to_conferences': "◀️ Back to conferences",
         'conference_details_template': "📋 *{name}*\n\n📍 City: {city}\n📅 Conference dates: {conf_start} - {conf_end}\n✈️ Trip dates: {trip_start} - {trip_end}",
 
@@ -499,8 +499,8 @@ COMMON_TEXTS = {
         # PR Question Form
         'pr_question_title': "❓ Question to PR Department",
         'pr_question_prompt': "Write your question (max 500 characters):",
-        'pr_question_success': "✅ **Question sent!**\n\nThank you for your question. Our PR team will contact you shortly.",
-        'pr_question_too_long': "❌ **Question too long**\n\nMaximum question length is 500 characters.\nPlease shorten your question and try again.",
+        'pr_question_success': "✅ *Question sent!*\n\nThank you for your question. Our PR team will contact you shortly.",
+        'pr_question_too_long': "❌ *Question too long*\n\nMaximum question length is 500 characters.\nPlease shorten your question and try again.",
 
         # PR Conference Bot
         'pr_conference_bot_title': "🤖 Conference Bot",
@@ -564,14 +564,19 @@ COMMON_TEXTS = {
         'success_certificate': "✅ Certificate request submitted!\n\nThank you for your response! Our team has received your request. Follow notifications for updates.",
 
         # Tickets
+        'start_event_text': "Please provide the following information to purchase your ticket\n\n",
         'ticket_step': "Step {step} of {total}",
-        'ticket_full_name': "✍️ Please enter your full name (as in passport):",
-        'ticket_position': "💼 Your position:",
-        'ticket_company': "🏢 Partner program/company name:",
-        'ticket_email': "📧 Your email (ticket will be sent here):",
-        'ticket_phone': "📱 Your phone number (for contact):",
-        'ticket_country': "🌍 Which country should be used for ticket registration?\n\nSelect from the list:",
-        'ticket_success': "✅ **Ticket request submitted!**\n\n📧 Ticket will be sent to: {email}\n\nThank you for your response! Our team will process your request and send the ticket shortly.\n\nFollow notifications for updates on your request status.",
+        'ticket_full_name': "Please enter your first and last name for the ticket registration:",
+        'ticket_position': "Enter your position / job title:",
+        'ticket_company': "Enter your affiliate programme name:",
+        'ticket_email': "Enter your email address (ticket will be sent here):",
+        'ticket_phone': "Enter your phone number (for contact):",
+        'ticket_country': "Which country should be used for ticket registration?",
+        'ticket_success': "✅ Your Conference Ticket!\n\nTicket will be sent to: {email}\n\n"
+                          "Once the ticket is issued by the administrator, you will receive a notification.\n\n",
+        'ticket_country_prompt': "Please write the name of your country:",
+        'error_invalid_country': "❌ Please enter a valid country name (minimum 2 characters)",
+
 
         'event_rules': "📋 Code of Conduct",
         'event_rules_pdf': "📋 Code of Conduct (PDF)",
@@ -593,7 +598,7 @@ COMMON_TEXTS = {
 
         # Rules text
         'rules_text': (
-            "📋 **Conference Code of Conduct**\n\n"
+            "📋 *Conference Code of Conduct*\n\n"
             "1. Be polite and respectful to other participants\n"
             "2. Follow the dress code: Business casual\n"
             "3. Don't be late for sessions and meetings\n"
@@ -603,15 +608,14 @@ COMMON_TEXTS = {
             "7. Distribution of materials without permission is prohibited\n\n"
             "Violation of rules may lead to access restriction."
         ),
-        'rules_pdf_caption': "📋 **Conference Code of Conduct**\n\nPlease read the rules carefully.",
+        'rules_pdf_caption': "📋 *Conference Code of Conduct*\n\nPlease read the rules carefully.",
         'rules_accepted': "✅ Rules accepted",
 
         # For ticket form
         'ticket_country_other_prompt': "Please write your country name:",
-        'error_select_country': "Please select a country from the buttons above.",
-        'error_invalid_email': "Please enter a valid email address (e.g., name@domain.com):",
-        'error_invalid_phone': "Please enter a valid phone number (minimum 10 digits):",
-        'error_wrong_date_format_range': "Invalid date format. Use: DD.MM.YYYY - DD.MM.YYYY",
+        'error_invalid_email': "❌ Please enter a valid email address (e.g., name@domain.com):",
+        'error_invalid_phone': "❌ Please enter a valid phone number (minimum 4 digits):",
+        'error_wrong_date_format_range': "❌ Invalid date format. Use: DD.MM.YYYY - DD.MM.YYYY",
 
         # For booth information
         'booth_location': "Booth is located in the main hall of the conference center",
@@ -644,10 +648,10 @@ COMMON_TEXTS = {
         'thanks_for_info': "✅ Thank you for the information!\n\nGreat that you've organized your travel independently.\nIf you have questions, contact travel team.",
 
         # Passport data
-        'passport_consent': "📋 **Data Storage Consent**\n\nDo you allow us to store your passport data for future bookings within 6 months?",
+        'passport_consent': "📋 *Data Storage Consent*\n\nDo you allow us to store your passport data for future bookings within 6 months?",
         'use_saved_data': "✅ Use saved data",
         'enter_new_data': "✏️ Enter new data",
-        'saved_passport_found': "📋 **Saved passport data found**\n\nName: {first_name} {last_name}\nPassport: {passport_number}\n\nUse saved data?",
+        'saved_passport_found': "📋 *Saved passport data found*\n\nName: {first_name} {last_name}\nPassport: {passport_number}\n\nUse saved data?",
 
         # Passport form
         'passport_step1': "Step 1 of 10\nYour first name as in passport:",
@@ -665,13 +669,13 @@ COMMON_TEXTS = {
         'baggage_question': "Step 11 of 12\nDo you need checked baggage?",
         'baggage_yes': "✅ Yes, need baggage",
         'baggage_no': "❌ No, only carry-on",
-        'hotel_question': "🏨 **Hotel needed?**\n\nWill you need a hotel for this conference?\n\n*Note:* Company does not reimburse independent bookings or +1 accompanying persons.",
+        'hotel_question': "🏨 *Hotel needed?*\n\nWill you need a hotel for this conference?\n\n*Note:* Company does not reimburse independent bookings or +1 accompanying persons.",
         'hotel_needed_yes': "✅ Yes, need hotel",
         'hotel_needed_no': "❌ No, don't need hotel",
-        'hotel_booking_note': "🏨 **Hotel Booking**\n\nIf you need a hotel, please fill out the flight request form. There will be a question about hotel needs.\n\nAfter submitting the request, our travel manager will contact you to clarify the details.",
+        'hotel_booking_note': "🏨 *Hotel Booking*\n\nIf you need a hotel, please fill out the flight request form. There will be a question about hotel needs.\n\nAfter submitting the request, our travel manager will contact you to clarify the details.",
 
         # Flight selection
-        'flight_choice': "✈️ **Choose your flight**\n\nPlease select the most convenient flight:",
+        'flight_choice': "✈️ *Choose your flight*\n\nPlease select the most convenient flight:",
         'flight_no_suitable': "❌ None of the flights are suitable. Contact me",
         'select_conference_for_flight': "✈️ Flight Information\n\nSelect the conference:",
         'select_conference_for_hotel': "🏨 Hotel Information\n\nSelect the conference:",
@@ -694,14 +698,14 @@ COMMON_TEXTS = {
         'network_bep20': "BEP20 (USDT/BUSD)",
         'enter_card_number': "💳 Enter your card number:",
         'enter_crypto_address': "🪙 Enter your crypto wallet address ({network}):",
-        'per_diem_consent': "📝 **Confirmation**\n\nI consent to the processing of personal data",
-        'per_diem_success': "✅ **Daily allowance request submitted!**\n\nThank you for your request. Our finance team will process your payment details and contact you if additional information is needed.\n\nFor questions, contact our travel team via bot.",
+        'per_diem_consent': "📝 *Confirmation*\n\nI consent to the processing of personal data",
+        'per_diem_success': "✅ *Daily allowance request submitted!*\n\nThank you for your request. Our finance team will process your payment details and contact you if additional information is needed.\n\nFor questions, contact our travel team via bot.",
 
         # Questions
         'question_to_manager': "❓ Question to Travel Manager\n\nPlease write your question (max 500 characters):",
-        'question_sent': "✅ **Question sent!**\n\nThank you for your question. Our travel team will contact you soon.",
+        'question_sent': "✅ *Question sent!*\n\nThank you for your question. Our travel team will contact you soon.",
         'question_too_long': "❌ Question is too long. Maximum 500 characters.",
-        'success_question': "✅ **Question sent!**\n\nThank you for your question. Our team will contact you shortly.",
+        'success_question': "✅ *Question sent!*\n\nThank you for your question. Our team will contact you shortly.",
         'success_rules': "✅ Rules accepted",
 
         # My requests
@@ -715,7 +719,7 @@ COMMON_TEXTS = {
         'status_footer': "_You will receive notifications when status changes._",
 
         # Form success
-        'form_complete': "✅ **Request submitted successfully!**\n\n📋 *Next steps:*\n• Check Telegram notifications for updates\n• If visa needed: start document collection\n• Monitor email for ticket confirmations\n• Click 'My Requests' to check status\n\n⏰ *Expected timeline:*\n• Flight tickets: 1-3 business days\n• Visa processing: 5-10 business days\n• Hotel booking: 2-4 business days\n\n_Our travel team will contact you soon._",
+        'form_complete': "✅ *Request submitted successfully!*\n\n📋 *Next steps:*\n• Check Telegram notifications for updates\n• If visa needed: start document collection\n• Monitor email for ticket confirmations\n• Click 'My Requests' to check status\n\n⏰ *Expected timeline:*\n• Flight tickets: 1-3 business days\n• Visa processing: 5-10 business days\n• Hotel booking: 2-4 business days\n\n_Our travel team will contact you soon._",
 
         # Additional phrases
         'back_to_travel': "◀️ Back to TRAVEL",

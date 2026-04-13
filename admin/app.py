@@ -633,22 +633,30 @@ def api_export_users():
     )
 
 
-@app.route('/api/users/count')
+@app.route('/api/users/count', methods=['GET', 'POST'])
 @login_required
 def api_users_count():
     """API для подсчета пользователей по фильтрам"""
-    companies = request.args.get('companies', '').split(',')
-    conferences = request.args.get('conferences', '').split(',')
+    if request.method == 'POST':
+        data = request.get_json()
+        companies = data.get('companies', [])
+        conferences = data.get('conferences', [])
+    else:
+        companies = request.args.get('companies', '').split(',')
+        conferences = request.args.get('conferences', '').split(',')
+        if companies == ['']:
+            companies = []
+        if conferences == ['']:
+            conferences = []
 
-    if companies and companies[0]:
+    if companies:
         users = run_async(db.get_users_by_company_list(companies))
-    elif conferences and conferences[0]:
+    elif conferences:
         users = run_async(db.get_users_by_conference_list(conferences))
     else:
         users = run_async(db.get_users_by_company_list())
 
     return jsonify({'count': len(users)})
-
 
 # ============================================
 # ПАНЕЛИ МЕНЕДЖЕРОВ
@@ -820,152 +828,6 @@ def update_certificate_status(request_id):
 # ============================================
 # API ДЛЯ ГРУПП
 # ============================================
-
-@app.route('/api/groups/add', methods=['POST'])
-@login_required
-def api_add_group():
-    """API для добавления группы"""
-    name = request.form.get('name')
-    description = request.form.get('description')
-    color = request.form.get('color', '#667eea')
-
-    if not name:
-        flash('Название группы обязательно', 'danger')
-        return redirect(url_for('user_groups_page'))
-
-    success = run_async(db.add_group(name, description, color))
-    if success:
-        flash('Группа создана', 'success')
-    else:
-        flash('Ошибка при создании группы', 'danger')
-
-    return redirect(url_for('user_groups_page'))
-
-
-@app.route('/api/groups/<int:group_id>')
-@login_required
-def api_get_group(group_id):
-    """API для получения информации о группе"""
-    group = run_async(db.get_group(group_id))
-    return jsonify(group)
-
-
-@app.route('/api/groups/edit/<int:group_id>', methods=['POST'])
-@login_required
-def api_edit_group(group_id):
-    """API для редактирования группы"""
-    name = request.form.get('name')
-    description = request.form.get('description')
-    color = request.form.get('color')
-
-    success = run_async(db.update_group(group_id, name, description, color))
-    if success:
-        flash('Группа обновлена', 'success')
-    else:
-        flash('Ошибка при обновлении группы', 'danger')
-
-    return redirect(url_for('user_groups_page'))
-
-
-@app.route('/api/groups/delete/<int:group_id>', methods=['POST'])
-@login_required
-def api_delete_group(group_id):
-    """API для удаления группы"""
-    success = run_async(db.delete_group(group_id))
-    if success:
-        flash('Группа удалена', 'success')
-    else:
-        flash('Ошибка при удалении группы', 'danger')
-
-    return redirect(url_for('user_groups_page'))
-
-
-@app.route('/api/groups/<int:group_id>/users')
-@login_required
-def api_get_group_users(group_id):
-    """API для получения пользователей группы"""
-    users = run_async(db.get_group_users(group_id))
-    return jsonify(users)
-
-
-@app.route('/api/groups/<int:group_id>/users/<int:user_id>/add', methods=['POST'])
-@login_required
-def api_add_user_to_group(group_id, user_id):
-    """API для добавления пользователя в группу"""
-    success = run_async(db.add_user_to_group(user_id, group_id))
-    return jsonify({'success': success})
-
-
-@app.route('/api/groups/<int:group_id>/users/<int:user_id>/remove', methods=['POST'])
-@login_required
-def api_remove_user_from_group(group_id, user_id):
-    """API для удаления пользователя из группы"""
-    success = run_async(db.remove_user_from_group(user_id, group_id))
-    return jsonify({'success': success})
-
-
-@app.route('/api/groups/<int:group_id>/export')
-@login_required
-def export_group_users(group_id):
-    """Экспорт участников группы в CSV"""
-    users = run_async(db.get_group_users(group_id))
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(['ID', 'Username', 'Full Name', 'Company'])
-
-    for user in users:
-        writer.writerow([user['user_id'], user['username'], user.get('full_name', ''), user.get('company', '')])
-
-    output.seek(0)
-    return send_file(
-        io.BytesIO(output.getvalue().encode('utf-8-sig')),
-        mimetype='text/csv',
-        as_attachment=True,
-        download_name=f'group_{group_id}_users.csv'
-    )
-
-
-@app.route('/api/groups/features/assign', methods=['POST'])
-@login_required
-def api_assign_features_to_group():
-    """API для назначения функций группе"""
-    data = request.get_json()
-    group_id = data.get('group_id')
-    features = data.get('features', [])
-
-    success = run_async(db.assign_features_to_group(group_id, features))
-    return jsonify({'success': success})
-
-
-@app.route('/api/features/add', methods=['POST'])
-@login_required
-def api_add_feature():
-    """API для добавления функции"""
-    name = request.form.get('name')
-    code = request.form.get('code')
-    description = request.form.get('description')
-    icon = request.form.get('icon', 'bi-grid')
-
-    if not name or not code:
-        flash('Название и код функции обязательны', 'danger')
-        return redirect(url_for('user_groups_page'))
-
-    success = run_async(db.add_feature(name, code, description, icon))
-    if success:
-        flash('Функция добавлена', 'success')
-    else:
-        flash('Ошибка при добавлении функции', 'danger')
-
-    return redirect(url_for('user_groups_page'))
-
-
-@app.route('/api/features/delete/<int:feature_id>', methods=['POST'])
-@login_required
-def api_delete_feature(feature_id):
-    """API для удаления функции"""
-    success = run_async(db.delete_feature(feature_id))
-    return jsonify({'success': success})
 
 
 @app.route('/api/users/all')

@@ -233,7 +233,7 @@ async def process_name_edit(message: Message, state: FSMContext):
     # Валидация
     if len(new_name) < 2 or len(new_name) > 100:
         await message.answer(
-            f"❌ {await t(user_id, 'error_invalid_name')}"
+            f"{await t(user_id, 'error_invalid_name')}"
         )
         return
 

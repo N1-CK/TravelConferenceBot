@@ -35,21 +35,14 @@
 <div class="fade-in">
     <h2 class="mb-4"><i class="bi bi-calendar-event"></i> Event-панель</h2>
 
-    <!-- Stats Cards -->
     <div class="row mb-4">
-        <div class="col-md-4 mb-3">
-            <div class="stat-card">
-                <div class="stat-number text-primary">{{ stats.total_certificates }}</div>
-                <div class="stat-label">Всего справок-вызовов</div>
-            </div>
-        </div>
-        <div class="col-md-4 mb-3">
+        <div class="col-md-6 mb-3">
             <div class="stat-card">
                 <div class="stat-number text-success">{{ stats.active_conferences }}</div>
                 <div class="stat-label">Активных конференций</div>
             </div>
         </div>
-        <div class="col-md-4 mb-3">
+        <div class="col-md-6 mb-3">
             <div class="stat-card">
                 <div class="stat-number text-info">{{ stats.total_conferences }}</div>
                 <div class="stat-label">Всего конференций</div>
@@ -57,126 +50,53 @@
         </div>
     </div>
 
-    <!-- Tabs -->
-    <ul class="nav nav-tabs mb-4" id="eventTabs" role="tablist">
-        <li class="nav-item">
-            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#certificates" type="button">
-                <i class="bi bi-file-text"></i> Справки-вызовы
-            </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#conferences" type="button">
-                <i class="bi bi-calendar3"></i> Конференции
-            </button>
-        </li>
-    </ul>
-
-    <div class="tab-content">
-        <!-- Certificates -->
-        <div class="tab-pane fade show active" id="certificates">
-            <div class="card">
-                <div class="card-header">
-                    <i class="bi bi-file-text"></i> Заявки на справки-вызовы
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table id="certificatesTable" class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Пользователь</th>
-                                    <th>ФИО</th>
-                                    <th>Компания</th>
-                                    <th>Дата заявки</th>
-                                    <th>Действия</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for cert in certificates %}
-                                <tr>
-                                    <td>{{ cert.id }}</td>
-                                    <td><strong>@{{ cert.username }}</strong></td>
-                                    <td>{{ cert.full_name or '-' }}</td>
-                                    <td>{{ cert.company or '-' }}</td>
-                                    <td>{{ cert.created_at.strftime('%d.%m.%Y %H:%M') if cert.created_at else '-' }}</td>
-                                    <td>
-                                        <button class="btn btn-sm btn-outline-primary" onclick="viewCertificate({{ cert.id }})">
-                                            <i class="bi bi-eye"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-success" onclick="downloadCertificate({{ cert.id }})">
-                                            <i class="bi bi-download"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">
-                                        <i class="bi bi-inbox fs-1"></i>
-                                        <p class="mt-2">Нет заявок на справки-вызовы</p>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-calendar3"></i> Конференции
         </div>
-
-        <!-- Conferences -->
-        <div class="tab-pane fade" id="conferences">
-            <div class="card">
-                <div class="card-header">
-                    <i class="bi bi-calendar3"></i> Конференции
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        {% for conf in conferences %}
-                        <div class="col-md-6">
-                            <div class="conference-card">
-                                <h5><i class="bi bi-calendar-check me-2"></i>{{ conf.name }}</h5>
-                                <p class="text-muted mb-2">
-                                    <i class="bi bi-geo-alt"></i> {{ conf.city or 'Город не указан' }}
-                                </p>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span><i class="bi bi-people"></i> {{ conf.user_count }} участников</span>
-                                    <span class="badge bg-primary">{{ conf.status|default('active') }}</span>
-                                </div>
-                                <hr class="my-2">
-                                <button class="btn btn-sm btn-outline-primary" onclick="viewConference('{{ conf.name }}')">
-                                    <i class="bi bi-eye"></i> Детали
-                                </button>
-                            </div>
+        <div class="card-body">
+            <div class="row">
+                {% for conf in conferences %}
+                <div class="col-md-6">
+                    <div class="conference-card">
+                        <h5><i class="bi bi-calendar-check me-2"></i>{{ conf.name }}</h5>
+                        <p class="text-muted mb-2">
+                            <i class="bi bi-geo-alt"></i> {{ conf.city or 'Город не указан' }}
+                        </p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-people"></i> {{ conf.user_count }} участников</span>
+                            <span class="badge bg-primary">{{ conf.status|default('active') }}</span>
                         </div>
-                        {% else %}
-                        <div class="col-12">
-                            <div class="text-center text-muted py-4">
-                                <i class="bi bi-calendar-x fs-1"></i>
-                                <p class="mt-2">Нет конференций</p>
-                            </div>
-                        </div>
-                        {% endfor %}
+                        <hr class="my-2">
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewConference('{{ conf.name }}')">
+                            <i class="bi bi-eye"></i> Детали
+                        </button>
                     </div>
                 </div>
+                {% else %}
+                <div class="col-12">
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-calendar-x fs-1"></i>
+                        <p class="mt-2">Нет конференций</p>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal для просмотра справки -->
-<div class="modal fade" id="certificateModal" tabindex="-1">
+<!-- Modal для просмотра конференции -->
+<div class="modal fade" id="conferenceModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Детали справки-вызова</h5>
+                <h5 class="modal-title">Детали конференции</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="certificateModalBody"></div>
+            <div class="modal-body" id="conferenceModalBody"></div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
-                <button type="button" class="btn btn-primary" onclick="generatePDF()">
-                    <i class="bi bi-file-pdf"></i> Сформировать PDF
-                </button>
             </div>
         </div>
     </div>
@@ -185,34 +105,6 @@
 
 {% block extra_js %}
 <script>
-    $(document).ready(function() {
-        $('#certificatesTable').DataTable({
-            language: { url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/ru.json' },
-            pageLength: 25,
-            order: [[4, 'desc']]
-        });
-    });
-
-    function viewCertificate(id) {
-        fetch(`/api/certificate/${id}`)
-            .then(response => response.json())
-            .then(data => {
-                let html = '<table class="table">';
-                for (let [key, value] of Object.entries(data)) {
-                    if (value) {
-                        html += `<tr><th>${key}:</th><td>${value}</td></tr>`;
-                    }
-                }
-                html += '</table>';
-                document.getElementById('certificateModalBody').innerHTML = html;
-                new bootstrap.Modal(document.getElementById('certificateModal')).show();
-            });
-    }
-
-    function downloadCertificate(id) {
-        window.location.href = `/api/certificate/${id}/download`;
-    }
-
     function viewConference(name) {
         fetch(`/api/conferences/${encodeURIComponent(name)}`)
             .then(response => response.json())
@@ -226,13 +118,9 @@
                         ${data.users ? data.users.map(u => `<li>@${u.username}</li>`).join('') : '<li>Нет данных</li>'}
                     </ul>
                 `;
-                document.getElementById('certificateModalBody').innerHTML = html;
-                new bootstrap.Modal(document.getElementById('certificateModal')).show();
+                document.getElementById('conferenceModalBody').innerHTML = html;
+                new bootstrap.Modal(document.getElementById('conferenceModal')).show();
             });
-    }
-
-    function generatePDF() {
-        alert('Функция генерации PDF в разработке');
     }
 </script>
 {% endblock %}

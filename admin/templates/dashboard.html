@@ -5,249 +5,139 @@
 {% block content %}
 <h2 class="mb-4 fade-in">{{ get_text('title_dashboard') }}</h2>
 
-<!-- Stats Cards -->
 <div class="row mb-4">
     <div class="col-md-3 mb-3">
         <div class="stat-card">
-            <div class="stat-icon text-primary mb-2">
-                <i class="bi bi-people fs-1"></i>
-            </div>
+            <div class="stat-icon text-primary mb-2"><i class="bi bi-people fs-1"></i></div>
             <div class="stat-number">{{ stats.total_users|default(0) }}</div>
             <div class="stat-label">{{ get_text('total_users') }}</div>
         </div>
     </div>
     <div class="col-md-3 mb-3">
         <div class="stat-card">
-            <div class="stat-icon text-success mb-2">
-                <i class="bi bi-person-check fs-1"></i>
-            </div>
+            <div class="stat-icon text-success mb-2"><i class="bi bi-person-check fs-1"></i></div>
             <div class="stat-number">{{ stats.active_today|default(0) }}</div>
             <div class="stat-label">{{ get_text('active_today') }}</div>
         </div>
     </div>
     <div class="col-md-3 mb-3">
         <div class="stat-card">
-            <div class="stat-icon text-info mb-2">
-                <i class="bi bi-calendar-check fs-1"></i>
-            </div>
+            <div class="stat-icon text-info mb-2"><i class="bi bi-calendar-check fs-1"></i></div>
             <div class="stat-number">{{ stats.active_conferences|default(0) }}</div>
             <div class="stat-label">{{ get_text('active_conferences') }}</div>
         </div>
     </div>
     <div class="col-md-3 mb-3">
         <div class="stat-card">
-            <div class="stat-icon text-warning mb-2">
-                <i class="bi bi-envelope fs-1"></i>
-            </div>
+            <div class="stat-icon text-warning mb-2"><i class="bi bi-envelope fs-1"></i></div>
             <div class="stat-number">{{ stats.total_broadcasts|default(0) }}</div>
             <div class="stat-label">{{ get_text('total_broadcasts') }}</div>
         </div>
     </div>
 </div>
 
-<!-- Charts Row -->
 <div class="row mb-4">
     <div class="col-md-6 mb-3">
         <div class="card h-100">
-            <div class="card-header">
-                <i class="bi bi-building me-2"></i> {{ get_text('top_companies') }}
-            </div>
+            <div class="card-header"><i class="bi bi-building me-2"></i> Топ компаний</div>
             <div class="card-body">
                 {% if stats.companies_stats %}
                 <div class="table-responsive">
                     <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>{{ get_text('company') }}</th>
-                                <th>{{ get_text('users') }}</th>
-                                <th width="50%"></th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Компания</th><th>Пользователей</th><th width="50%"></th></tr></thead>
                         <tbody>
                             {% for company in stats.companies_stats[:5] %}
                             <tr>
                                 <td><strong>{{ company.company }}</strong></td>
                                 <td><span class="badge bg-primary">{{ company.user_count }}</span></td>
-                                <td>
-                                    <div class="progress" style="height: 8px;">
-                                        <div class="progress-bar bg-primary" style="width: {{ (company.user_count / (stats.companies_stats[0].user_count + 1) * 100)|int }}%"></div>
-                                    </div>
-                                </td>
+                                <td><div class="progress" style="height: 8px;"><div class="progress-bar bg-primary" style="width: {{ (company.user_count / (stats.companies_stats[0].user_count + 1) * 100)|int }}%"></div></div></td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
                 {% else %}
-                <div class="text-center text-muted py-4">
-                    <i class="bi bi-building fs-1"></i>
-                    <p class="mt-2">{{ get_text('no_data') }}</p>
-                </div>
+                <div class="text-center text-muted py-4"><i class="bi bi-building fs-1"></i><p class="mt-2">{{ get_text('no_data') }}</p></div>
                 {% endif %}
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-6 mb-3">
         <div class="card h-100">
-            <div class="card-header">
-                <i class="bi bi-clock-history me-2"></i> {{ get_text('recent_broadcasts') }}
-            </div>
+            <div class="card-header"><i class="bi bi-clock-history me-2"></i> Последние рассылки</div>
             <div class="card-body">
                 {% if broadcasts %}
                 <div class="table-responsive">
                     <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>{{ get_text('time') }}</th>
-                                <th>{{ get_text('type') }}</th>
-                                <th>{{ get_text('result') }}</th>
-                            </tr>
-                        </thead>
+                        <thead><td><th>Время</th><th>Тип</th><th>Результат</th></tr></thead>
                         <tbody>
                             {% for broadcast in broadcasts[:5] %}
                             <tr>
                                 <td><small>{{ broadcast.timestamp.strftime('%d.%m.%Y %H:%M') if broadcast.timestamp else '-' }}</small></td>
                                 <td>
-                                    {% if broadcast.broadcast_type == 'all' %}
-                                    <span class="badge bg-info">{{ get_text('all_users') }}</span>
-                                    {% elif broadcast.broadcast_type == 'company' %}
-                                    <span class="badge bg-warning">{{ get_text('by_company') }}</span>
-                                    {% else %}
-                                    <span class="badge bg-secondary">{{ get_text('selected') }}</span>
-                                    {% endif %}
+                                    {% if broadcast.broadcast_type == 'all' %}<span class="badge bg-info">Всем</span>
+                                    {% elif broadcast.broadcast_type == 'company' %}<span class="badge bg-warning">По компаниям</span>
+                                    {% else %}<span class="badge bg-secondary">Выборочно</span>{% endif %}
                                 </td>
-                                <td>
-                                    <span class="badge bg-success">{{ broadcast.success_count }} ✓</span>
-                                    {% if broadcast.failed_count > 0 %}
-                                    <span class="badge bg-danger">{{ broadcast.failed_count }} ✗</span>
-                                    {% endif %}
-                                </td>
+                                <td><span class="badge bg-success">{{ broadcast.success_count }} ✓</span>{% if broadcast.failed_count > 0 %}<span class="badge bg-danger">{{ broadcast.failed_count }} ✗</span>{% endif %}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
                 {% else %}
-                <div class="text-center text-muted py-4">
-                    <i class="bi bi-envelope fs-1"></i>
-                    <p class="mt-2">{{ get_text('no_data') }}</p>
-                </div>
+                <div class="text-center text-muted py-4"><i class="bi bi-envelope fs-1"></i><p class="mt-2">{{ get_text('no_data') }}</p></div>
                 {% endif %}
-                <div class="text-center mt-3">
-                    <a href="/broadcast" class="btn btn-primary">
-                        <i class="bi bi-plus-circle"></i> {{ get_text('new_broadcast') }}
-                    </a>
-                </div>
+                <div class="text-center mt-3"><a href="/broadcast" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Новая рассылка</a></div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Recent Activity -->
 <div class="row">
     <div class="col-md-6 mb-3">
         <div class="card">
-            <div class="card-header">
-                <i class="bi bi-calendar-event me-2"></i> {{ get_text('active_conferences') }}
-            </div>
+            <div class="card-header"><i class="bi bi-calendar-event me-2"></i> Активные конференции</div>
             <div class="card-body">
                 {% if active_conferences %}
                 <div class="list-group list-group-flush">
                     {% for conference in active_conferences[:5] %}
                     <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <i class="bi bi-calendar3 text-primary me-2"></i>
-                            <strong>{{ conference.name }}</strong>
-                            <br>
-                            <small class="text-muted">{{ conference.city|default('-') }}</small>
-                        </div>
-                        <div>
-                            <span class="badge bg-primary rounded-pill">
-                                <i class="bi bi-people"></i> {{ conference.user_count }}
-                            </span>
-                        </div>
+                        <div><i class="bi bi-calendar3 text-primary me-2"></i><strong>{{ conference.name }}</strong><br><small class="text-muted">{{ conference.city|default('-') }}</small></div>
+                        <div><span class="badge bg-primary rounded-pill"><i class="bi bi-people"></i> {{ conference.user_count }}</span></div>
                     </div>
                     {% endfor %}
                 </div>
                 {% else %}
-                <div class="text-center text-muted py-4">
-                    <i class="bi bi-calendar-x fs-1"></i>
-                    <p class="mt-2">{{ get_text('no_data') }}</p>
-                </div>
+                <div class="text-center text-muted py-4"><i class="bi bi-calendar-x fs-1"></i><p class="mt-2">{{ get_text('no_data') }}</p></div>
                 {% endif %}
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-6 mb-3">
         <div class="card">
-            <div class="card-header">
-                <i class="bi bi-people me-2"></i> {{ get_text('recent_active_users') }}
-            </div>
+            <div class="card-header"><i class="bi bi-people me-2"></i> Недавно активные</div>
             <div class="card-body">
                 {% if recent_users %}
                 <div class="list-group list-group-flush">
                     {% for user in recent_users[:5] %}
                     <div class="list-group-item d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center">
-                            <div class="user-avatar me-3">
-                                {{ user.username[0]|upper if user.username else '?' }}
-                            </div>
-                            <div>
-                                <strong>@{{ user.username }}</strong>
-                                <br>
-                                <small class="text-muted">
-                                    {% if user.last_active %}
-                                    {{ user.last_active.strftime('%d.%m.%Y %H:%M') }}
-                                    {% else %}
-                                    {{ get_text('never') }}
-                                    {% endif %}
-                                </small>
-                            </div>
+                            <div class="user-avatar me-3">{{ user.username[0]|upper if user.username else '?' }}</div>
+                            <div><strong>@{{ user.username }}</strong><br><small class="text-muted">{% if user.last_active %}{{ user.last_active.strftime('%d.%m.%Y %H:%M') }}{% else %}{{ get_text('never') }}{% endif %}</small></div>
                         </div>
-                        <div>
-                            <span class="badge bg-info">{{ user.company|default('-') }}</span>
-                        </div>
+                        <div><span class="badge bg-info">{{ user.company|default('-') }}</span></div>
                     </div>
                     {% endfor %}
                 </div>
                 {% else %}
-                <div class="text-center text-muted py-4">
-                    <i class="bi bi-people fs-1"></i>
-                    <p class="mt-2">{{ get_text('no_data') }}</p>
-                </div>
+                <div class="text-center text-muted py-4"><i class="bi bi-people fs-1"></i><p class="mt-2">{{ get_text('no_data') }}</p></div>
                 {% endif %}
-                <div class="text-center mt-3">
-                    <a href="/users" class="btn btn-outline-primary">
-                        <i class="bi bi-people"></i> {{ get_text('all_users') }}
-                    </a>
-                </div>
+                <div class="text-center mt-3"><a href="/users" class="btn btn-outline-primary"><i class="bi bi-people"></i> Все пользователи</a></div>
             </div>
         </div>
     </div>
 </div>
-
-<style>
-    .progress {
-        border-radius: 10px;
-        background-color: #e9ecef;
-    }
-    .list-group-item {
-        border-left: none;
-        border-right: none;
-        padding: 0.75rem 0;
-    }
-    .list-group-item:first-child {
-        border-top: none;
-        padding-top: 0;
-    }
-    .list-group-item:last-child {
-        border-bottom: none;
-        padding-bottom: 0;
-    }
-    .stat-icon i {
-        font-size: 2rem;
-    }
-</style>
 {% endblock %}

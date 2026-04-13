@@ -1,5 +1,3 @@
-# handlers/event.py - ПОЛНОСТЬЮ ЛОКАЛИЗОВАННАЯ ВЕРСИЯ
-
 import re
 import os
 import logging
@@ -196,9 +194,10 @@ async def start_ticket_form(callback: CallbackQuery, state: FSMContext):
 
     step_text = await t(user_id, 'ticket_step', step=1, total=6)
     question_text = await t(user_id, 'ticket_full_name')
+    start_event_text = await t(user_id, 'start_event_text')
 
     await callback.message.edit_text(
-        f"🎫 **{await t(user_id, 'event_ticket')}**\n\n{step_text}\n\n{question_text}",
+        f"{await t(user_id, 'event_ticket')}\n\n{start_event_text}\n{step_text}\n\n{question_text}",
         reply_markup=await get_back_next_keyboard(back_to="menu_event", next_disabled=True, user_id=user_id)
     )
 
@@ -208,7 +207,7 @@ async def process_ticket_full_name(message: Message, state: FSMContext):
     """Шаг 1: ФИО"""
     user_id = message.from_user.id
     if len(message.text.strip()) < 3:
-        await message.answer("❌ " + await t(user_id, 'error_invalid_name'))
+        await message.answer(await t(user_id, 'error_invalid_name'))
         return
 
     await state.update_data(full_name=message.text.strip())
@@ -225,7 +224,7 @@ async def process_ticket_position(message: Message, state: FSMContext):
     """Шаг 2: Должность"""
     user_id = message.from_user.id
     if len(message.text.strip()) < 2:
-        await message.answer("❌ " + await t(user_id, 'error_invalid_position'))
+        await message.answer(await t(user_id, 'error_invalid_position'))
         return
 
     await state.update_data(position=message.text.strip())
@@ -242,7 +241,7 @@ async def process_ticket_company(message: Message, state: FSMContext):
     """Шаг 3: Компания"""
     user_id = message.from_user.id
     if len(message.text.strip()) < 2:
-        await message.answer("❌ " + await t(user_id, 'error_invalid_company'))
+        await message.answer(await t(user_id, 'error_invalid_company'))
         return
 
     await state.update_data(company=message.text.strip())
@@ -264,7 +263,7 @@ async def process_ticket_email(message: Message, state: FSMContext):
     email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 
     if not re.match(email_pattern, email):
-        await message.answer("❌ " + await t(user_id, 'error_invalid_email'))
+        await message.answer(await t(user_id, 'error_invalid_email'))
         return
 
     await state.update_data(email=email)
@@ -284,69 +283,31 @@ async def process_ticket_phone(message: Message, state: FSMContext):
 
     # Простая валидация телефона
     digits = re.sub(r'\D', '', phone)
-    if len(digits) < 10:
-        await message.answer("❌ " + await t(user_id, 'error_invalid_phone'))
+    if len(digits) < 4:
+        await message.answer(await t(user_id, 'error_invalid_phone'))
         return
 
     await state.update_data(phone=phone)
     await state.set_state(EventTicketForm.waiting_for_country)
 
-    # Клавиатура выбора страны с локализацией
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🇷🇺 Russia", callback_data="ticket_country_russia")],
-        [InlineKeyboardButton(text="🇦🇪 UAE", callback_data="ticket_country_uae")],
-        [InlineKeyboardButton(text="🇰🇿 Kazakhstan", callback_data="ticket_country_kazakhstan")],
-        [InlineKeyboardButton(text="🇺🇿 Uzbekistan", callback_data="ticket_country_uzbekistan")],
-        [InlineKeyboardButton(text="🇨🇳 China", callback_data="ticket_country_china")],
-        [InlineKeyboardButton(text="🇮🇳 India", callback_data="ticket_country_india")],
-        [InlineKeyboardButton(text="🌍 Other", callback_data="ticket_country_other")],
-        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="ticket_back_step5")]
-    ])
-
     await message.answer(
-        await t(user_id, 'ticket_step', step=6, total=6) + "\n\n" + await t(user_id, 'ticket_country'),
-        reply_markup=keyboard
+        await t(user_id, 'ticket_step', step=6, total=6) + "\n\n" + await t(user_id, 'ticket_country_prompt'),
+        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step5", user_id=user_id)
     )
 
 
-@router.callback_query(F.data.startswith("ticket_country_"), EventTicketForm.waiting_for_country)
-async def process_ticket_country(callback: CallbackQuery, state: FSMContext):
-    """Шаг 6: Выбор страны и сохранение заявки"""
-    user_id = callback.from_user.id
-    country_map = {
-        "russia": "Russia",
-        "uae": "UAE (United Arab Emirates)",
-        "kazakhstan": "Kazakhstan",
-        "uzbekistan": "Uzbekistan",
-        "china": "China",
-        "india": "India",
-        "other": "Other"
-    }
+@router.message(EventTicketForm.waiting_for_country)
+async def process_ticket_country(message: Message, state: FSMContext):
+    """Шаг 6: Страна (текстовый ввод)"""
+    user_id = message.from_user.id
+    country = message.text.strip()
 
-    country_key = callback.data.replace("ticket_country_", "")
-    country = country_map.get(country_key, country_key)
-
-    if country_key == "other":
-        await state.update_data(waiting_for_custom_country=True)
-        await callback.message.edit_text(
-            await t(user_id, 'ticket_step', step=6, total=6) + "\n\n🌍 " + await t(user_id, 'ticket_country_other_prompt')
-        )
+    if len(country) < 2:
+        await message.answer(await t(user_id, 'error_invalid_country'))
         return
 
     await state.update_data(country=country)
-    await save_ticket_request(callback, state)
-
-
-@router.message(EventTicketForm.waiting_for_country)
-async def process_ticket_custom_country(message: Message, state: FSMContext):
-    """Обработка ручного ввода страны"""
-    user_id = message.from_user.id
-    data = await state.get_data()
-    if data.get('waiting_for_custom_country'):
-        await state.update_data(country=message.text.strip(), waiting_for_custom_country=False)
-        await save_ticket_request(message, state)
-    else:
-        await message.answer(await t(user_id, 'error_select_country'))
+    await save_ticket_request(message, state)
 
 
 async def save_ticket_request(update, state: FSMContext):
@@ -393,7 +354,7 @@ async def save_ticket_request(update, state: FSMContext):
         )
     else:
         await message_obj.answer(
-            "❌ " + await t(user_id, 'error_saving_request')
+            await t(user_id, 'error_saving_request')
         )
 
     await state.clear()
@@ -446,129 +407,14 @@ async def ticket_back_to_email(callback: CallbackQuery, state: FSMContext):
     )
 
 
-# ============================================
-# ФОРМА СПРАВКИ-ВЫЗОВА
-# ============================================
-
-@router.callback_query(F.data == "event_certificate")
-async def start_certificate_form(callback: CallbackQuery, state: FSMContext):
-    """Начало формы справки-вызова"""
+@router.callback_query(F.data == "ticket_back_step6")
+async def ticket_back_to_phone(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
-    await state.set_state(EventCertificateForm.waiting_for_name)
-
+    await state.set_state(EventTicketForm.waiting_for_phone)
     await callback.message.edit_text(
-        f"{await t(user_id, 'event_certificate_form_title')}\n\n"
-        f"1/6 {await t(user_id, 'event_certificate_step1')}",
-        reply_markup=await get_back_next_keyboard(back_to="menu_event", next_disabled=True, user_id=user_id)
+        await t(user_id, 'ticket_step', step=5, total=6) + "\n\n" + await t(user_id, 'ticket_phone'),
+        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step4", user_id=user_id)
     )
-
-
-@router.message(EventCertificateForm.waiting_for_name)
-async def process_certificate_name(message: Message, state: FSMContext):
-    """Обработка ФИО для справки"""
-    user_id = message.from_user.id
-    if len(message.text.strip()) < 3:
-        await message.answer("❌ " + await t(user_id, 'error_invalid_name'))
-        return
-    await state.update_data(full_name=message.text)
-    await state.set_state(EventCertificateForm.waiting_for_position)
-    await message.answer(
-        f"2/6 {await t(user_id, 'event_certificate_step2')}",
-        reply_markup=await get_back_next_keyboard(back_to="certificate_step1", user_id=user_id)
-    )
-
-
-@router.message(EventCertificateForm.waiting_for_position)
-async def process_certificate_position(message: Message, state: FSMContext):
-    """Обработка должности"""
-    user_id = message.from_user.id
-    if len(message.text.strip()) < 2:
-        await message.answer("❌ " + await t(user_id, 'error_invalid_position'))
-        return
-    await state.update_data(position=message.text)
-    await state.set_state(EventCertificateForm.waiting_for_company)
-    await message.answer(
-        f"3/6 {await t(user_id, 'event_certificate_step3')}",
-        reply_markup=await get_back_next_keyboard(back_to="certificate_step2", user_id=user_id)
-    )
-
-
-@router.message(EventCertificateForm.waiting_for_company)
-async def process_certificate_company(message: Message, state: FSMContext):
-    """Обработка компании"""
-    user_id = message.from_user.id
-    if len(message.text.strip()) < 2:
-        await message.answer("❌ " + await t(user_id, 'error_invalid_company'))
-        return
-    await state.update_data(company=message.text)
-    await state.set_state(EventCertificateForm.waiting_for_company_legal)
-    await message.answer(
-        f"4/6 {await t(user_id, 'event_certificate_step4')}",
-        reply_markup=await get_back_next_keyboard(back_to="certificate_step3", user_id=user_id)
-    )
-
-
-@router.message(EventCertificateForm.waiting_for_company_legal)
-async def process_certificate_legal(message: Message, state: FSMContext):
-    """Обработка юр. данных"""
-    await state.update_data(company_legal=message.text)
-    await state.set_state(EventCertificateForm.waiting_for_addressee)
-    user_id = message.from_user.id
-    await message.answer(
-        f"5/6 {await t(user_id, 'event_certificate_step5')}",
-        reply_markup=await get_back_next_keyboard(back_to="certificate_step4", user_id=user_id)
-    )
-
-
-@router.message(EventCertificateForm.waiting_for_addressee)
-async def process_certificate_addressee(message: Message, state: FSMContext):
-    """Обработка адресата"""
-    await state.update_data(addressee=message.text)
-    await state.set_state(EventCertificateForm.waiting_for_dates)
-    user_id = message.from_user.id
-    await message.answer(
-        f"6/6 {await t(user_id, 'event_certificate_step6')}",
-        reply_markup=await get_back_next_keyboard(back_to="certificate_step5", user_id=user_id)
-    )
-
-
-@router.message(EventCertificateForm.waiting_for_dates)
-async def process_certificate_dates(message: Message, state: FSMContext):
-    """Обработка дат и сохранение заявки"""
-    user_id = message.from_user.id
-    # Валидация формата дат
-    date_pattern = r'^\d{2}\.\d{2}\.\d{4}\s*-\s*\d{2}\.\d{2}\.\d{4}$'
-    if not re.match(date_pattern, message.text.strip()):
-        await message.answer("❌ " + await t(user_id, 'error_wrong_date_format_range'))
-        return
-
-    await state.update_data(dates=message.text)
-    data = await state.get_data()
-
-    # Сохранение в БД
-    certificate_data = {
-        'username': message.from_user.username,
-        'user_id': user_id,
-        'full_name': data.get('full_name', ''),
-        'position': data.get('position', ''),
-        'company': data.get('company', ''),
-        'company_legal': data.get('company_legal', ''),
-        'addressee': data.get('addressee', ''),
-        'dates': data.get('dates', '')
-    }
-
-    if await db.save_certificate_request(certificate_data):
-        await db.log_user_action(
-            user_id=user_id,
-            username=message.from_user.username,
-            action="certificate_request_submitted",
-            details={"data": certificate_data}
-        )
-
-    await message.answer(
-        await t(user_id, 'event_certificate_success')
-    )
-    await state.clear()
 
 
 # ============================================
@@ -586,7 +432,7 @@ async def start_event_question(callback: CallbackQuery, state: FSMContext):
     ])
 
     await callback.message.edit_text(
-        f"**{await t(user_id, 'event_question')}**\n\n"
+        f"*{await t(user_id, 'event_question')}*\n\n"
         f"{await t(user_id, 'event_question_prompt')}\n\n",
         reply_markup=keyboard,
         parse_mode="Markdown"
@@ -656,7 +502,7 @@ async def show_booth_info(callback: CallbackQuery):
     )
 
     text = (
-        "ℹ️ **" + await t(user_id, 'event_booth') + "**\n\n"
+        "ℹ️ *" + await t(user_id, 'event_booth') + "*\n\n"
         "📍 " + await t(user_id, 'booth_location') + "\n"
         "🕐 " + await t(user_id, 'booth_hours') + "\n"
         "📞 " + await t(user_id, 'booth_contact') + "\n\n"
@@ -664,58 +510,3 @@ async def show_booth_info(callback: CallbackQuery):
     )
 
     await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
-
-
-# ============================================
-# ОБРАБОТЧИКИ КНОПОК НАЗАД
-# ============================================
-
-@router.callback_query(F.data == "certificate_step1")
-async def back_to_name_from_position(callback: CallbackQuery, state: FSMContext):
-    user_id = callback.from_user.id
-    await state.set_state(EventCertificateForm.waiting_for_name)
-    await callback.message.edit_text(
-        f"{await t(user_id, 'event_certificate_form_title')}\n\n"
-        f"1/6 {await t(user_id, 'event_certificate_step1')}",
-        reply_markup=await get_back_next_keyboard(back_to="menu_event", next_disabled=True, user_id=user_id)
-    )
-
-
-@router.callback_query(F.data == "certificate_step2")
-async def back_to_name_from_position(callback: CallbackQuery, state: FSMContext):
-    user_id = callback.from_user.id
-    await state.set_state(EventCertificateForm.waiting_for_position)
-    await callback.message.edit_text(
-        f"2/6 {await t(user_id, 'event_certificate_step2')}",
-        reply_markup=await get_back_next_keyboard(back_to="certificate_step1", user_id=user_id)
-    )
-
-
-@router.callback_query(F.data == "certificate_step3")
-async def back_to_position_from_company(callback: CallbackQuery, state: FSMContext):
-    user_id = callback.from_user.id
-    await state.set_state(EventCertificateForm.waiting_for_company)
-    await callback.message.edit_text(
-        f"3/6 {await t(user_id, 'event_certificate_step3')}",
-        reply_markup=await get_back_next_keyboard(back_to="certificate_step2", user_id=user_id)
-    )
-
-
-@router.callback_query(F.data == "certificate_step4")
-async def back_to_company_from_legal(callback: CallbackQuery, state: FSMContext):
-    user_id = callback.from_user.id
-    await state.set_state(EventCertificateForm.waiting_for_company_legal)
-    await callback.message.edit_text(
-        f"4/6 {await t(user_id, 'event_certificate_step4')}",
-        reply_markup=await get_back_next_keyboard(back_to="certificate_step3", user_id=user_id)
-    )
-
-
-@router.callback_query(F.data == "certificate_step5")
-async def back_to_legal_from_addressee(callback: CallbackQuery, state: FSMContext):
-    user_id = callback.from_user.id
-    await state.set_state(EventCertificateForm.waiting_for_addressee)
-    await callback.message.edit_text(
-        f"5/6 {await t(user_id, 'event_certificate_step5')}",
-        reply_markup=await get_back_next_keyboard(back_to="certificate_step4", user_id=user_id)
-    )

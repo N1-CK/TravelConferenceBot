@@ -3198,55 +3198,216 @@ class Database:
             return 0
 
     async def get_user_conversations(self) -> list:
-        """Получить список всех активных чатов"""
+        """Получить список всех активных чатов (включая вопросы)"""
         try:
             async with self.pool.acquire() as conn:
-                # Сначала получаем последнее сообщение для каждого пользователя
-                rows = await conn.fetch(f"""
+                # Получаем обычные сообщения
+                messages = await conn.fetch(f"""
                     SELECT 
                         user_id,
                         username,
-                        last_message,
-                        last_message_time,
-                        unread_count
-                    FROM (
-                        SELECT 
-                            user_id,
-                            username,
-                            FIRST_VALUE(message_text) OVER (
-                                PARTITION BY user_id 
-                                ORDER BY created_at DESC
-                            ) as last_message,
-                            FIRST_VALUE(created_at) OVER (
-                                PARTITION BY user_id 
-                                ORDER BY created_at DESC
-                            ) as last_message_time,
-                            COUNT(*) FILTER (WHERE direction = 'incoming' AND read_at IS NULL) 
-                                OVER (PARTITION BY user_id) as unread_count,
-                            ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC) as rn
-                        FROM {self.db_schema}.user_messages
-                    ) t
-                    WHERE rn = 1
-                    ORDER BY last_message_time DESC NULLS LAST
+                        MAX(created_at) as last_message_time,
+                        STRING_AGG(message_text, ' ') as all_messages,
+                        COUNT(*) FILTER (WHERE direction = 'incoming' AND read_at IS NULL) as unread_count
+                    FROM {self.db_schema}.user_messages
+                    GROUP BY user_id, username
                 """)
-                return [dict(row) for row in rows]
+
+                # Получаем вопросы из PR таблицы
+                pr_questions = await conn.fetch(f"""
+                    SELECT 
+                        user_id,
+                        username,
+                        MAX(created_at) as last_message_time,
+                        STRING_AGG(question, ' ') as all_messages,
+                        0 as unread_count
+                    FROM {self.db_schema}.pr_questions
+                    GROUP BY user_id, username
+                """)
+
+                # Получаем вопросы из EVENT таблицы
+                event_questions = await conn.fetch(f"""
+                    SELECT 
+                        user_id,
+                        username,
+                        MAX(created_at) as last_message_time,
+                        STRING_AGG(question, ' ') as all_messages,
+                        0 as unread_count
+                    FROM {self.db_schema}.event_questions
+                    GROUP BY user_id, username
+                """)
+
+                # Получаем вопросы из TRAVEL таблицы
+                travel_questions = await conn.fetch(f"""
+                    SELECT 
+                        user_id,
+                        username,
+                        MAX(created_at) as last_message_time,
+                        STRING_AGG(question, ' ') as all_messages,
+                        0 as unread_count
+                    FROM {self.db_schema}.travel_questions
+                    GROUP BY user_id, username
+                """)
+
+                # Объединяем все источники
+                all_users = {}
+
+                for row in messages:
+                    user_id = row['user_id']
+                    if user_id not in all_users:
+                        all_users[user_id] = {
+                            'user_id': user_id,
+                            'username': row['username'],
+                            'last_message_time': row['last_message_time'],
+                            'last_message': row['all_messages'][:100] if row['all_messages'] else '',
+                            'unread_count': row['unread_count']
+                        }
+                    else:
+                        # Обновляем время последнего сообщения
+                        if row['last_message_time'] and (not all_users[user_id]['last_message_time'] or
+                                                         row['last_message_time'] > all_users[user_id][
+                                                             'last_message_time']):
+                            all_users[user_id]['last_message_time'] = row['last_message_time']
+                            all_users[user_id]['last_message'] = row['all_messages'][:100] if row[
+                                'all_messages'] else ''
+                        all_users[user_id]['unread_count'] += row['unread_count']
+
+                # Добавляем PR вопросы
+                for row in pr_questions:
+                    user_id = row['user_id']
+                    if user_id not in all_users:
+                        all_users[user_id] = {
+                            'user_id': user_id,
+                            'username': row['username'],
+                            'last_message_time': row['last_message_time'],
+                            'last_message': f"[Вопрос PR] {row['all_messages'][:80]}" if row[
+                                'all_messages'] else '[Вопрос PR]',
+                            'unread_count': row['unread_count']
+                        }
+                    else:
+                        if row['last_message_time'] and (not all_users[user_id]['last_message_time'] or
+                                                         row['last_message_time'] > all_users[user_id][
+                                                             'last_message_time']):
+                            all_users[user_id]['last_message_time'] = row['last_message_time']
+                            all_users[user_id]['last_message'] = f"[Вопрос PR] {row['all_messages'][:80]}" if row[
+                                'all_messages'] else '[Вопрос PR]'
+
+                # Добавляем EVENT вопросы
+                for row in event_questions:
+                    user_id = row['user_id']
+                    if user_id not in all_users:
+                        all_users[user_id] = {
+                            'user_id': user_id,
+                            'username': row['username'],
+                            'last_message_time': row['last_message_time'],
+                            'last_message': f"[Вопрос EVENT] {row['all_messages'][:80]}" if row[
+                                'all_messages'] else '[Вопрос EVENT]',
+                            'unread_count': row['unread_count']
+                        }
+                    else:
+                        if row['last_message_time'] and (not all_users[user_id]['last_message_time'] or
+                                                         row['last_message_time'] > all_users[user_id][
+                                                             'last_message_time']):
+                            all_users[user_id]['last_message_time'] = row['last_message_time']
+                            all_users[user_id]['last_message'] = f"[Вопрос EVENT] {row['all_messages'][:80]}" if row[
+                                'all_messages'] else '[Вопрос EVENT]'
+
+                # Добавляем TRAVEL вопросы
+                for row in travel_questions:
+                    user_id = row['user_id']
+                    if user_id not in all_users:
+                        all_users[user_id] = {
+                            'user_id': user_id,
+                            'username': row['username'],
+                            'last_message_time': row['last_message_time'],
+                            'last_message': f"[Вопрос TRAVEL] {row['all_messages'][:80]}" if row[
+                                'all_messages'] else '[Вопрос TRAVEL]',
+                            'unread_count': row['unread_count']
+                        }
+                    else:
+                        if row['last_message_time'] and (not all_users[user_id]['last_message_time'] or
+                                                         row['last_message_time'] > all_users[user_id][
+                                                             'last_message_time']):
+                            all_users[user_id]['last_message_time'] = row['last_message_time']
+                            all_users[user_id]['last_message'] = f"[Вопрос TRAVEL] {row['all_messages'][:80]}" if row[
+                                'all_messages'] else '[Вопрос TRAVEL]'
+
+                # Преобразуем в список и сортируем
+                result = list(all_users.values())
+                result.sort(key=lambda x: x.get('last_message_time') or datetime.min, reverse=True)
+
+                return result
         except Exception as e:
             logger.error(f"Error getting conversations: {e}")
             return []
 
     async def get_user_messages(self, user_id: int, limit: int = 50) -> list:
-        """Получить историю сообщений пользователя"""
+        """Получить историю сообщений пользователя (включая вопросы)"""
         try:
             async with self.pool.acquire() as conn:
-                rows = await conn.fetch(f"""
-                    SELECT id, user_id, username, manager_id, direction, 
-                           message_text, file_type, file_id, created_at, read_at
+                # Получаем обычные сообщения
+                messages = await conn.fetch(f"""
+                    SELECT 
+                        id, user_id, username, manager_id, direction, 
+                        message_text, file_type, file_id, created_at, read_at,
+                        'message' as source_type, NULL as category
                     FROM {self.db_schema}.user_messages
                     WHERE user_id = $1
-                    ORDER BY created_at DESC
-                    LIMIT $2
-                """, user_id, limit)
-                return [dict(row) for row in rows]
+                """, user_id)
+
+                # Получаем PR вопросы
+                pr_questions = await conn.fetch(f"""
+                    SELECT 
+                        id, user_id, username, NULL as manager_id,
+                        'incoming' as direction,
+                        question as message_text,
+                        NULL as file_type, NULL as file_id, created_at, NULL as read_at,
+                        'pr_question' as source_type, category
+                    FROM {self.db_schema}.pr_questions
+                    WHERE user_id = $1
+                """, user_id)
+
+                # Получаем EVENT вопросы
+                event_questions = await conn.fetch(f"""
+                    SELECT 
+                        id, user_id, username, NULL as manager_id,
+                        'incoming' as direction,
+                        question as message_text,
+                        NULL as file_type, NULL as file_id, created_at, NULL as read_at,
+                        'event_question' as source_type, category
+                    FROM {self.db_schema}.event_questions
+                    WHERE user_id = $1
+                """, user_id)
+
+                # Получаем TRAVEL вопросы
+                travel_questions = await conn.fetch(f"""
+                    SELECT 
+                        id, user_id, username, NULL as manager_id,
+                        'incoming' as direction,
+                        question as message_text,
+                        NULL as file_type, NULL as file_id, created_at, NULL as read_at,
+                        'travel_question' as source_type, category
+                    FROM {self.db_schema}.travel_questions
+                    WHERE user_id = $1
+                """, user_id)
+
+                # Объединяем все
+                all_messages = []
+                for row in messages:
+                    msg = dict(row)
+                    msg['category'] = None
+                    all_messages.append(msg)
+                for row in pr_questions:
+                    all_messages.append(dict(row))
+                for row in event_questions:
+                    all_messages.append(dict(row))
+                for row in travel_questions:
+                    all_messages.append(dict(row))
+
+                # Сортируем по времени
+                all_messages.sort(key=lambda x: x['created_at'], reverse=True)
+
+                return all_messages[:limit]
         except Exception as e:
             logger.error(f"Error getting messages: {e}")
             return []

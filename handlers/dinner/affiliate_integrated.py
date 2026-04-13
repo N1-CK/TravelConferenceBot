@@ -286,7 +286,7 @@ async def show_cities_list(call: CallbackQuery):
     )
 
     await call.message.edit_text(
-        "🏙 **Select city:**",
+        "🏙 *Select city:*",
         reply_markup=builder.as_markup(),
         parse_mode=ParseMode.MARKDOWN
     )
@@ -323,7 +323,7 @@ async def show_city_restaurants(call: CallbackQuery):
     )
 
     await call.message.edit_text(
-        f"🍽 **Restaurants in {city}:**",
+        f"🍽 *Restaurants in {city}:*",
         reply_markup=builder.as_markup(),
         parse_mode=ParseMode.MARKDOWN
     )
@@ -646,7 +646,7 @@ async def show_booking_confirmation(msg: Union[Message, CallbackQuery], state: F
     data = await state.get_data()
 
     confirmation_text = (
-        "📝 **Booking Confirmation**\n\n"
+        "📝 *Booking Confirmation*\n\n"
         f"👨‍💼 Manager: {data.get('manager', 'Not specified')}\n"
         f"📅 Date & Time: {data.get('datetime', 'Not specified')}\n"
         f"🏢 Partner Company: {data.get('company', 'Not specified')}\n"
@@ -747,7 +747,7 @@ async def show_my_bookings(call: CallbackQuery):
         await call.message.edit_text("No bookings yet", reply_markup=builder.as_markup())
         return
 
-    response = "📋 **Your bookings:**\n\n"
+    response = "📋 *Your bookings:*\n\n"
     for i, booking in enumerate(bookings, 1):
         response += (
             f"{i}. {booking['restaurant']}\n"

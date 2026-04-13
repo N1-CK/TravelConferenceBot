@@ -4,96 +4,18 @@
 
 {% block extra_css %}
 <style>
-    .broadcast-card {
-        background: white;
-        border-radius: 16px;
-        padding: 30px;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-    }
-    .counter {
-        font-size: 0.85rem;
-        color: #6c757d;
-        margin-top: 5px;
-    }
-    .counter.warning {
-        color: #dc3545;
-    }
-    .preview-card {
-        background: #f8f9fa;
-        border-radius: 12px;
-        padding: 15px;
-        margin-top: 20px;
-        border-left: 4px solid #667eea;
-    }
-    .file-upload-area {
-        border: 2px dashed #dee2e6;
-        border-radius: 12px;
-        padding: 20px;
-        text-align: center;
-        background: #f8f9fa;
-        cursor: pointer;
-        transition: all 0.3s;
-    }
-    .file-upload-area:hover {
-        border-color: #667eea;
-        background: #e8eaf6;
-    }
-    .file-upload-area i {
-        font-size: 2rem;
-        color: #667eea;
-    }
-    .selected-files {
-        margin-top: 15px;
-    }
-    .file-item {
-        display: flex;
-        align-items: center;
-        padding: 8px 12px;
-        background: #f8f9fa;
-        border-radius: 8px;
-        margin-bottom: 5px;
-    }
-    .file-item i {
-        margin-right: 10px;
-        color: #667eea;
-    }
-    .file-item .remove-file {
-        margin-left: auto;
-        cursor: pointer;
-        color: #dc3545;
-    }
-    .recipient-stats {
-        background: #e8f4fd;
-        border-radius: 10px;
-        padding: 12px 15px;
-        margin: 15px 0;
-    }
-    .user-list {
-        max-height: 300px;
-        overflow-y: auto;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 10px;
-        margin-top: 10px;
-    }
-    .user-item {
-        padding: 8px;
-        border-bottom: 1px solid #eee;
-    }
-    .user-item:last-child {
-        border-bottom: none;
-    }
-    .user-checkbox {
-        margin-right: 10px;
-    }
-    .select2-container--default .select2-selection--multiple {
-        border-radius: 8px;
-        border-color: #dee2e6;
-    }
-    .select2-container--default.select2-container--focus .select2-selection--multiple {
-        border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-    }
+    .broadcast-card { background: white; border-radius: 16px; padding: 30px; box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
+    .counter { font-size: 0.85rem; color: #6c757d; margin-top: 5px; }
+    .counter.warning { color: #dc3545; }
+    .preview-card { background: #f8f9fa; border-radius: 12px; padding: 15px; margin-top: 20px; border-left: 4px solid #667eea; }
+    .recipient-stats { background: #e8f4fd; border-radius: 10px; padding: 12px 15px; margin: 15px 0; }
+    .user-list { max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 8px; padding: 10px; margin-top: 10px; }
+    .user-item { padding: 8px; border-bottom: 1px solid #eee; }
+    .user-item:last-child { border-bottom: none; }
+    .user-checkbox { margin-right: 10px; }
+    .company-checkbox-group { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px; max-height: 200px; overflow-y: auto; padding: 10px; border: 1px solid #dee2e6; border-radius: 8px; background: #fafafa; }
+    .company-checkbox { display: flex; align-items: center; gap: 8px; min-width: 150px; }
+    .company-checkbox input { width: 18px; height: 18px; }
 </style>
 {% endblock %}
 
@@ -102,230 +24,115 @@
     <h2 class="mb-4">📨 Массовая рассылка</h2>
 
     <div class="broadcast-card">
-        <ul class="nav nav-tabs mb-4" id="broadcastTabs" role="tablist">
-            <li class="nav-item">
-                <button class="nav-link active" id="simple-tab" data-bs-toggle="tab" data-bs-target="#simple" type="button">
-                    Простая рассылка
-                </button>
-            </li>
-            <li class="nav-item">
-                <button class="nav-link" id="advanced-tab" data-bs-toggle="tab" data-bs-target="#advanced" type="button">
-                    Расширенная рассылка
-                </button>
-            </li>
-        </ul>
-
-        <div class="tab-content">
-            <!-- Простая рассылка -->
-            <div class="tab-pane fade show active" id="simple">
-                <form method="POST" action="/broadcast" id="broadcastForm" enctype="multipart/form-data">
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Тип рассылки:</label>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="target_type" id="targetAll" value="all" checked onclick="toggleCompanySelect()">
-                            <label class="form-check-label" for="targetAll">Всем пользователям</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="target_type" id="targetCompany" value="company" onclick="toggleCompanySelect()">
-                            <label class="form-check-label" for="targetCompany">По компаниям (множественный выбор)</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="target_type" id="targetSpecific" value="specific" onclick="toggleCompanySelect()">
-                            <label class="form-check-label" for="targetSpecific">Конкретным пользователям</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="target_type" id="targetConference" value="conference" onclick="toggleCompanySelect()">
-                            <label class="form-check-label" for="targetConference">По конференциям</label>
-                        </div>
-                    </div>
-
-                    <div class="mb-4" id="companyMultiSelect" style="display: none;">
-                        <label class="form-label fw-bold">Выберите компании:</label>
-                        <select class="form-select" name="companies" id="companySelect" multiple style="width: 100%">
-                            {% for company in companies %}
-                            <option value="{{ company }}">{{ company }}</option>
-                            {% endfor %}
-                        </select>
-                        <div class="mt-2">
-                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllCompanies()">Выбрать все</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllCompanies()">Очистить</button>
-                        </div>
-                        <div class="recipient-stats" id="companyStats" style="display: none;">
-                            <i class="bi bi-people"></i> <span id="companyRecipientCount">0</span> получателей
-                        </div>
-                    </div>
-
-                    <div class="mb-4" id="specificUsersSelect" style="display: none;">
-                        <label class="form-label fw-bold">Выберите пользователей:</label>
-                        <input type="text" class="form-control mb-2" id="userSearch" placeholder="Поиск по имени или username...">
-                        <div class="user-list" id="userList">
-                            {% for user in users %}
-                            <div class="user-item" data-username="{{ user.username }}" data-name="{{ user.full_name|default('') }}">
-                                <label>
-                                    <input type="checkbox" class="user-checkbox" name="selected_users" value="{{ user.user_id }}">
-                                    <strong>@{{ user.username }}</strong>
-                                    {% if user.full_name %}({{ user.full_name }}){% endif %}
-                                    {% if user.company %} - {{ user.company }}{% endif %}
-                                </label>
-                            </div>
-                            {% endfor %}
-                        </div>
-                        <div class="mt-2">
-                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllUsers()">Выбрать всех</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllUsers()">Очистить</button>
-                        </div>
-                        <div class="recipient-stats" id="userStats" style="display: none;">
-                            <i class="bi bi-people"></i> <span id="userRecipientCount">0</span> получателей
-                        </div>
-                    </div>
-
-                    <div class="mb-4" id="conferenceMultiSelect" style="display: none;">
-                        <label class="form-label fw-bold">Выберите конференции:</label>
-                        <select class="form-select" name="conferences" id="conferenceSelect" multiple style="width: 100%">
-                            {% for conference in conferences %}
-                            <option value="{{ conference.name }}">{{ conference.name }} ({{ conference.user_count }} участников)</option>
-                            {% endfor %}
-                        </select>
-                        <div class="recipient-stats" id="conferenceStats" style="display: none;">
-                            <i class="bi bi-people"></i> <span id="conferenceRecipientCount">0</span> получателей
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Сообщение:</label>
-                        <textarea class="form-control" name="message" rows="6" placeholder="Введите текст сообщения (можно использовать HTML разметку)" id="messageInput"></textarea>
-                        <div class="counter" id="charCounter">0 / 4000 символов</div>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Прикрепить файлы:</label>
-                        <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
-                            <i class="bi bi-cloud-upload"></i>
-                            <p class="mb-0 mt-2">Нажмите для выбора файлов или перетащите их сюда</p>
-                            <small class="text-muted">Максимум 10 файлов, каждый до 50 MB</small>
-                        </div>
-                        <input type="file" class="d-none" id="fileInput" name="files" multiple accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.xls,.xlsx,.txt">
-                        <div class="selected-files" id="selectedFiles"></div>
-                    </div>
-
-                    <div class="preview-card" id="preview" style="display: none;">
-                        <h6><i class="bi bi-eye"></i> Предпросмотр:</h6>
-                        <div id="previewText" class="mt-2"></div>
-                        <div id="previewFiles" class="mt-2"></div>
-                    </div>
-
-                    <div class="alert alert-warning">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        <strong>Внимание!</strong> Рассылка может занять некоторое время в зависимости от количества получателей.
-                    </div>
-
-                    <div class="d-flex justify-content-end gap-2">
-                        <a href="/" class="btn btn-secondary">Отмена</a>
-                        <button type="submit" class="btn btn-primary" id="submitBtn">
-                            <i class="bi bi-send"></i> Отправить рассылку
-                        </button>
-                    </div>
-                </form>
+        <form method="POST" action="/broadcast" id="broadcastForm" enctype="multipart/form-data">
+            <div class="mb-4">
+                <label class="form-label fw-bold">Тип рассылки:</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="target_type" id="targetAll" value="all" checked onclick="toggleSelects()">
+                    <label class="form-check-label" for="targetAll">Всем пользователям</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="target_type" id="targetCompany" value="company" onclick="toggleSelects()">
+                    <label class="form-check-label" for="targetCompany">По компаниям</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="target_type" id="targetSpecific" value="specific" onclick="toggleSelects()">
+                    <label class="form-check-label" for="targetSpecific">Конкретным пользователям</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="target_type" id="targetConference" value="conference" onclick="toggleSelects()">
+                    <label class="form-check-label" for="targetConference">По конференциям</label>
+                </div>
             </div>
 
-            <!-- Расширенная рассылка -->
-            <div class="tab-pane fade" id="advanced">
-                <form method="POST" action="/broadcast/advanced" id="advancedBroadcastForm" enctype="multipart/form-data">
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Фильтры получателей:</label>
-
-                        <div class="card mb-3">
-                            <div class="card-body">
-                                <h6 class="card-title">По конференциям</h6>
-                                <select class="form-select" name="filter_conferences" multiple style="width: 100%">
-                                    {% for conference in conferences %}
-                                    <option value="{{ conference.name }}">{{ conference.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="card mb-3">
-                            <div class="card-body">
-                                <h6 class="card-title">По компаниям</h6>
-                                <select class="form-select" name="filter_companies" multiple style="width: 100%">
-                                    {% for company in companies %}
-                                    <option value="{{ company }}">{{ company }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="card mb-3">
-                            <div class="card-body">
-                                <h6 class="card-title">По активности</h6>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="filter_active_today" value="1">
-                                    <label class="form-check-label">Были активны сегодня</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="filter_active_week" value="1">
-                                    <label class="form-check-label">Были активны за последнюю неделю</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="filter_has_requests" value="1">
-                                    <label class="form-check-label">Имеют заявки</label>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card mb-3">
-                            <div class="card-body">
-                                <h6 class="card-title">Пользовательский фильтр</h6>
-                                <textarea class="form-control" name="custom_filter" rows="3" placeholder='Пример: {"company": "CompanyA", "registered_after": "2024-01-01"}'></textarea>
-                                <small class="text-muted">JSON формат для расширенной фильтрации</small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Сообщение:</label>
-                        <textarea class="form-control" name="message" rows="6" placeholder="Введите текст сообщения"></textarea>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Прикрепить файлы:</label>
-                        <div class="file-upload-area" onclick="document.getElementById('advancedFileInput').click()">
-                            <i class="bi bi-cloud-upload"></i>
-                            <p class="mb-0 mt-2">Нажмите для выбора файлов</p>
-                        </div>
-                        <input type="file" class="d-none" id="advancedFileInput" name="files" multiple>
-                    </div>
-
-                    <div class="d-flex justify-content-end gap-2">
-                        <button type="button" class="btn btn-secondary" onclick="previewRecipients()">
-                            <i class="bi bi-search"></i> Предпросмотр получателей
-                        </button>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-send"></i> Отправить
-                        </button>
-                    </div>
-                </form>
+            <div class="mb-4" id="companyMultiSelect" style="display: none;">
+                <label class="form-label fw-bold">Выберите компании:</label>
+                <div class="company-checkbox-group" id="companyCheckboxes">
+                    {% for company in companies %}
+                    <label class="company-checkbox">
+                        <input type="checkbox" name="companies" value="{{ company }}" onchange="updateCompanyCount()">
+                        <span>{{ company }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <div class="mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllCompanies()">Выбрать все</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllCompanies()">Очистить</button>
+                </div>
+                <div class="recipient-stats" id="companyStats" style="display: none;">
+                    <i class="bi bi-people"></i> <span id="companyRecipientCount">0</span> получателей
+                </div>
             </div>
-        </div>
+
+            <div class="mb-4" id="specificUsersSelect" style="display: none;">
+                <label class="form-label fw-bold">Выберите пользователей:</label>
+                <input type="text" class="form-control mb-2" id="userSearch" placeholder="Поиск по имени или username...">
+                <div class="user-list" id="userList">
+                    {% for user in users %}
+                    <div class="user-item" data-username="{{ user.username }}" data-name="{{ user.full_name|default('') }}">
+                        <label>
+                            <input type="checkbox" class="user-checkbox" name="selected_users" value="{{ user.user_id }}" onchange="updateUserCount()">
+                            <strong>@{{ user.username }}</strong>
+                            {% if user.full_name %}({{ user.full_name }}){% endif %}
+                            {% if user.company %} - {{ user.company }}{% endif %}
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllUsers()">Выбрать всех</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllUsers()">Очистить</button>
+                </div>
+                <div class="recipient-stats" id="userStats" style="display: none;">
+                    <i class="bi bi-people"></i> <span id="userRecipientCount">0</span> получателей
+                </div>
+            </div>
+
+            <div class="mb-4" id="conferenceMultiSelect" style="display: none;">
+                <label class="form-label fw-bold">Выберите конференции:</label>
+                <div class="company-checkbox-group" id="conferenceCheckboxes">
+                    {% for conference in conferences %}
+                    <label class="company-checkbox">
+                        <input type="checkbox" name="conferences" value="{{ conference.name }}" onchange="updateConferenceCount()">
+                        <span>{{ conference.name }} ({{ conference.user_count }} участников)</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <div class="recipient-stats" id="conferenceStats" style="display: none;">
+                    <i class="bi bi-people"></i> <span id="conferenceRecipientCount">0</span> получателей
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Сообщение:</label>
+                <textarea class="form-control" name="message" rows="6" placeholder="Введите текст сообщения" id="messageInput"></textarea>
+                <div class="counter" id="charCounter">0 / 4000 символов</div>
+            </div>
+
+            <div class="preview-card" id="preview" style="display: none;">
+                <h6><i class="bi bi-eye"></i> Предпросмотр:</h6>
+                <div id="previewText" class="mt-2"></div>
+            </div>
+
+            <div class="alert alert-warning mt-3">
+                <i class="bi bi-exclamation-triangle"></i>
+                <strong>Внимание!</strong> Рассылка может занять некоторое время в зависимости от количества получателей.
+            </div>
+
+            <div class="d-flex justify-content-end gap-2">
+                <a href="/" class="btn btn-secondary">Отмена</a>
+                <button type="submit" class="btn btn-primary" id="submitBtn">
+                    <i class="bi bi-send"></i> Отправить рассылку
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-    $(document).ready(function() {
-        $('#companySelect, #conferenceSelect').select2({
-            placeholder: "Выберите...",
-            allowClear: true
-        });
-
-        $('#companySelect').on('change', updateCompanyRecipientCount);
-        $('#conferenceSelect').on('change', updateConferenceRecipientCount);
-    });
-
-    function toggleCompanySelect() {
+    function toggleSelects() {
         const targetCompany = document.getElementById('targetCompany').checked;
         const targetSpecific = document.getElementById('targetSpecific').checked;
         const targetConference = document.getElementById('targetConference').checked;
@@ -336,19 +143,23 @@
     }
 
     function selectAllCompanies() {
-        $('#companySelect option').prop('selected', true);
-        $('#companySelect').trigger('change');
+        document.querySelectorAll('#companyCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = true);
+        updateCompanyCount();
     }
 
     function deselectAllCompanies() {
-        $('#companySelect option').prop('selected', false);
-        $('#companySelect').trigger('change');
+        document.querySelectorAll('#companyCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
+        updateCompanyCount();
     }
 
-    function updateCompanyRecipientCount() {
-        const selected = $('#companySelect').val();
-        if (selected && selected.length) {
-            $.get('/api/users/count', { companies: selected.join(',') }, function(data) {
+    function updateCompanyCount() {
+        const selected = Array.from(document.querySelectorAll('#companyCheckboxes input[type="checkbox"]:checked')).map(cb => cb.value);
+        if (selected.length) {
+            fetch('/api/users/count', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ companies: selected })
+            }).then(res => res.json()).then(data => {
                 document.getElementById('companyStats').style.display = 'block';
                 document.getElementById('companyRecipientCount').textContent = data.count;
             });
@@ -377,9 +188,21 @@
         }
     }
 
-    document.querySelectorAll('.user-checkbox').forEach(cb => {
-        cb.addEventListener('change', updateUserCount);
-    });
+    function updateConferenceCount() {
+        const selected = Array.from(document.querySelectorAll('#conferenceCheckboxes input[type="checkbox"]:checked')).map(cb => cb.value);
+        if (selected.length) {
+            fetch('/api/users/count', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ conferences: selected })
+            }).then(res => res.json()).then(data => {
+                document.getElementById('conferenceStats').style.display = 'block';
+                document.getElementById('conferenceRecipientCount').textContent = data.count;
+            });
+        } else {
+            document.getElementById('conferenceStats').style.display = 'none';
+        }
+    }
 
     document.getElementById('userSearch').addEventListener('input', function(e) {
         const term = e.target.value.toLowerCase();
@@ -390,50 +213,10 @@
         });
     });
 
-    function updateConferenceRecipientCount() {
-        const selected = $('#conferenceSelect').val();
-        if (selected && selected.length) {
-            $.get('/api/users/count', { conferences: selected.join(',') }, function(data) {
-                document.getElementById('conferenceStats').style.display = 'block';
-                document.getElementById('conferenceRecipientCount').textContent = data.count;
-            });
-        } else {
-            document.getElementById('conferenceStats').style.display = 'none';
-        }
-    }
-
-    // File handling
-    document.getElementById('fileInput').addEventListener('change', function(e) {
-        const container = document.getElementById('selectedFiles');
-        container.innerHTML = '';
-        Array.from(this.files).forEach((file, index) => {
-            const div = document.createElement('div');
-            div.className = 'file-item';
-            div.innerHTML = `
-                <i class="bi bi-file-earmark"></i>
-                <span>${file.name} (${(file.size / 1024).toFixed(1)} KB)</span>
-                <span class="remove-file" onclick="removeFile(${index})">
-                    <i class="bi bi-x-circle"></i>
-                </span>
-            `;
-            container.appendChild(div);
-        });
-    });
-
-    function removeFile(index) {
-        const input = document.getElementById('fileInput');
-        const dt = new DataTransfer();
-        Array.from(input.files).forEach((file, i) => { if (i !== index) dt.items.add(file); });
-        input.files = dt.files;
-        input.dispatchEvent(new Event('change'));
-    }
-
-    // Character counter and preview
     const messageInput = document.getElementById('messageInput');
     const charCounter = document.getElementById('charCounter');
     const preview = document.getElementById('preview');
     const previewText = document.getElementById('previewText');
-    const previewFiles = document.getElementById('previewFiles');
 
     messageInput.addEventListener('input', function() {
         const len = this.value.length;
@@ -444,14 +227,11 @@
         if (len > 0) {
             preview.style.display = 'block';
             previewText.innerHTML = this.value.replace(/\n/g, '<br>');
-            const files = document.getElementById('fileInput').files;
-            previewFiles.innerHTML = files.length ? `<br><i class="bi bi-paperclip"></i> Прикреплено файлов: ${files.length}` : '';
         } else {
             preview.style.display = 'none';
         }
     });
 
-    // Submit confirmation
     document.getElementById('broadcastForm').addEventListener('submit', function(e) {
         const message = messageInput.value.trim();
         const targetType = document.querySelector('input[name="target_type"]:checked').value;
@@ -460,40 +240,22 @@
         if (targetType === 'all') {
             confirmText += 'ВСЕМ пользователям?';
         } else if (targetType === 'company') {
-            const companies = $('#companySelect').val();
-            if (!companies || !companies.length) {
-                alert('Выберите хотя бы одну компанию!');
-                e.preventDefault();
-                return;
-            }
+            const companies = Array.from(document.querySelectorAll('#companyCheckboxes input:checked')).map(cb => cb.value);
+            if (!companies.length) { alert('Выберите хотя бы одну компанию!'); e.preventDefault(); return; }
             confirmText += `пользователям компаний: ${companies.join(', ')}?`;
         } else if (targetType === 'specific') {
             const selected = document.querySelectorAll('.user-checkbox:checked').length;
-            if (!selected) {
-                alert('Выберите хотя бы одного пользователя!');
-                e.preventDefault();
-                return;
-            }
+            if (!selected) { alert('Выберите хотя бы одного пользователя!'); e.preventDefault(); return; }
             confirmText += `${selected} выбранным пользователям?`;
         } else if (targetType === 'conference') {
-            const conferences = $('#conferenceSelect').val();
-            if (!conferences || !conferences.length) {
-                alert('Выберите хотя бы одну конференцию!');
-                e.preventDefault();
-                return;
-            }
+            const conferences = Array.from(document.querySelectorAll('#conferenceCheckboxes input:checked')).map(cb => cb.value);
+            if (!conferences.length) { alert('Выберите хотя бы одну конференцию!'); e.preventDefault(); return; }
             confirmText += `участникам конференций: ${conferences.join(', ')}?`;
         }
 
         if (!confirm(confirmText)) e.preventDefault();
     });
 
-    function previewRecipients() {
-        $.get('/api/users/preview', function(data) {
-            alert(`Будет отправлено ${data.count} пользователям`);
-        });
-    }
-
-    toggleCompanySelect();
+    toggleSelects();
 </script>
 {% endblock %}
