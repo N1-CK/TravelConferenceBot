@@ -355,6 +355,13 @@ COMMON_TEXTS = {
         'no_flights': "❌ Информация о рейсах для этой конференции не найдена.",
         'no_hotel': "❌ Информация об отеле для этой конференции не найдена.",
 
+        'multiple_companies_found': "🔍 Найдено несколько компаний. Выберите одну:",
+        'company_not_found': "Компания '{company}' не найдена в списке.\n\nЕсли это правильное название, нажмите подтвердить.\nИначе нажмите «Повторить ввод» и укажите компанию заново:",
+        'multiple_companies_with_input': "🔍 Найдено несколько компаний. Выберите одну или подтвердите свой вариант:\n\nВаш ввод: {company_input}",
+        'company_not_found_simple': "Компания '{company}' не найдена в списке.\n\nЕсли это правильное название, нажмите подтвердить.\nИначе введите название заново:",
+        'confirm_company': "✅ Подтвердить '{company}'",
+        'retry_input': "🔄 Повторить ввод",
+        'ask_company_prompt': "Укажите название вашей компании / партнерской программы:",
     },
     'en': {
         # ============================================
@@ -713,6 +720,14 @@ COMMON_TEXTS = {
         'hotel_info_title': "🏨 Hotel Information\n\nSelect the conference:",
         'no_flights': "❌ No flight information found for this conference.",
         'no_hotel': "❌ Hotel information not found for this conference.",
+
+        'multiple_companies_found': "🔍 Multiple companies found. Select one:",
+        'company_not_found': "Company '{company}' not found in the list.\n\nIf this is the correct name, click confirm.\nOtherwise click 'Retry input' and enter the company name again:",
+        'multiple_companies_with_input': "🔍 Multiple companies found. Select one or confirm your input:\n\nYour input: {company_input}",
+        'company_not_found_simple': "Company '{company}' not found in the list.\n\nIf this is the correct name, click confirm.\nOtherwise enter the company name again:",
+        'confirm_company': "✅ Confirm '{company}'",
+        'retry_input': "🔄 Retry input",
+        'ask_company_prompt': "Enter your company/partner program name:",
 
     }
 }

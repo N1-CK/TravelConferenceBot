@@ -76,10 +76,19 @@ async def cmd_start(message: Message, state: FSMContext):
 @router.callback_query(F.data.startswith("lang_"), RegistrationStates.waiting_for_language)
 async def process_language_choice(callback: CallbackQuery, state: FSMContext):
     lang = callback.data.split("_")[1]
+    user_id = callback.from_user.id
+    username = callback.from_user.username
+
+    # Сохраняем язык в state
     await state.update_data(language=lang)
-    await callback.message.edit_text(await t(callback.from_user.id, 'language_selected'))
+
+    # Сохраняем язык в БД сразу, чтобы t() мог его использовать
+    await db.save_user_language(user_id, username, lang)
+
+    # Используем синхронную версию для гарантии правильного языка
+    await callback.message.edit_text(get_text_sync(lang, 'language_selected'))
     await state.set_state(RegistrationStates.waiting_for_fullname)
-    await callback.message.answer(await t(callback.from_user.id, 'ask_fullname'))
+    await callback.message.answer(get_text_sync(lang, 'ask_fullname'))
     await callback.answer()
 
 
@@ -117,42 +126,34 @@ async def process_company(message: Message, state: FSMContext):
     matches = await db.search_companies_by_prefix(company_input)
 
     if len(matches) == 1:
-        # Точное совпадение
         await complete_registration(message, state, matches[0])
 
     elif len(matches) > 1:
-        # Несколько совпадений - показываем кнопки
         builder = InlineKeyboardBuilder()
         for comp in matches:
             builder.row(InlineKeyboardButton(text=comp, callback_data=f"reg_company_{comp}"))
-        builder.row(InlineKeyboardButton(text="✏️ Ввести вручную", callback_data="reg_company_manual"))
 
         await state.update_data(manual_company=company_input)
         await message.answer(
-            "🔍 Найдено несколько компаний. Выберите одну:",
+            await t(message.from_user.id, 'multiple_companies_found'),  # ← локализовано
             reply_markup=builder.as_markup()
         )
-
     else:
-        # Нет совпадений
         builder = InlineKeyboardBuilder()
         builder.row(InlineKeyboardButton(
-            text=f"✅ Подтвердить '{company_input}'",
+            text=await t(message.from_user.id, 'confirm_company', company=company_input),  # ← локализовано
             callback_data=f"reg_company_confirm_{company_input}"
         ))
         builder.row(InlineKeyboardButton(
-            text="📋 Выбрать из списка",
-            callback_data="reg_company_show_list"
+            text=await t(message.from_user.id, 'retry_input'),  # ← локализовано
+            callback_data="reg_company_retry"
         ))
 
         await state.update_data(manual_company=company_input)
         await message.answer(
-            f"Компания '{company_input}' не найдена в списке.\n\n"
-            f"Если это правильное название, нажмите подтвердить.\n"
-            f"Иначе выберите из списка:",
+            await t(message.from_user.id, 'company_not_found', company=company_input),  # ← локализовано
             reply_markup=builder.as_markup()
         )
-
 
 @router.message(RegistrationStates.waiting_for_company)
 async def process_company(message: Message, state: FSMContext):
@@ -162,41 +163,41 @@ async def process_company(message: Message, state: FSMContext):
         await message.answer(await t(message.from_user.id, 'error_invalid_company'))
         return
 
-    # Ищем компании по префиксу
     matches = await db.search_companies_by_prefix(company_input)
-
-    # Сохраняем введенное значение
     await state.update_data(manual_company=company_input)
 
     if matches:
-        # Найдены совпадения - показываем кнопки
         builder = InlineKeyboardBuilder()
-        for comp in matches[:10]:  # Не более 10 вариантов
+        for comp in matches[:10]:
             builder.row(InlineKeyboardButton(text=comp, callback_data=f"reg_company_{comp}"))
         builder.row(InlineKeyboardButton(
-            text=f"✅ Подтвердить '{company_input}'",
+            text=await t(message.from_user.id, 'confirm_company', company=company_input),  # ← локализовано
             callback_data=f"reg_company_confirm_{company_input}"
         ))
 
         await message.answer(
-            f"🔍 Найдено несколько компаний. Выберите одну или подтвердите свой вариант:\n\n"
-            f"Ваш ввод: {company_input}",
+            await t(message.from_user.id, 'multiple_companies_with_input', company_input=company_input),  # ← локализовано
             reply_markup=builder.as_markup()
         )
     else:
-        # Нет совпадений - только подтверждение
         builder = InlineKeyboardBuilder()
         builder.row(InlineKeyboardButton(
-            text=f"✅ Подтвердить '{company_input}'",
+            text=await t(message.from_user.id, 'confirm_company', company=company_input),  # ← локализовано
             callback_data=f"reg_company_confirm_{company_input}"
         ))
 
         await message.answer(
-            f"Компания '{company_input}' не найдена в списке.\n\n"
-            f"Если это правильное название, нажмите подтвердить.\n"
-            f"Иначе введите название заново:",
+            await t(message.from_user.id, 'company_not_found_simple', company=company_input),  # ← локализовано
             reply_markup=builder.as_markup()
         )
+
+@router.callback_query(F.data == "reg_company_retry")
+async def retry_company_input(callback: CallbackQuery, state: FSMContext):
+    """Позволяет пользователю заново ввести название компании"""
+    await callback.message.delete()  # Удаляем сообщение с кнопками
+    await state.set_state(RegistrationStates.waiting_for_company)
+    await callback.message.answer(await t(callback.from_user.id, 'ask_company'))
+    await callback.answer()
 
 
 @router.callback_query(F.data.startswith("reg_company_"))

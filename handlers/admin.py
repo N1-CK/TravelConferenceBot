@@ -31,7 +31,7 @@ async def is_admin(user_id: int) -> bool:
     try:
         async with db.pool.acquire() as conn:
             result = await conn.fetchval(
-                f"SELECT 1 FROM {db.db_schema}.admins WHERE user_id = $1",
+                f"SELECT 1 FROM {db.db_schema_admin}.admins WHERE user_id = $1",
                 user_id
             )
             return bool(result) or (user_id in admins)
@@ -78,8 +78,8 @@ async def show_stats(callback: CallbackQuery):
             """)
 
             # Статистика по заявкам
-            banner_requests = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema}.pr_banner_requests")
-            business_cards = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema}.pr_business_cards")
+            banner_requests = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema_pr}.pr_banner_requests")
+            business_cards = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema_pr}.pr_business_cards")
             visa_requests = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema}.travel_visa_requests")
 
             stats_text = (

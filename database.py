@@ -138,7 +138,7 @@ class Database:
 
                     # PR таблицы
                     f'''
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.pr_banner_requests (
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_pr}.pr_banner_requests (
                         id SERIAL PRIMARY KEY,
                         username TEXT,
                         user_id BIGINT,
@@ -273,7 +273,7 @@ class Database:
                     ''',
 
                     f'''
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.pr_business_cards (
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_pr}.pr_business_cards (
                         id SERIAL PRIMARY KEY,
                         username TEXT,
                         user_id BIGINT,
@@ -380,7 +380,7 @@ class Database:
                 ]
 
                 await conn.execute(f"""
-                                CREATE TABLE IF NOT EXISTS {self.db_schema}.admin_users (
+                                CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.admin_users (
                                     id SERIAL PRIMARY KEY,
                                     username TEXT UNIQUE NOT NULL,
                                     password_hash TEXT NOT NULL,
@@ -411,9 +411,9 @@ class Database:
 
                 # Таблица сессий админки
                 await conn.execute(f"""
-                                CREATE TABLE IF NOT EXISTS {self.db_schema}.admin_sessions (
+                                CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.admin_sessions (
                                     id SERIAL PRIMARY KEY,
-                                    admin_id INTEGER REFERENCES {self.db_schema}.admin_users(id),
+                                    admin_id INTEGER REFERENCES {self.db_schema_admin}.admin_users(id),
                                     session_token TEXT UNIQUE,
                                     ip_address TEXT,
                                     user_agent TEXT,
@@ -424,9 +424,9 @@ class Database:
 
                 # Таблица логов действий админов
                 await conn.execute(f"""
-                                CREATE TABLE IF NOT EXISTS {self.db_schema}.admin_logs (
+                                CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.admin_logs (
                                     id SERIAL PRIMARY KEY,
-                                    admin_id INTEGER REFERENCES {self.db_schema}.admin_users(id),
+                                    admin_id INTEGER REFERENCES {self.db_schema_admin}.admin_users(id),
                                     action TEXT NOT NULL,
                                     details JSONB,
                                     ip_address TEXT,
@@ -467,7 +467,7 @@ class Database:
                 password_hash = sha256(default_pass.encode()).hexdigest()
 
                 await conn.execute(f"""
-                                INSERT INTO {self.db_schema}.admin_users 
+                                INSERT INTO {self.db_schema_admin}.admin_users 
                                 (username, password_hash, full_name, role, can_manage_users, can_broadcast, can_view_stats, can_manage_conferences)
                                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                                 ON CONFLICT (username) DO NOTHING
@@ -703,7 +703,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.pr_banner_requests 
+                    INSERT INTO {self.db_schema_pr}.pr_banner_requests 
                     (username, user_id, full_name, position, company, language, photo_required, photo_file_id)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 """,
@@ -726,7 +726,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.pr_business_cards 
+                    INSERT INTO {self.db_schema_pr}.pr_business_cards 
                     (username, user_id, full_name, position_en, company, contacts, brand_style)
                     VALUES ($1, $2, $3, $4, $5, $6, $7)
                 """,
@@ -886,6 +886,21 @@ class Database:
         except Exception as e:
             logger.error(f"Error saving ticket request: {e}")
             return False, None
+
+    async def save_user_language(self, user_id: int, username: str, language: str) -> bool:
+        """Сохранить язык пользователя"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    INSERT INTO {self.db_schema_config}.user_profiles (user_id, username, language, updated_at)
+                    VALUES ($1, $2, $3, NOW())
+                    ON CONFLICT (user_id) 
+                    DO UPDATE SET language = EXCLUDED.language, updated_at = NOW()
+                """, user_id, username, language)
+            return True
+        except Exception as e:
+            logger.error(f"Error saving user language: {e}")
+            return False
 
     async def save_flight_request(self, flight_data: Dict) -> bool:
         """Save flight request to database"""
@@ -1576,7 +1591,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 # Проверяем, существует ли уже
                 exists = await conn.fetchval(f"""
-                    SELECT id FROM {self.db_schema}.admin_users WHERE username = $1
+                    SELECT id FROM {self.db_schema_admin}.admin_users WHERE username = $1
                 """, username)
 
                 if exists:
@@ -1584,7 +1599,7 @@ class Database:
 
                 perms = permissions or {}
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.admin_users 
+                    INSERT INTO {self.db_schema_admin}.admin_users 
                     (username, password_hash, full_name, role, 
                      can_manage_users, can_broadcast, can_view_stats, can_manage_conferences)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -1610,14 +1625,14 @@ class Database:
                     SELECT id, username, full_name, role, 
                            can_manage_users, can_broadcast, can_view_stats, can_manage_conferences,
                            is_active
-                    FROM {self.db_schema}.admin_users 
+                    FROM {self.db_schema_admin}.admin_users 
                     WHERE username = $1 AND password_hash = $2 AND is_active = TRUE
                 """, username, password_hash)
 
                 if admin:
                     # Обновляем время последнего входа
                     await conn.execute(f"""
-                        UPDATE {self.db_schema}.admin_users 
+                        UPDATE {self.db_schema_admin}.admin_users 
                         SET last_login = NOW() 
                         WHERE id = $1
                     """, admin['id'])
@@ -1647,7 +1662,7 @@ class Database:
                     SELECT id, username, full_name, role, 
                            can_manage_users, can_broadcast, can_view_stats, can_manage_conferences,
                            created_at, last_login, is_active
-                    FROM {self.db_schema}.admin_users
+                    FROM {self.db_schema_admin}.admin_users
                     ORDER BY id
                 """)
                 return [dict(row) for row in rows]
@@ -1678,7 +1693,7 @@ class Database:
                 if set_clauses:
                     values.append(admin_id)
                     query = f"""
-                        UPDATE {self.db_schema}.admin_users 
+                        UPDATE {self.db_schema_admin}.admin_users 
                         SET {', '.join(set_clauses)}
                         WHERE id = ${i}
                     """
@@ -1694,7 +1709,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 await conn.execute(f"""
-                    DELETE FROM {self.db_schema}.admin_users WHERE id = $1
+                    DELETE FROM {self.db_schema_admin}.admin_users WHERE id = $1
                 """, admin_id)
                 return True
         except Exception as e:
@@ -1745,7 +1760,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.admin_logs 
+                    INSERT INTO {self.db_schema_admin}.admin_logs 
                     (admin_id, action, details, ip_address)
                     VALUES ($1, $2, $3, $4)
                 """, admin_id, action, details or {}, ip_address)
@@ -1760,7 +1775,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 admin = await conn.fetchrow(f"""
                     SELECT role, can_manage_users, can_broadcast, can_view_stats, can_manage_conferences
-                    FROM {self.db_schema}.admin_users
+                    FROM {self.db_schema_admin}.admin_users
                     WHERE id = $1 AND is_active = TRUE
                 """, admin_id)
 
@@ -1809,7 +1824,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
-                    SELECT * FROM {self.db_schema}.pr_banner_requests 
+                    SELECT * FROM {self.db_schema_pr}.pr_banner_requests 
                     ORDER BY created_at DESC
                 """)
                 return [dict(row) for row in rows]
@@ -1856,15 +1871,6 @@ class Database:
                     )
                 """)
 
-                # Таблица связи групп с функциями
-                await conn.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.group_features (
-                        group_id INTEGER NOT NULL REFERENCES {self.db_schema}.user_groups(id) ON DELETE CASCADE,
-                        feature_id INTEGER NOT NULL REFERENCES {self.db_schema}.features(id) ON DELETE CASCADE,
-                        created_at TIMESTAMP DEFAULT NOW(),
-                        PRIMARY KEY (group_id, feature_id)
-                    )
-                """)
 
                 # Добавить базовые функции, если их нет
                 basic_features = [
@@ -1889,173 +1895,6 @@ class Database:
         except Exception as e:
             logger.error(f"Error creating groups tables: {e}")
             return False
-
-    async def get_all_groups(self) -> list:
-        """Получить все группы с количеством пользователей и функций"""
-        try:
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(f"""
-                    SELECT 
-                        g.*,
-                        COUNT(DISTINCT ugm.user_id) as users_count,
-                        COUNT(DISTINCT gf.feature_id) as features_count
-                    FROM {self.db_schema}.user_groups g
-                    LEFT JOIN {self.db_schema}.user_group_membership ugm ON g.id = ugm.group_id
-                    LEFT JOIN {self.db_schema}.group_features gf ON g.id = gf.group_id
-                    GROUP BY g.id
-                    ORDER BY g.name
-                """)
-
-                groups = []
-                for row in rows:
-                    group = dict(row)
-                    # Получаем функции группы
-                    features = await conn.fetch(f"""
-                        SELECT f.* 
-                        FROM {self.db_schema}.features f
-                        JOIN {self.db_schema}.group_features gf ON f.id = gf.feature_id
-                        WHERE gf.group_id = $1
-                    """, row['id'])
-                    group['features'] = [dict(f) for f in features]
-                    groups.append(group)
-
-                return groups
-        except Exception as e:
-            logger.error(f"Error getting groups: {e}")
-            return []
-
-    async def get_group(self, group_id: int) -> dict:
-        """Получить информацию о группе"""
-        try:
-            async with self.pool.acquire() as conn:
-                row = await conn.fetchrow(f"""
-                    SELECT * FROM {self.db_schema}.user_groups WHERE id = $1
-                """, group_id)
-                return dict(row) if row else {}
-        except Exception as e:
-            logger.error(f"Error getting group: {e}")
-            return {}
-
-    async def add_group(self, name: str, description: str = None, color: str = '#667eea') -> bool:
-        """Добавить новую группу"""
-        try:
-            async with self.pool.acquire() as conn:
-                await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.user_groups (name, description, color)
-                    VALUES ($1, $2, $3)
-                """, name, description, color)
-                return True
-        except Exception as e:
-            logger.error(f"Error adding group: {e}")
-            return False
-
-    async def update_group(self, group_id: int, name: str = None,
-                           description: str = None, color: str = None) -> bool:
-        """Обновить информацию о группе"""
-        try:
-            async with self.pool.acquire() as conn:
-                updates = []
-                values = []
-                i = 1
-
-                if name is not None:
-                    updates.append(f"name = ${i}")
-                    values.append(name)
-                    i += 1
-                if description is not None:
-                    updates.append(f"description = ${i}")
-                    values.append(description)
-                    i += 1
-                if color is not None:
-                    updates.append(f"color = ${i}")
-                    values.append(color)
-                    i += 1
-
-                updates.append("updated_at = NOW()")
-
-                if updates:
-                    values.append(group_id)
-                    query = f"""
-                        UPDATE {self.db_schema}.user_groups 
-                        SET {', '.join(updates)}
-                        WHERE id = ${i}
-                    """
-                    await conn.execute(query, *values)
-
-                return True
-        except Exception as e:
-            logger.error(f"Error updating group: {e}")
-            return False
-
-    async def delete_group(self, group_id: int) -> bool:
-        """Удалить группу"""
-        try:
-            async with self.pool.acquire() as conn:
-                await conn.execute(f"""
-                    DELETE FROM {self.db_schema}.user_groups WHERE id = $1
-                """, group_id)
-                return True
-        except Exception as e:
-            logger.error(f"Error deleting group: {e}")
-            return False
-
-    async def get_group_users(self, group_id: int) -> list:
-        """Получить пользователей группы"""
-        try:
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(f"""
-                    SELECT up.user_id, up.username, up.full_name, up.company
-                    FROM {self.db_schema_config}.user_profiles up
-                    JOIN {self.db_schema}.user_group_membership ugm ON up.user_id = ugm.user_id
-                    WHERE ugm.group_id = $1
-                    ORDER BY up.username
-                """, group_id)
-                return [dict(row) for row in rows]
-        except Exception as e:
-            logger.error(f"Error getting group users: {e}")
-            return []
-
-    async def add_user_to_group(self, user_id: int, group_id: int) -> bool:
-        """Добавить пользователя в группу"""
-        try:
-            async with self.pool.acquire() as conn:
-                await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.user_group_membership (user_id, group_id)
-                    VALUES ($1, $2)
-                    ON CONFLICT DO NOTHING
-                """, user_id, group_id)
-                return True
-        except Exception as e:
-            logger.error(f"Error adding user to group: {e}")
-            return False
-
-    async def remove_user_from_group(self, user_id: int, group_id: int) -> bool:
-        """Удалить пользователя из группы"""
-        try:
-            async with self.pool.acquire() as conn:
-                await conn.execute(f"""
-                    DELETE FROM {self.db_schema}.user_group_membership
-                    WHERE user_id = $1 AND group_id = $2
-                """, user_id, group_id)
-                return True
-        except Exception as e:
-            logger.error(f"Error removing user from group: {e}")
-            return False
-
-    async def get_user_groups(self, user_id: int) -> list:
-        """Получить группы пользователя"""
-        try:
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(f"""
-                    SELECT g.*
-                    FROM {self.db_schema}.user_groups g
-                    JOIN {self.db_schema}.user_group_membership ugm ON g.id = ugm.group_id
-                    WHERE ugm.user_id = $1
-                """, user_id)
-                return [dict(row) for row in rows]
-        except Exception as e:
-            logger.error(f"Error getting user groups: {e}")
-            return []
 
     async def get_all_features(self) -> list:
         """Получить все доступные функции"""
@@ -2100,44 +1939,6 @@ class Database:
             logger.error(f"Error deleting feature: {e}")
             return False
 
-    async def assign_features_to_group(self, group_id: int, feature_ids: list) -> bool:
-        """Назначить функции группе"""
-        try:
-            async with self.pool.acquire() as conn:
-                # Удаляем старые связи
-                await conn.execute(f"""
-                    DELETE FROM {self.db_schema}.group_features
-                    WHERE group_id = $1
-                """, group_id)
-
-                # Добавляем новые
-                for feature_id in feature_ids:
-                    await conn.execute(f"""
-                        INSERT INTO {self.db_schema}.group_features (group_id, feature_id)
-                        VALUES ($1, $2)
-                        ON CONFLICT DO NOTHING
-                    """, group_id, feature_id)
-
-                return True
-        except Exception as e:
-            logger.error(f"Error assigning features to group: {e}")
-            return False
-
-    async def get_group_features(self, group_id: int) -> list:
-        """Получить функции группы"""
-        try:
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(f"""
-                    SELECT f.*
-                    FROM {self.db_schema}.features f
-                    JOIN {self.db_schema}.group_features gf ON f.id = gf.feature_id
-                    WHERE gf.group_id = $1
-                """, group_id)
-                return [dict(row) for row in rows]
-        except Exception as e:
-            logger.error(f"Error getting group features: {e}")
-            return []
-
     async def get_all_companies_from_config(self) -> list:
         """Получить список всех компаний из конфига"""
         try:
@@ -2167,52 +1968,6 @@ class Database:
             logger.error(f"Error searching companies: {e}")
             return []
 
-    async def get_all_users_with_groups(self) -> list:
-        """Получить всех пользователей с их группами и функциями"""
-        try:
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(f"""
-                    SELECT 
-                        up.user_id,
-                        up.username,
-                        up.full_name,
-                        up.company,
-                        up.position
-                    FROM {self.db_schema_config}.user_profiles up
-                    ORDER BY up.username
-                """)
-
-                users = []
-                for row in rows:
-                    user = dict(row)
-
-                    # Получаем группы пользователя
-                    groups = await conn.fetch(f"""
-                        SELECT g.*
-                        FROM {self.db_schema}.user_groups g
-                        JOIN {self.db_schema}.user_group_membership ugm ON g.id = ugm.group_id
-                        WHERE ugm.user_id = $1
-                    """, user['user_id'])
-                    user['groups'] = [dict(g) for g in groups]
-                    user['group_ids'] = [g['id'] for g in groups]
-
-                    # Получаем функции пользователя (через группы)
-                    features = await conn.fetch(f"""
-                        SELECT DISTINCT f.*
-                        FROM {self.db_schema}.features f
-                        JOIN {self.db_schema}.group_features gf ON f.id = gf.feature_id
-                        JOIN {self.db_schema}.user_group_membership ugm ON gf.group_id = ugm.group_id
-                        WHERE ugm.user_id = $1
-                    """, user['user_id'])
-                    user['features'] = [dict(f) for f in features]
-
-                    users.append(user)
-
-                return users
-        except Exception as e:
-            logger.error(f"Error getting users with groups: {e}")
-            return []
-
     async def get_all_users_basic(self) -> list:
         """Получить базовую информацию о всех пользователях"""
         try:
@@ -2227,31 +1982,13 @@ class Database:
             logger.error(f"Error getting users basic: {e}")
             return []
 
-    async def user_has_feature(self, user_id: int, feature_code: str) -> bool:
-        """Проверить, имеет ли пользователь доступ к функции"""
-        try:
-            async with self.pool.acquire() as conn:
-                result = await conn.fetchval(f"""
-                    SELECT 1
-                    FROM {self.db_schema}.user_group_membership ugm
-                    JOIN {self.db_schema}.group_features gf ON ugm.group_id = gf.group_id
-                    JOIN {self.db_schema}.features f ON gf.feature_id = f.id
-                    WHERE ugm.user_id = $1 AND f.code = $2
-                    LIMIT 1
-                """, user_id, feature_code)
-                return bool(result)
-        except Exception as e:
-            logger.error(f"Error checking user feature: {e}")
-            return False
-
-    # Добавить в класс Database после метода get_all_certificates():
 
     async def get_all_business_cards(self) -> list:
         """Получить все заявки на визитки"""
         try:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
-                    SELECT * FROM {self.db_schema}.pr_business_cards 
+                    SELECT * FROM {self.db_schema_pr}.pr_business_cards 
                     ORDER BY created_at DESC
                 """)
                 return [dict(row) for row in rows]
@@ -2369,7 +2106,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 await conn.execute(f"""
-                    UPDATE {self.db_schema}.pr_banner_requests 
+                    UPDATE {self.db_schema_pr}.pr_banner_requests 
                     SET status = $1, updated_at = NOW()
                     WHERE id = $2
                 """, status, request_id)
@@ -2424,7 +2161,7 @@ class Database:
                 """)
 
                 banner_requests = await conn.fetchval(f"""
-                    SELECT COUNT(*) FROM {self.db_schema}.pr_banner_requests
+                    SELECT COUNT(*) FROM {self.db_schema_pr}.pr_banner_requests
                 """) or 0
 
                 visa_requests = await conn.fetchval(f"""
@@ -2612,10 +2349,16 @@ class Database:
                     requests_count = 0
                     for table in ['pr_banner_requests', 'pr_business_cards', 'travel_visa_requests']:
                         try:
-                            cnt = await conn.fetchval(f"""
-                                SELECT COUNT(*) FROM {self.db_schema}.{table} WHERE username = $1
-                            """, user['username'])
-                            requests_count += cnt
+                            if table in ('pr_banner_requests', 'pr_business_cards'):
+                                cnt = await conn.fetchval(f"""
+                                    SELECT COUNT(*) FROM {self.db_schema_pr}.{table} WHERE username = $1
+                                """, user['username'])
+                                requests_count += cnt
+                            else:
+                                cnt = await conn.fetchval(f"""
+                                    SELECT COUNT(*) FROM {self.db_schema}.{table} WHERE username = $1
+                                """, user['username'])
+                                requests_count += cnt
                         except:
                             pass
                     user['requests_count'] = requests_count
@@ -2814,12 +2557,21 @@ class Database:
                 ]
                 for table, type_name in request_tables:
                     try:
-                        rows = await conn.fetch(f"""
-                            SELECT id, created_at, 'pending' as status
-                            FROM {self.db_schema}.{table}
-                            WHERE username = $1
-                            ORDER BY created_at DESC
-                            LIMIT 5
+                        if table in ('pr_banner_requests', 'pr_business_cards'):
+                            rows = await conn.fetch(f"""
+                               SELECT id, created_at, 'pending' as status
+                               FROM {self.db_schema_pr}.{table}
+                               WHERE username = $1
+                               ORDER BY created_at DESC
+                               LIMIT 5
+                           """, result['username'])
+                        else:
+                            rows = await conn.fetch(f"""
+                                SELECT id, created_at, 'pending' as status
+                                FROM {self.db_schema}.{table}
+                                WHERE username = $1
+                                ORDER BY created_at DESC
+                                LIMIT 5
                         """, result['username'])
                         for row in rows:
                             result['requests'].append({
