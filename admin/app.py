@@ -1,5 +1,3 @@
-# app.py - замените весь код после импортов на это:
-
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from functools import wraps
 import asyncio
@@ -667,17 +665,14 @@ def api_users_count():
 @group_required(['event', 'admin'])
 def event_panel():
     """Панель Event-менеджера"""
-    certificates = run_async(db.get_all_certificates())
     conferences = run_async(db.get_conferences_list())
 
     stats = {
-        'total_certificates': len(certificates),
         'active_conferences': len([c for c in conferences if c.get('user_count', 0) > 0]),
         'total_conferences': len(conferences)
     }
 
     return render_template('event_panel.html',
-                           certificates=certificates,
                            conferences=conferences,
                            stats=stats,
                            username=session.get('username'))
@@ -812,19 +807,6 @@ def update_banner_status(request_id):
     return redirect(url_for('pr_panel'))
 
 
-@app.route('/api/certificate/<int:request_id>/status', methods=['POST'])
-@login_required
-def update_certificate_status(request_id):
-    """Обновить статус справки"""
-    status = request.form.get('status')
-    success = run_async(db.update_certificate_status(request_id, status))
-    if success:
-        flash(f'Статус заявки #{request_id} обновлен', 'success')
-    else:
-        flash('Ошибка при обновлении статуса', 'danger')
-    return redirect(url_for('event_panel'))
-
-
 # ============================================
 # API ДЛЯ ГРУПП
 # ============================================
@@ -861,13 +843,6 @@ def api_business_card_details(request_id):
     data = run_async(db.get_business_card_request(request_id))
     return jsonify(data)
 
-
-@app.route('/api/certificate/<int:request_id>')
-@login_required
-def api_certificate_details(request_id):
-    """API для получения деталей справки"""
-    data = run_async(db.get_certificate_request(request_id))
-    return jsonify(data)
 
 
 @app.route('/api/conferences/<path:conference_name>')

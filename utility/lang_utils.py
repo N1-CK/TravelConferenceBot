@@ -188,14 +188,6 @@ COMMON_TEXTS = {
         'event_booth': "ℹ️ О стенде",
         'event_info': "ℹ️ О конференции",
         'event_question': "❓ Вопрос Event департаменту",
-        'event_certificate_form_title': "📄 Справка-вызов",
-        'event_certificate_step1': "Укажите ФИО:",
-        'event_certificate_step2': "Укажите должность:",
-        'event_certificate_step3': "Название компании:",
-        'event_certificate_step4': "Юридические данные компании (ИНН, ОГРН и т.д.):",
-        'event_certificate_step5': "Кому адресовать справку? (ФИО, должность):",
-        'event_certificate_step6': "Даты участия (например: 15.11.2024 - 17.11.2024):",
-        'success_certificate': "✅ Заявка на справку-вызов отправлена!\n\nБлагодарим за ответ, наша команда получила твой запрос. Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
 
         # Билеты
         'start_event_text': "Для покупки билета, пожалуйста, предоставьте следующую информацию\n\n",
@@ -215,8 +207,6 @@ COMMON_TEXTS = {
         'event_rules_pdf': "📋 Правила поведения (PDF)",
         'accept_rules': "✅ Я ознакомился(ась)",
         'back_to_event': "◀️ Назад в EVENT",
-        'event_certificate': "📄 Справка-вызов",
-        'event_certificate_success': "✅ Заявка на справку-вызов отправлена!\n\nБлагодарим за ответ, наша команда получила твой запрос. Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
 
         # Информация о конференции
         'conference_info_title': "ℹ️ Общая информация о конференции:",
@@ -554,14 +544,7 @@ COMMON_TEXTS = {
         'event_booth': "ℹ️ Booth information",
         'event_info': "ℹ️ Event info",
         'event_question': "❓Question to Event Department",
-        'event_certificate_form_title': "📄 Certificate Request",
-        'event_certificate_step1': "Enter your full name:",
-        'event_certificate_step2': "Enter your position:",
-        'event_certificate_step3': "Company name:",
-        'event_certificate_step4': "Company legal data (INN, OGRN, etc.):",
-        'event_certificate_step5': "Who should the certificate be addressed to? (Full name, position):",
-        'event_certificate_step6': "Participation dates (e.g., 15.11.2024 - 17.11.2024):",
-        'success_certificate': "✅ Certificate request submitted!\n\nThank you for your response! Our team has received your request. Follow notifications for updates.",
+
 
         # Tickets
         'start_event_text': "Please provide the following information to purchase your ticket\n\n",
@@ -582,8 +565,6 @@ COMMON_TEXTS = {
         'event_rules_pdf': "📋 Code of Conduct (PDF)",
         'accept_rules': "✅ I have read and agree",
         'back_to_event': "◀️ Back to EVENT",
-        'event_certificate': "📄 Certificate Request",
-        'event_certificate_success': "✅ Certificate request submitted!\n\nThank you for your response! Our team has received your request. Follow notifications for updates.",
 
         # Conference info
         'conference_info_title': "ℹ️ Conference Information:",

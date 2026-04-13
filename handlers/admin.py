@@ -81,7 +81,6 @@ async def show_stats(callback: CallbackQuery):
             banner_requests = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema}.pr_banner_requests")
             business_cards = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema}.pr_business_cards")
             visa_requests = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema}.travel_visa_requests")
-            certificates = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema}.event_certificates")
 
             stats_text = (
                 "📊 Статистика бота:\n\n"
@@ -91,7 +90,6 @@ async def show_stats(callback: CallbackQuery):
                 f"• Баннеры: {banner_requests}\n"
                 f"• Визитки: {business_cards}\n"
                 f"• Визы: {visa_requests}\n"
-                f"• Справки: {certificates}\n\n"
                 f"🔄 Последнее обновление: {datetime.now().strftime('%H:%M %d.%m.%Y')}"
             )
 

@@ -47,16 +47,16 @@ async def send_question_to_manager(bot: Bot, manager_chat_id: int, user_data: di
     # Определяем отдел по типу вопроса
     department = question_type.replace('_question', '')
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text="📝 Ответить пользователю",
-            callback_data=f"reply_to_{user_data['user_id']}_{question_type}"
-        )],
-        [InlineKeyboardButton(
-            text="🔄 Переслать в другой отдел",
-            callback_data=f"share_question_{question_type}_{user_data.get('question_id', 'new')}"
-        )]
-    ])
+    # keyboard = InlineKeyboardMarkup(inline_keyboard=[
+    #     [InlineKeyboardButton(
+    #         text="📝 Ответить пользователю",
+    #         callback_data=f"reply_to_{user_data['user_id']}_{question_type}"
+    #     )],
+    #     [InlineKeyboardButton(
+    #         text="🔄 Переслать в другой отдел",
+    #         callback_data=f"share_question_{question_type}_{user_data.get('question_id', 'new')}"
+    #     )]
+    # ])
 
     message_text = (
         f"❓ Новый вопрос ({question_type.upper()})\n\n"
@@ -69,8 +69,7 @@ async def send_question_to_manager(bot: Bot, manager_chat_id: int, user_data: di
     try:
         message = await bot.send_message(
             chat_id=manager_chat_id,
-            text=message_text,
-            reply_markup=keyboard
+            text=message_text
         )
 
         # Сохраняем соответствие

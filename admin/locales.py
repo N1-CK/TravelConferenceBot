@@ -167,11 +167,6 @@ TEXTS = {
         'pr_brand_style': 'Бренд-стиль',
         'pr_contacts': 'Контакты',
 
-        # Event
-        'event_certificate': 'Справка-вызов',
-        'event_company_legal': 'Юридическое название',
-        'event_addressee': 'Кому',
-        'event_dates': 'Даты',
 
         # Валидация
         'field_required': 'Это поле обязательно',
@@ -394,11 +389,6 @@ TEXTS = {
         'pr_brand_style': 'Brand Style',
         'pr_contacts': 'Contacts',
 
-        # Event
-        'event_certificate': 'Invitation Letter',
-        'event_company_legal': 'Legal Name',
-        'event_addressee': 'Addressee',
-        'event_dates': 'Dates',
 
         # Validation
         'field_required': 'This field is required',

@@ -22,10 +22,10 @@ class Database:
             self.pool = None
             self.db_schema = os.getenv('DB_SCHEMA', 'travelconference_bot')
             self.db_schema_config = os.getenv('DB_SCHEMA_CONFIG', 'travelconference_config')
-            self.db_schema_travel = os.getenv('DB_SCHEMA_CONFIG', 'travelconference_travel')
-            self.db_schema_pr = os.getenv('DB_SCHEMA_CONFIG', 'travelconference_pr')
-            self.db_schema_event = os.getenv('DB_SCHEMA_CONFIG', 'travelconference_event')
-            self.db_schema_admin = os.getenv('DB_SCHEMA_CONFIG', 'travelconference_admin')
+            self.db_schema_travel = os.getenv('DB_SCHEMA_TRAVEL', 'travelconference_travel')
+            self.db_schema_pr = os.getenv('DB_SCHEMA_PR', 'travelconference_pr')
+            self.db_schema_event = os.getenv('DB_SCHEMA_EVENT', 'travelconference_event')
+            self.db_schema_admin = os.getenv('DB_SCHEMA_ADMIN', 'travelconference_admin')
 
     async def create_pool(self):
         """Создание пула подключений"""
@@ -153,22 +153,6 @@ class Database:
                     )
                     ''',
 
-                    # EVENT таблицы
-                    f'''
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.event_certificates (
-                        id SERIAL PRIMARY KEY,
-                        username TEXT,
-                        user_id BIGINT,
-                        full_name TEXT,
-                        position TEXT,
-                        company TEXT,
-                        company_legal TEXT,
-                        addressee TEXT,
-                        dates TEXT,
-                        created_at TIMESTAMP DEFAULT NOW()
-                    )
-                    ''',
-
                     # TRAVEL таблицы
                     f'''
                     CREATE TABLE IF NOT EXISTS {self.db_schema}.travel_visa_requests (
@@ -249,7 +233,7 @@ class Database:
 
                     # Вопросы к EVENT
                     f'''
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.event_questions (
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_event}.event_questions (
                         id SERIAL PRIMARY KEY,
                         username TEXT,
                         user_id BIGINT,
@@ -259,9 +243,24 @@ class Database:
                     )
                     ''',
 
+                    f'''
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_event}.event_ticket_requests (
+                        id SERIAL PRIMARY KEY,
+                        username TEXT,
+                        user_id BIGINT,
+                        full_name TEXT,
+                        position TEXT,
+                        company TEXT,
+                        email TEXT,
+                        phone TEXT,
+                        country TEXT,
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                    ''',
+
                     # Вопросы к PR
                     f'''
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.pr_questions (
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_pr}.pr_questions (
                         id SERIAL PRIMARY KEY,
                         username TEXT,
                         user_id BIGINT,
@@ -287,7 +286,7 @@ class Database:
 
                     # Вопросы к Travel
                     f'''
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.travel_questions (
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_travel}.travel_questions (
                         id SERIAL PRIMARY KEY,
                         username TEXT,
                         user_id BIGINT,
@@ -597,37 +596,13 @@ class Database:
             logger.error(f"Error getting restaurant: {e}")
             return None
 
-    # Добавить в класс Database после существующих методов
-
-    async def save_certificate_request(self, data: dict) -> bool:
-        """Сохранение заявки на справку-вызов"""
-        try:
-            async with self.pool.acquire() as conn:
-                await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.event_certificates 
-                    (username, user_id, full_name, position, company, company_legal, addressee, dates)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                """,
-                                   data['username'],
-                                   data['user_id'],
-                                   data['full_name'],
-                                   data.get('position', ''),
-                                   data.get('company', ''),
-                                   data.get('company_legal', ''),
-                                   data.get('addressee', ''),
-                                   data.get('dates', '')
-                                   )
-                return True
-        except Exception as e:
-            logger.error(f"Error saving certificate: {e}")
-            return False
 
     async def save_event_question(self, data: dict) -> bool:
         """Сохранение вопроса к EVENT-менеджеру"""
         try:
             async with self.pool.acquire() as conn:
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.event_questions 
+                    INSERT INTO {self.db_schema_event}.event_questions 
                     (username, user_id, category, question)
                     VALUES ($1, $2, $3, $4)
                 """,
@@ -754,7 +729,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 row = await conn.fetchrow(f"""
-                    INSERT INTO {self.db_schema}.pr_questions 
+                    INSERT INTO {self.db_schema_pr}.pr_questions 
                     (username, user_id, category, question)
                     VALUES ($1, $2, $3, $4)
                     RETURNING id
@@ -770,7 +745,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.travel_questions 
+                    INSERT INTO {self.db_schema_travel}.travel_questions 
                     (username, user_id, category, question)
                     VALUES ($1, $2, $3, $4)
                 """,
@@ -836,7 +811,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 # Создаем таблицу если нет
                 await conn.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.event_ticket_requests (
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_event}.event_ticket_requests (
                         id SERIAL PRIMARY KEY,
                         username TEXT,
                         user_id BIGINT,
@@ -851,7 +826,7 @@ class Database:
                 """)
 
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.event_ticket_requests 
+                    INSERT INTO {self.db_schema_event}.event_ticket_requests 
                     (username, user_id, full_name, position, company, email, phone, country)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 """,
@@ -1264,10 +1239,21 @@ class Database:
         """Получить все вопросы из таблицы"""
         try:
             async with self.pool.acquire() as conn:
-                rows = await conn.fetch(f"""
-                    SELECT * FROM {self.db_schema}.{table}
-                    ORDER BY created_at DESC
-                """)
+                if table == 'event_questions':
+                    rows = await conn.fetch(f"""
+                        SELECT * FROM {self.db_schema_event}.{table}
+                        ORDER BY created_at DESC
+                    """)
+                elif table == 'travel_questions':
+                    rows = await conn.fetch(f"""
+                        SELECT * FROM {self.db_schema_travel}.{table}
+                        ORDER BY created_at DESC
+                    """)
+                else:
+                    rows = await conn.fetch(f"""
+                        SELECT * FROM {self.db_schema_pr}.{table}
+                        ORDER BY created_at DESC
+                    """)
                 return [dict(row) for row in rows]
         except Exception as e:
             logger.error(f"Error getting questions from {table}: {e}")
@@ -1788,18 +1774,6 @@ class Database:
             logger.error(f"Error getting banner requests: {e}")
             return []
 
-    async def get_all_certificates(self) -> list:
-        """Получить все заявки на справки"""
-        try:
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(f"""
-                    SELECT * FROM {self.db_schema}.event_certificates 
-                    ORDER BY created_at DESC
-                """)
-                return [dict(row) for row in rows]
-        except Exception as e:
-            logger.error(f"Error getting certificates: {e}")
-            return []
 
     async def create_groups_tables(self):
         """Создание таблиц для групп и функций"""
@@ -1853,7 +1827,6 @@ class Database:
                 basic_features = [
                     ('PR-баннеры', 'pr_banner', 'Заказ баннеров для конференций', 'bi-megaphone'),
                     ('PR-визитки', 'pr_business_cards', 'Заказ визиток', 'bi-card-text'),
-                    ('Справки-вызовы', 'event_certificate', 'Заказ справок для участия', 'bi-file-text'),
                     ('Визы', 'travel_visa', 'Оформление виз', 'bi-passport'),
                     ('Авиабилеты', 'travel_flights', 'Бронирование авиабилетов', 'bi-airplane'),
                     ('Отели', 'travel_hotels', 'Бронирование отелей', 'bi-building'),
@@ -2362,19 +2335,6 @@ class Database:
             logger.error(f"Error updating banner status: {e}")
             return False
 
-    async def update_certificate_status(self, request_id: int, status: str) -> bool:
-        """Обновить статус справки"""
-        try:
-            async with self.pool.acquire() as conn:
-                await conn.execute(f"""
-                    UPDATE {self.db_schema}.event_certificates 
-                    SET status = $1, updated_at = NOW()
-                    WHERE id = $2
-                """, status, request_id)
-                return True
-        except Exception as e:
-            logger.error(f"Error updating certificate status: {e}")
-            return False
 
     async def get_recent_broadcasts(self, limit=10) -> list:
         """Получить последние рассылки"""
@@ -2594,8 +2554,7 @@ class Database:
                     user['conferences'] = [c['conference_name'] for c in confs]
 
                     requests_count = 0
-                    for table in ['pr_banner_requests', 'pr_business_cards', 'event_certificates',
-                                  'travel_visa_requests']:
+                    for table in ['pr_banner_requests', 'pr_business_cards', 'travel_visa_requests']:
                         try:
                             cnt = await conn.fetchval(f"""
                                 SELECT COUNT(*) FROM {self.db_schema}.{table} WHERE username = $1
@@ -2693,9 +2652,9 @@ class Database:
             async with self.pool.acquire() as conn:
                 # Определяем таблицы
                 tables = {
-                    'pr': f'{self.db_schema}.pr_questions',
-                    'event': f'{self.db_schema}.event_questions',
-                    'travel': f'{self.db_schema}.travel_questions'
+                    'pr': f'{self.db_schema_pr}.pr_questions',
+                    'event': f'{self.db_schema_event}.event_questions',
+                    'travel': f'{self.db_schema_travel}.travel_questions'
                 }
 
                 # Получаем исходный вопрос
@@ -2747,9 +2706,9 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 tables = {
-                    'pr': f'{self.db_schema}.pr_questions',
-                    'event': f'{self.db_schema}.event_questions',
-                    'travel': f'{self.db_schema}.travel_questions'
+                    'pr': f'{self.db_schema_pr}.pr_questions',
+                    'event': f'{self.db_schema_event}.event_questions',
+                    'travel': f'{self.db_schema_travel}.travel_questions'
                 }
 
                 table = tables.get(question_type)
@@ -2795,7 +2754,6 @@ class Database:
                 request_tables = [
                     ('pr_banner_requests', 'Баннер'),
                     ('pr_business_cards', 'Визитки'),
-                    ('event_certificates', 'Справка'),
                     ('travel_visa_requests', 'Виза')
                 ]
                 for table, type_name in request_tables:
@@ -3221,7 +3179,7 @@ class Database:
                         MAX(created_at) as last_message_time,
                         STRING_AGG(question, ' ') as all_messages,
                         0 as unread_count
-                    FROM {self.db_schema}.pr_questions
+                    FROM {self.db_schema_pr}.pr_questions
                     GROUP BY user_id, username
                 """)
 
@@ -3233,7 +3191,7 @@ class Database:
                         MAX(created_at) as last_message_time,
                         STRING_AGG(question, ' ') as all_messages,
                         0 as unread_count
-                    FROM {self.db_schema}.event_questions
+                    FROM {self.db_schema_event}.event_questions
                     GROUP BY user_id, username
                 """)
 
@@ -3245,7 +3203,7 @@ class Database:
                         MAX(created_at) as last_message_time,
                         STRING_AGG(question, ' ') as all_messages,
                         0 as unread_count
-                    FROM {self.db_schema}.travel_questions
+                    FROM {self.db_schema_travel}.travel_questions
                     GROUP BY user_id, username
                 """)
 
@@ -3363,7 +3321,7 @@ class Database:
                         question as message_text,
                         NULL as file_type, NULL as file_id, created_at, NULL as read_at,
                         'pr_question' as source_type, category
-                    FROM {self.db_schema}.pr_questions
+                    FROM {self.db_schema_pr}.pr_questions
                     WHERE user_id = $1
                 """, user_id)
 
@@ -3375,7 +3333,7 @@ class Database:
                         question as message_text,
                         NULL as file_type, NULL as file_id, created_at, NULL as read_at,
                         'event_question' as source_type, category
-                    FROM {self.db_schema}.event_questions
+                    FROM {self.db_schema_event}.event_questions
                     WHERE user_id = $1
                 """, user_id)
 
@@ -3387,7 +3345,7 @@ class Database:
                         question as message_text,
                         NULL as file_type, NULL as file_id, created_at, NULL as read_at,
                         'travel_question' as source_type, category
-                    FROM {self.db_schema}.travel_questions
+                    FROM {self.db_schema_travel}.travel_questions
                     WHERE user_id = $1
                 """, user_id)
 
