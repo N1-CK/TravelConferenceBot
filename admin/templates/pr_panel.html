@@ -32,11 +32,24 @@
     .status-in_progress { background: #cfe2ff; color: #084298; }
     .status-ready { background: #d4edda; color: #155724; }
     .nav-tabs .nav-link {
-        font-size: 1.1rem;
+        font-size: 1rem;
         padding: 10px 20px;
     }
     .nav-tabs .nav-link i {
         margin-right: 8px;
+    }
+    .table-affiliate {
+        font-size: 0.85rem;
+    }
+    .table-affiliate td, .table-affiliate th {
+        vertical-align: middle;
+        padding: 10px 8px;
+    }
+    .booking-details, .report-details {
+        max-width: 250px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 </style>
 {% endblock %}
@@ -57,12 +70,21 @@
                 <i class="bi bi-card-text"></i> {{ get_text('pr_business_cards') }}
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="affiliate-bookings-tab" data-bs-toggle="tab" data-bs-target="#affiliateBookings" type="button" role="tab">
+                <i class="bi bi-calendar-check"></i> {{ get_text('affiliate_bookings') }}
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="affiliate-reports-tab" data-bs-toggle="tab" data-bs-target="#affiliateReports" type="button" role="tab">
+                <i class="bi bi-file-text"></i> {{ get_text('affiliate_reports') }}
+            </button>
+        </li>
     </ul>
 
     <div class="tab-content">
         <!-- BANNERS TAB -->
         <div class="tab-pane fade show active" id="banners" role="tabpanel">
-            <!-- Banner Stats Cards -->
             <div class="mb-4">
                 <div class="row">
                     <div class="col-md-3 mb-3">
@@ -92,7 +114,6 @@
                 </div>
             </div>
 
-            <!-- Banner Requests Table -->
             <div class="card">
                 <div class="card-header">
                     <i class="bi bi-image"></i> {{ get_text('banner_requests') }}
@@ -172,7 +193,6 @@
 
         <!-- BUSINESS CARDS TAB -->
         <div class="tab-pane fade" id="cards" role="tabpanel">
-            <!-- Cards Stats Cards -->
             <div class="mb-4">
                 <div class="row">
                     <div class="col-md-3 mb-3">
@@ -202,7 +222,6 @@
                 </div>
             </div>
 
-            <!-- Business Cards Table -->
             <div class="card">
                 <div class="card-header">
                     <i class="bi bi-card-text"></i> {{ get_text('business_cards_requests') }}
@@ -237,7 +256,7 @@
                                         {% else %}
                                         <span class="badge bg-secondary">{{ get_text('no') }}</span>
                                         {% endif %}
-                                    </td>
+                                    </div>
                                     <td>{{ card.created_at.strftime('%d.%m.%Y %H:%M') if card.created_at else '-' }}</td>
                                     <td>
                                         <span class="status-badge status-{{ card.status }}">
@@ -249,7 +268,7 @@
                                                 <i class="bi bi-check-lg"></i> {{ get_text('status_ready') }}
                                             {% endif %}
                                         </span>
-                                    </td>
+                                    </div>
                                     <td>
                                         <div class="btn-group btn-group-sm" role="group">
                                             <button class="btn btn-sm btn-outline-warning"
@@ -271,7 +290,7 @@
                                                 <i class="bi bi-check-lg"></i>
                                             </button>
                                         </div>
-                                    </td>
+                                    </div>
                                 </tr>
                                 {% else %}
                                 <tr>
@@ -287,6 +306,102 @@
                 </div>
             </div>
         </div>
+
+        <!-- AFFILIATE BOOKINGS TAB -->
+        <div class="tab-pane fade" id="affiliateBookings" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-calendar-check"></i> {{ get_text('affiliate_bookings_title') }}
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="bookingsTable" class="table table-hover table-affiliate">
+                            <thead>
+                                <tr>
+                                    <th>{{ get_text('id') }}</th>
+                                    <th>{{ get_text('username') }}</th>
+                                    <th>{{ get_text('affiliate_manager') }}</th>
+                                    <th>{{ get_text('affiliate_datetime') }}</th>
+                                    <th>{{ get_text('company') }}</th>
+                                    <th>{{ get_text('affiliate_partner') }}</th>
+                                    <th>{{ get_text('affiliate_restaurant') }}</th>
+                                    <th>{{ get_text('affiliate_people') }}</th>
+                                    <th>{{ get_text('affiliate_payment') }}</th>
+                                    <th>{{ get_text('affiliate_partner_type') }}</th>
+                                    <th>{{ get_text('actions') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bookingsTableBody">
+                                <tr><td colspan="11" class="text-center">{{ get_text('loading') }}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AFFILIATE REPORTS TAB -->
+        <div class="tab-pane fade" id="affiliateReports" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-file-text"></i> {{ get_text('affiliate_reports_title') }}
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="reportsTable" class="table table-hover table-affiliate">
+                            <thead>
+                                <tr>
+                                    <th>{{ get_text('id') }}</th>
+                                    <th>{{ get_text('username') }}</th>
+                                    <th>{{ get_text('company') }}</th>
+                                    <th>{{ get_text('affiliate_meeting_date') }}</th>
+                                    <th>{{ get_text('affiliate_manager') }}</th>
+                                    <th>{{ get_text('affiliate_partner') }}</th>
+                                    <th>{{ get_text('affiliate_results') }}</th>
+                                    <th>{{ get_text('affiliate_budget') }}</th>
+                                    <th>{{ get_text('actions') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reportsTableBody">
+                                <tr><td colspan="9" class="text-center">{{ get_text('loading') }}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal для просмотра деталей бронирования -->
+<div class="modal fade" id="bookingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ get_text('affiliate_booking_details') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="bookingModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('close') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal для просмотра деталей отчета -->
+<div class="modal fade" id="reportModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ get_text('affiliate_report_details') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="reportModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('close') }}</button>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -295,6 +410,8 @@
 <script>
     let currentBannerFilter = '{{ banner_filter if banner_filter else "all" }}';
     let currentCardsFilter = '{{ cards_filter if cards_filter else "all" }}';
+    let bookingsData = [];
+    let reportsData = [];
 
     $(document).ready(function() {
         $('#bannersTable, #cardsTable').DataTable({
@@ -304,18 +421,163 @@
             pageLength: 25,
             order: [[0, 'desc']]
         });
+
+        loadAffiliateBookings();
+        loadAffiliateReports();
     });
+
+    // ============================================
+    // AFFILIATE BOOKINGS
+    // ============================================
+
+    async function loadAffiliateBookings() {
+        try {
+            const response = await fetch('/api/affiliate/bookings');
+            bookingsData = await response.json();
+            renderBookingsTable(bookingsData);
+        } catch (e) {
+            console.error('Error loading bookings:', e);
+            document.getElementById('bookingsTableBody').innerHTML =
+                '<tr><td colspan="11" class="text-center text-danger">{{ get_text("error_occurred") }}</td></tr>';
+        }
+    }
+
+    function renderBookingsTable(bookings) {
+        const tbody = document.getElementById('bookingsTableBody');
+
+        if (!bookings.length) {
+            tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">{{ get_text("affiliate_no_bookings") }}</td></tr>';
+            return;
+        }
+
+        let html = '';
+        for (const b of bookings) {
+            html += `
+                <tr>
+                    <td>${b.id}</td>
+                    <td><strong>@${b.username}</strong></td>
+                    <td>${b.manager || '-'}</td>
+                    <td><small>${b.datetime || '-'}</small></td>
+                    <td class="booking-details" title="${b.company || ''}">${b.company || '-'}</td>
+                    <td>${b.partner || '-'}</td>
+                    <td class="booking-details" title="${b.restaurant || ''}">${b.restaurant || '-'}</td>
+                    <td>${b.people || '-'}</td>
+                    <td>${b.payment_method || '-'}</td>
+                    <td>${b.partnertype || '-'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewBookingDetails(${b.id})" title="{{ get_text('view') }}">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }
+        tbody.innerHTML = html;
+    }
+
+    function viewBookingDetails(id) {
+        const booking = bookingsData.find(b => b.id === id);
+        if (!booking) return;
+
+        const html = `
+            <table class="table table-bordered">
+                <tr><th style="width: 40%">{{ get_text('id') }}</th><td>${booking.id}</td></tr>
+                <tr><th>{{ get_text('username') }}</th><td>@${booking.username} (ID: ${booking.user_id})</td></tr>
+                <tr><th>{{ get_text('affiliate_manager') }}</th><td>${booking.manager || '-'}</td></tr>
+                <tr><th>{{ get_text('affiliate_datetime') }}</th><td>${booking.datetime || '-'}</td></tr>
+                <tr><th>{{ get_text('company') }}</th><td>${booking.company || '-'}</td></tr>
+                <tr><th>{{ get_text('affiliate_partner') }}</th><td>${booking.partner || '-'}</td></tr>
+                <tr><th>{{ get_text('affiliate_restaurant') }}</th><td>${booking.restaurant || '-'}</td></tr>
+                <tr><th>{{ get_text('affiliate_people') }}</th><td>${booking.people || '-'}</td></tr>
+                <tr><th>{{ get_text('affiliate_payment') }}</th><td>${booking.payment_method || '-'}</td></tr>
+                <tr><th>{{ get_text('affiliate_partner_type') }}</th><td>${booking.partnertype || '-'}</td></tr>
+                <tr><th>{{ get_text('created_at') }}</th><td>${booking.created_at ? new Date(booking.created_at).toLocaleString() : '-'}</td></tr>
+            </table>
+        `;
+        document.getElementById('bookingModalBody').innerHTML = html;
+        new bootstrap.Modal(document.getElementById('bookingModal')).show();
+    }
+
+    // ============================================
+    // AFFILIATE REPORTS
+    // ============================================
+
+    async function loadAffiliateReports() {
+        try {
+            const response = await fetch('/api/affiliate/reports');
+            reportsData = await response.json();
+            renderReportsTable(reportsData);
+        } catch (e) {
+            console.error('Error loading reports:', e);
+            document.getElementById('reportsTableBody').innerHTML =
+                '<tr><td colspan="9" class="text-center text-danger">{{ get_text("error_occurred") }}</td></tr>';
+        }
+    }
+
+    function renderReportsTable(reports) {
+        const tbody = document.getElementById('reportsTableBody');
+
+        if (!reports.length) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">{{ get_text("affiliate_no_reports") }}</td></tr>';
+            return;
+        }
+
+        let html = '';
+        for (const r of reports) {
+            html += `
+                <tr>
+                    <td>${r.id}</td>
+                    <td><strong>@${r.username}</strong></td>
+                    <td class="booking-details" title="${r.company || ''}">${r.company || '-'}</td>
+                    <td><small>${r.meeting_date || '-'}</small></td>
+                    <td>${r.manager || '-'}</td>
+                    <td>${r.partner || '-'}</td>
+                    <td class="report-details" title="${(r.result || '').replace(/"/g, '&quot;')}">${(r.result || '-').substring(0, 50)}${(r.result || '').length > 50 ? '...' : ''}</td>
+                    <td>${r.budget || '0'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewReportDetails(${r.id})" title="{{ get_text('view') }}">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }
+        tbody.innerHTML = html;
+    }
+
+    function viewReportDetails(id) {
+        const report = reportsData.find(r => r.id === id);
+        if (!report) return;
+
+        const html = `
+            <table class="table table-bordered">
+                <tr><th style="width: 40%">{{ get_text('id') }}</th><td>${report.id}</td></tr>
+                <tr><th>{{ get_text('username') }}</th><td>@${report.username}</td></tr>
+                <tr><th>{{ get_text('company') }}</th><td>${report.company || '-'}</td></tr>
+                <tr><th>{{ get_text('affiliate_meeting_date') }}</th><td>${report.meeting_date || '-'}</td></tr>
+                <tr><th>{{ get_text('affiliate_manager') }}</th><td>${report.manager || '-'}</td></tr>
+                <tr><th>{{ get_text('affiliate_partner') }}</th><td>${report.partner || '-'}</td></tr>
+                <tr><th>{{ get_text('affiliate_results') }}</th><td><pre class="mb-0" style="white-space: pre-wrap;">${report.result || '-'}</pre></td></tr>
+                <tr><th>{{ get_text('affiliate_budget') }}</th><td>${report.budget || '0'}</td></tr>
+                <tr><th>{{ get_text('created_at') }}</th><td>${report.created_at ? new Date(report.created_at).toLocaleString() : '-'}</td></tr>
+            </table>
+        `;
+        document.getElementById('reportModalBody').innerHTML = html;
+        new bootstrap.Modal(document.getElementById('reportModal')).show();
+    }
+
+    // ============================================
+    // EXISTING FUNCTIONS (banners, cards)
+    // ============================================
 
     function filterBanners(status) {
         currentBannerFilter = status;
         const table = $('#bannersTable').DataTable();
-
         if (status === 'all') {
             table.search('').columns().search('').draw();
         } else {
             table.column(6).search(status).draw();
         }
-
         document.querySelectorAll('#banners .stat-card').forEach(card => card.classList.remove('active'));
         event.currentTarget.classList.add('active');
     }
@@ -323,13 +585,11 @@
     function filterCards(status) {
         currentCardsFilter = status;
         const table = $('#cardsTable').DataTable();
-
         if (status === 'all') {
             table.search('').columns().search('').draw();
         } else {
             table.column(7).search(status).draw();
         }
-
         document.querySelectorAll('#cards .stat-card').forEach(card => card.classList.remove('active'));
         event.currentTarget.classList.add('active');
     }
@@ -340,23 +600,19 @@
             'in_progress': '{{ get_text("status_in_progress") }}',
             'ready': '{{ get_text("status_ready") }}'
         };
-
         if (confirm(`{{ get_text("confirm_status_change") }} ${statusNames[status]}?`)) {
             fetch(`/api/banner/${id}/status`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: `status=${status}`
-            })
-            .then(response => response.json())
-            .then(data => {
+            }).then(response => response.json()).then(data => {
                 if (data.success) {
                     showToast(`{{ get_text("status_changed") }} ${statusNames[status]}`, 'success');
                     setTimeout(() => location.reload(), 1500);
                 } else {
                     showToast('{{ get_text("error_status_change") }}', 'danger');
                 }
-            })
-            .catch(error => {
+            }).catch(error => {
                 console.error('Error:', error);
                 showToast('{{ get_text("error_status_change") }}', 'danger');
             });
@@ -369,23 +625,19 @@
             'in_progress': '{{ get_text("status_in_progress") }}',
             'ready': '{{ get_text("status_ready") }}'
         };
-
         if (confirm(`{{ get_text("confirm_status_change") }} ${statusNames[status]}?`)) {
             fetch(`/api/business_card/${id}/status`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: `status=${status}`
-            })
-            .then(response => response.json())
-            .then(data => {
+            }).then(response => response.json()).then(data => {
                 if (data.success) {
                     showToast(`{{ get_text("status_changed") }} ${statusNames[status]}`, 'success');
                     setTimeout(() => location.reload(), 1500);
                 } else {
                     showToast('{{ get_text("error_status_change") }}', 'danger');
                 }
-            })
-            .catch(error => {
+            }).catch(error => {
                 console.error('Error:', error);
                 showToast('{{ get_text("error_status_change") }}', 'danger');
             });
@@ -406,7 +658,6 @@
             warning: '{{ get_text("warning") }}',
             info: '{{ get_text("info") }}'
         };
-
         const toastHtml = `
             <div class="toast show" role="alert" data-bs-autohide="true" data-bs-delay="3000">
                 <div class="toast-header">
@@ -417,9 +668,7 @@
                 <div class="toast-body">${message}</div>
             </div>
         `;
-
         toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-
         setTimeout(() => {
             const toast = toastContainer.lastElementChild;
             if (toast) toast.remove();

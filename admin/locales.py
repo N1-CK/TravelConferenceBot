@@ -271,6 +271,27 @@ TEXTS = {
         'brand_style': 'Бренд-стиль',
         'yes': 'Да',
         'no': 'Нет',
+
+
+        # Affiliate веб-панель
+        'affiliate_bookings': 'Affiliate (Бронирования)',
+        'affiliate_reports': 'Affiliate (Отчеты)',
+        'affiliate_bookings_title': 'Бронирования ресторанов (Affiliate Bookings)',
+        'affiliate_reports_title': 'Отчеты о встречах (Affiliate Reports)',
+        'affiliate_manager': 'Менеджер',
+        'affiliate_datetime': 'Дата/Время',
+        'affiliate_partner': 'Партнер',
+        'affiliate_restaurant': 'Ресторан',
+        'affiliate_people': 'Кол-во',
+        'affiliate_payment': 'Оплата',
+        'affiliate_partner_type': 'Тип',
+        'affiliate_meeting_date': 'Дата встречи',
+        'affiliate_results': 'Результаты',
+        'affiliate_budget': 'Бюджет',
+        'affiliate_booking_details': 'Детали бронирования',
+        'affiliate_report_details': 'Детали отчета',
+        'affiliate_no_bookings': 'Нет бронирований',
+        'affiliate_no_reports': 'Нет отчетов',
     },
     'en': {
         # Navigation
@@ -538,6 +559,26 @@ TEXTS = {
         'brand_style': 'Brand Style',
         'yes': 'Yes',
         'no': 'No',
+
+        # Affiliate web panel
+        'affiliate_bookings': 'Affiliate (Bookings)',
+        'affiliate_reports': 'Affiliate (Reports)',
+        'affiliate_bookings_title': 'Restaurant Bookings (Affiliate Bookings)',
+        'affiliate_reports_title': 'Meeting Reports (Affiliate Reports)',
+        'affiliate_manager': 'Manager',
+        'affiliate_datetime': 'Date/Time',
+        'affiliate_partner': 'Partner',
+        'affiliate_restaurant': 'Restaurant',
+        'affiliate_people': 'People',
+        'affiliate_payment': 'Payment',
+        'affiliate_partner_type': 'Type',
+        'affiliate_meeting_date': 'Meeting Date',
+        'affiliate_results': 'Results',
+        'affiliate_budget': 'Budget',
+        'affiliate_booking_details': 'Booking Details',
+        'affiliate_report_details': 'Report Details',
+        'affiliate_no_bookings': 'No bookings',
+        'affiliate_no_reports': 'No reports',
     }
 }
 

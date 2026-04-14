@@ -1218,6 +1218,38 @@ def api_get_questions_by_department(department):
     questions = run_async(db.get_all_questions_by_table(table))
     return jsonify(questions)
 
+# Добавьте эти маршруты в app.py
+
+@app.route('/api/affiliate/bookings')
+@login_required
+def api_affiliate_bookings():
+    """API для получения бронирований"""
+    bookings = run_async(db.get_all_affiliate_bookings())
+    return jsonify(bookings)
+
+@app.route('/api/affiliate/reports')
+@login_required
+def api_affiliate_reports():
+    """API для получения отчетов"""
+    reports = run_async(db.get_all_affiliate_reports())
+    return jsonify(reports)
+
+@app.route('/api/affiliate/booking/<int:booking_id>/status', methods=['POST'])
+@login_required
+def api_update_booking_status(booking_id):
+    """Обновить статус бронирования"""
+    status = request.form.get('status')
+    success = run_async(db.update_affiliate_booking_status(booking_id, status))
+    return jsonify({'success': success})
+
+@app.route('/api/affiliate/report/<int:report_id>/status', methods=['POST'])
+@login_required
+def api_update_report_status(report_id):
+    """Обновить статус отчета"""
+    status = request.form.get('status')
+    success = run_async(db.update_affiliate_report_status(report_id, status))
+    return jsonify({'success': success})
+
 
 @app.route('/api/ticket/<int:request_id>/status', methods=['POST'])
 @login_required

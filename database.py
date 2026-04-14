@@ -212,7 +212,9 @@ class Database:
                         people TEXT NOT NULL,
                         payment_method TEXT NOT NULL,
                         partnertype TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT NOW()
+                        status TEXT DEFAULT 'confirmed',
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
                     )
                     ''',
 
@@ -227,7 +229,9 @@ class Database:
                         partner TEXT NOT NULL,
                         result TEXT,
                         budget TEXT DEFAULT '0',
-                        created_at TIMESTAMP DEFAULT NOW()
+                        status TEXT DEFAULT 'pending',
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
                     )
                     ''',
 
@@ -1211,7 +1215,77 @@ class Database:
             logger.error(f"Error getting companies: {e}")
             return []
 
-    # Добавить в класс Database:
+    async def get_all_affiliate_bookings(self) -> list:
+        """Получить все бронирования из affil_bookings"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT * FROM {self.db_schema_pr}.affil_bookings 
+                    ORDER BY created_at DESC
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting affiliate bookings: {e}")
+            return []
+
+    async def get_all_affiliate_reports(self) -> list:
+        """Получить все отчеты из affil_reports"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT * FROM {self.db_schema_pr}.affil_reports 
+                    ORDER BY created_at DESC
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting affiliate reports: {e}")
+            return []
+
+    async def update_affiliate_booking_status(self, booking_id: int, status: str) -> bool:
+        """Обновить статус бронирования (добавляем колонку status если нет)"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Добавляем колонку status если её нет
+                try:
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_pr}.affil_bookings 
+                        ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'confirmed'
+                    """)
+                except:
+                    pass
+
+                await conn.execute(f"""
+                    UPDATE {self.db_schema_pr}.affil_bookings 
+                    SET status = $1, updated_at = NOW()
+                    WHERE id = $2
+                """, status, booking_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error updating affiliate booking status: {e}")
+            return False
+
+    async def update_affiliate_report_status(self, report_id: int, status: str) -> bool:
+        """Обновить статус отчета (добавляем колонку status если нет)"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Добавляем колонку status если её нет
+                try:
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_pr}.affil_reports 
+                        ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'
+                    """)
+                except:
+                    pass
+
+                await conn.execute(f"""
+                    UPDATE {self.db_schema_pr}.affil_reports 
+                    SET status = $1, updated_at = NOW()
+                    WHERE id = $2
+                """, status, report_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error updating affiliate report status: {e}")
+            return False
 
     async def save_user_registration(self, user_data: dict) -> bool:
         """Сохранение данных регистрации пользователя"""

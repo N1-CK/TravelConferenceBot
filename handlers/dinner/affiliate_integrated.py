@@ -736,10 +736,11 @@ async def show_my_bookings(call: CallbackQuery):
         await call.message.edit_text(await t(user_id, 'affiliate_no_bookings'), reply_markup=builder.as_markup())
         return
 
-    response = f"📋 *{await t(user_id, 'affiliate_your_bookings')}:*\n\n"
+    response = f"📋 {await t(user_id, 'affiliate_your_bookings')}:\n\n"
     for i, booking in enumerate(bookings, 1):
         response += (
             f"{i}. {booking['restaurant']}\n"
+            f"   📅 {booking['datetime']}\n"
             f"   📅 {booking['datetime']}\n"
             f"   🤝 {booking['partner']} ({booking['company']})\n"
             f"   👥 {booking['people']} {await t(user_id, 'affiliate_people_lower')} | 💳 {booking['payment_method']}\n\n"
