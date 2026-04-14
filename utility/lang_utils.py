@@ -119,12 +119,12 @@ COMMON_TEXTS = {
         'business_cards_success': "✅ Заявка на визитки отправлена!\n\nБлагодарим за ответ, наша команда получила твой запрос. Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
 
         'business_cards_title': "📇 Заказ визиток",
-        'business_cards_step1': "Шаг 1 из 6\nУкажите имя и фамилию для визитки:",
-        'business_cards_step2': "Шаг 2 из 6\nУкажите должность на английском (как будет на визитке):",
-        'business_cards_step3': "Шаг 3 из 6\nНазвание компании/партнерской программы:",
-        'business_cards_step4': "Шаг 4 из 6\nУкажите контакты для связи (Telegram/email):",
-        'business_cards_step5': "Шаг 5 из 6\nНужно ли придерживаться фирменного стиля?",
-        'business_cards_step6': "Шаг 6 из 6\n📝 Ваши комментарии (необязательно)\n\nЕсли у вас есть дополнительные пожелания к дизайну визиток, напишите их ниже.\n\nИли нажмите 'Пропустить':",
+        'business_cards_step1': "Шаг 1 из 5\nУкажите имя и фамилию для визитки:",
+        'business_cards_step2': "Шаг 2 из 5\nУкажите должность на английском (как будет на визитке):",
+        'business_cards_step3': "Шаг 3 из 5\nНазвание компании/партнерской программы:",
+        'business_cards_step4': "Шаг 4 из 5\nУкажите контакты для связи (Telegram/email):",
+        # 'business_cards_step5': "Шаг 5 из 5\nНужно ли придерживаться фирменного стиля?",
+        'business_cards_step6': "Шаг 5 из 5\n📝 Ваши комментарии (необязательно)\n\nЕсли у вас есть дополнительные пожелания к дизайну визиток, напишите их ниже.\n\nИли нажмите 'Пропустить':",
         'business_cards_brand_style_yes': "✅ Да, придерживаться",
         'business_cards_brand_style_no': "❌ Нет, не нужно",
         'business_cards_back_step2': "business_cards_back_step2",
@@ -576,12 +576,12 @@ COMMON_TEXTS = {
 
         # PR Business Cards Form
         'business_cards_title': "📇 Business Card Order",
-        'business_cards_step1': "Step 1 of 6\nEnter your name for the business card:",
-        'business_cards_step2': "Step 2 of 6\nEnter your job title/role:",
-        'business_cards_step3': "Step 3 of 6\nCompany / partner program name:",
-        'business_cards_step4': "Step 4 of 6\nEnter contact information (Telegram/email):",
-        'business_cards_step5': "Step 5 of 6\nShould the corporate style be followed?",
-        'business_cards_step6': "Step 6 of 6\nYour comments (optional)"
+        'business_cards_step1': "Step 1 of 5\nEnter your name for the business card:",
+        'business_cards_step2': "Step 2 of 5\nEnter your job title/role:",
+        'business_cards_step3': "Step 3 of 5\nCompany / partner program name:",
+        'business_cards_step4': "Step 4 of 5\nEnter contact information (Telegram/email):",
+        # 'business_cards_step5': "Step 5 of 5\nShould the corporate style be followed?",
+        'business_cards_step6': "Step 5 of 5\nYour comments (optional)"
                                 "\n\nOr click 'Skip':",
         'business_cards_brand_style_yes': "✅ Yes, brand style",
         'business_cards_brand_style_no': "❌ No, not needed",

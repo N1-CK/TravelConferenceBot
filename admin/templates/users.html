@@ -7,51 +7,30 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="bi bi-people"></i> {{ get_text('users') }}</h2>
         <div>
-            <button class="btn btn-outline-primary me-2" onclick="exportUsers()">
+            <button class="btn btn-outline-primary" onclick="exportUsers()">
                 <i class="bi bi-download"></i> {{ get_text('export') }}
-            </button>
-            <button class="btn btn-primary" onclick="bulkAction()">
-                <i class="bi bi-envelope"></i> {{ get_text('broadcast') }}
             </button>
         </div>
     </div>
 
     <!-- Stats Cards -->
     <div class="row mb-4">
-        <div class="col-md-2 col-6 mb-3">
+        <div class="col-md-4 mb-3">
             <div class="stat-card">
                 <div class="stat-number">{{ stats.total }}</div>
                 <div class="stat-label">{{ get_text('total_users') }}</div>
             </div>
         </div>
-        <div class="col-md-2 col-6 mb-3">
+        <div class="col-md-4 mb-3">
             <div class="stat-card">
                 <div class="stat-number text-success">{{ stats.online }}</div>
                 <div class="stat-label">{{ get_text('status_online') }}</div>
             </div>
         </div>
-        <div class="col-md-2 col-6 mb-3">
+        <div class="col-md-4 mb-3">
             <div class="stat-card">
                 <div class="stat-number text-warning">{{ stats.active_today }}</div>
                 <div class="stat-label">{{ get_text('active_today') }}</div>
-            </div>
-        </div>
-        <div class="col-md-2 col-6 mb-3">
-            <div class="stat-card">
-                <div class="stat-number">{{ stats.with_requests }}</div>
-                <div class="stat-label">{{ get_text('total_requests') }}</div>
-            </div>
-        </div>
-        <div class="col-md-2 col-6 mb-3">
-            <div class="stat-card">
-                <div class="stat-number">{{ stats.companies }}</div>
-                <div class="stat-label">{{ get_text('company') }}</div>
-            </div>
-        </div>
-        <div class="col-md-2 col-6 mb-3">
-            <div class="stat-card">
-                <div class="stat-number">{{ stats.conferences }}</div>
-                <div class="stat-label">{{ get_text('conferences') }}</div>
             </div>
         </div>
     </div>
@@ -60,7 +39,7 @@
     <div class="card mb-4">
         <div class="card-body">
             <div class="row g-3">
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <select class="form-select" id="companyFilter">
                         <option value="">{{ get_text('all_companies') }}</option>
                         {% for company in companies %}
@@ -68,7 +47,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <select class="form-select" id="conferenceFilter">
                         <option value="">{{ get_text('all_conferences') }}</option>
                         {% for conf in conferences %}
@@ -76,16 +55,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <select class="form-select" id="statusFilter">
-                        <option value="">{{ get_text('all_statuses') }}</option>
-                        <option value="online">{{ get_text('status_online') }}</option>
-                        <option value="offline">{{ get_text('status_offline') }}</option>
-                        <option value="active_today">{{ get_text('active_today') }}</option>
-                        <option value="has_requests">{{ get_text('has_requests') }}</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <input type="text" class="form-control" id="searchFilter" placeholder="{{ get_text('search') }}...">
                 </div>
             </div>
@@ -105,7 +75,7 @@
                             <th>{{ get_text('conferences') }}</th>
                             <th>{{ get_text('last_active') }}</th>
                             <th>{{ get_text('total_requests') }}</th>
-                            <th width="120">{{ get_text('actions') }}</th>
+                            <th width="50">{{ get_text('actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -152,12 +122,6 @@
                             <td>
                                 <button class="btn btn-sm btn-outline-primary" onclick="viewUser({{ user.user_id }})" title="{{ get_text('view') }}">
                                     <i class="bi bi-eye"></i>
-                                </button>
-                                <button class="btn btn-sm btn-outline-success" onclick="messageUser({{ user.user_id }})" title="{{ get_text('send_message') }}">
-                                    <i class="bi bi-chat"></i>
-                                </button>
-                                <button class="btn btn-sm btn-outline-danger" onclick="blockUser({{ user.user_id }})" title="{{ get_text('block') }}">
-                                    <i class="bi bi-ban"></i>
                                 </button>
                             </td>
                         </tr>
@@ -206,16 +170,20 @@
             ]
         });
 
-        // Фильтры
+        // Filters
         $('#companyFilter').on('change', function() {
             usersTable.column(2).search(this.value).draw();
+        });
+
+        $('#conferenceFilter').on('change', function() {
+            usersTable.column(3).search(this.value).draw();
         });
 
         $('#searchFilter').on('keyup', function() {
             usersTable.search(this.value).draw();
         });
 
-        // Выбрать всех
+        // Select All
         $('#selectAll').on('change', function() {
             $('.user-select').prop('checked', this.checked);
         });
@@ -273,7 +241,7 @@
                                             </tr>
                                         `).join('') || '<tr><td colspan="3" class="text-center">-</td></tr>'}
                                     </tbody>
-                                </table>
+                                 licensierad
                             </div>
                         </div>
                     </div>
@@ -283,31 +251,10 @@
             });
     }
 
-    function messageUser(userId) {
-        window.location.href = `/broadcast?user=${userId}`;
-    }
-
     function sendMessageToCurrentUser() {
         if (currentUserId) {
-            messageUser(currentUserId);
+            window.location.href = `/broadcast?user=${currentUserId}`;
         }
-    }
-
-    function blockUser(userId) {
-        if (confirm('{{ get_text("confirm_block") }}')) {
-            fetch(`/api/users/${userId}/block`, { method: 'POST' })
-                .then(() => location.reload());
-        }
-    }
-
-    function bulkAction() {
-        const selected = Array.from(document.querySelectorAll('.user-select:checked'))
-            .map(cb => cb.value);
-        if (selected.length === 0) {
-            showToast('{{ get_text("select_users_first") }}', 'warning');
-            return;
-        }
-        window.location.href = `/broadcast?users=${selected.join(',')}`;
     }
 
     function exportUsers() {

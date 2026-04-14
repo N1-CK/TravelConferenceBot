@@ -1,5 +1,3 @@
-# handlers/pr.py - ИСПРАВЛЕННЫЙ ФАЙЛ (фото запрашивается сразу, без вопроса)
-
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message
 from aiogram.fsm.context import FSMContext
@@ -30,7 +28,7 @@ class BusinessCardsForm(StatesGroup):
     waiting_for_position_en = State()
     waiting_for_company = State()
     waiting_for_contacts = State()
-    waiting_for_brand_style = State()
+    # waiting_for_brand_style = State()
     waiting_for_comments = State()
 
 
@@ -67,7 +65,7 @@ async def submit_business_cards_request(update, state: FSMContext):
         'position_en': data.get('position_en', ''),
         'company': data.get('company', ''),
         'contacts': data.get('contacts', ''),
-        'brand_style': data.get('brand_style', False),
+        # 'brand_style': data.get('brand_style', False),
         'comments': data.get('comments', '')
     }
 
@@ -413,32 +411,33 @@ async def process_business_cards_company(message: Message, state: FSMContext):
 @router.message(BusinessCardsForm.waiting_for_contacts)
 async def process_business_cards_contacts(message: Message, state: FSMContext):
     await state.update_data(contacts=message.text)
-    await state.set_state(BusinessCardsForm.waiting_for_brand_style)
+    await state.set_state(BusinessCardsForm.waiting_for_comments)  # Сразу к комментариям
 
     user_id = message.from_user.id
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_yes'), callback_data="brand_style_yes"),
-         InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_no'), callback_data="brand_style_no")],
+        [InlineKeyboardButton(text=await t(user_id, 'skip'), callback_data="cards_skip_comments")],
         [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="business_cards_back_step4")]
     ])
-    await message.answer(await t(user_id, 'business_cards_step5'), reply_markup=keyboard)
-
-
-@router.callback_query(F.data.startswith("brand_style_"), BusinessCardsForm.waiting_for_brand_style)
-async def process_business_cards_brand_style(callback: CallbackQuery, state: FSMContext):
-    brand_style = callback.data == "brand_style_yes"
-    await state.update_data(brand_style=brand_style)
-    await state.set_state(BusinessCardsForm.waiting_for_comments)
-
-    user_id = callback.from_user.id
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=await t(user_id, 'skip'), callback_data="cards_skip_comments")],
-        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="business_cards_back_step5")]
-    ])
-    await callback.message.edit_text(
+    await message.answer(
         await t(user_id, 'business_cards_step6'),
         reply_markup=keyboard
     )
+
+# @router.callback_query(F.data.startswith("brand_style_"), BusinessCardsForm.waiting_for_brand_style)
+# async def process_business_cards_brand_style(callback: CallbackQuery, state: FSMContext):
+#     brand_style = callback.data == "brand_style_yes"
+#     await state.update_data(brand_style=brand_style)
+#     await state.set_state(BusinessCardsForm.waiting_for_comments)
+#
+#     user_id = callback.from_user.id
+#     keyboard = InlineKeyboardMarkup(inline_keyboard=[
+#         [InlineKeyboardButton(text=await t(user_id, 'skip'), callback_data="cards_skip_comments")],
+#         [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="business_cards_back_step5")]
+#     ])
+#     await callback.message.edit_text(
+#         await t(user_id, 'business_cards_step6'),
+#         reply_markup=keyboard
+#     )
 
 
 @router.message(BusinessCardsForm.waiting_for_comments, F.text)
@@ -488,21 +487,21 @@ async def back_to_contacts_from_style(callback: CallbackQuery, state: FSMContext
     await callback.answer()
 
 
-@router.callback_query(F.data == "business_cards_back_step5")
-async def back_to_style_from_comments(callback: CallbackQuery, state: FSMContext):
-    await state.set_state(BusinessCardsForm.waiting_for_brand_style)
-    user_id = callback.from_user.id
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_yes'), callback_data="brand_style_yes"),
-         InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_no'), callback_data="brand_style_no")],
-        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="business_cards_back_step4")]
-    ])
-    await callback.message.edit_text(
-        await t(user_id, 'business_cards_step5'),
-        reply_markup=keyboard
-    )
-    await callback.answer()
+# @router.callback_query(F.data == "business_cards_back_step5")
+# async def back_to_style_from_comments(callback: CallbackQuery, state: FSMContext):
+#     await state.set_state(BusinessCardsForm.waiting_for_brand_style)
+#     user_id = callback.from_user.id
+#
+#     keyboard = InlineKeyboardMarkup(inline_keyboard=[
+#         [InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_yes'), callback_data="brand_style_yes"),
+#          InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_no'), callback_data="brand_style_no")],
+#         [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="business_cards_back_step4")]
+#     ])
+#     await callback.message.edit_text(
+#         await t(user_id, 'business_cards_step5'),
+#         reply_markup=keyboard
+#     )
+#     await callback.answer()
 
 
 @router.callback_query(F.data == "business_cards_back_step3_company")
@@ -516,22 +515,22 @@ async def back_to_company_from_contacts_bc(callback: CallbackQuery, state: FSMCo
     await callback.answer()
 
 
-@router.callback_query(F.data == "cards_back_step5")
-async def back_to_brand_style(callback: CallbackQuery, state: FSMContext):
-    await state.set_state(BusinessCardsForm.waiting_for_brand_style)
-    user_id = callback.from_user.id
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_yes'),
-                              callback_data="brand_style_yes")],
-        [InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_no'), callback_data="brand_style_no")],
-        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="business_cards_back_step5")]
-    ])
-
-    await callback.message.edit_text(
-        await t(user_id, 'business_cards_step5'),
-        reply_markup=keyboard
-    )
+# @router.callback_query(F.data == "cards_back_step5")
+# async def back_to_brand_style(callback: CallbackQuery, state: FSMContext):
+#     await state.set_state(BusinessCardsForm.waiting_for_brand_style)
+#     user_id = callback.from_user.id
+#
+#     keyboard = InlineKeyboardMarkup(inline_keyboard=[
+#         [InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_yes'),
+#                               callback_data="brand_style_yes")],
+#         [InlineKeyboardButton(text=await t(user_id, 'business_cards_brand_style_no'), callback_data="brand_style_no")],
+#         [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="business_cards_back_step5")]
+#     ])
+#
+#     await callback.message.edit_text(
+#         await t(user_id, 'business_cards_step5'),
+#         reply_markup=keyboard
+#     )
 
 
 # ============================================

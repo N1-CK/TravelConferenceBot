@@ -16,6 +16,74 @@
         transform: translateY(-3px);
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
     }
+    .conference-card {
+        background: white;
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-left: 4px solid #667eea;
+        transition: all 0.2s;
+    }
+    .conference-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    .status-active {
+        background: #d4edda;
+        color: #155724;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .status-inactive {
+        background: #e2e3e5;
+        color: #383d41;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .participant-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        font-weight: bold;
+        margin-right: 8px;
+    }
+    .participant-list {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    .participant-item {
+        padding: 10px;
+        border-bottom: 1px solid #e9ecef;
+        display: flex;
+        align-items: center;
+    }
+    .participant-item:hover {
+        background: #f8f9fa;
+    }
+    .detail-row {
+        padding: 12px 0;
+        border-bottom: 1px solid #e9ecef;
+        display: flex;
+    }
+    .detail-label {
+        width: 140px;
+        font-weight: 600;
+        color: #495057;
+    }
+    .detail-value {
+        flex: 1;
+        color: #212529;
+    }
 </style>
 {% endblock %}
 
@@ -54,110 +122,227 @@
         </div>
     </div>
 
-    <!-- Conferences Table -->
+    <!-- Conferences Cards -->
     <div class="card">
         <div class="card-header">
             <i class="bi bi-table me-2"></i> {{ get_text('conferences_list') }}
         </div>
         <div class="card-body">
-            <div class="table-responsive">
-                <table id="conferencesTable" class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>{{ get_text('conference_name') }}</th>
-                            <th>{{ get_text('conference_city') }}</th>
-                            <th>{{ get_text('conference_dates') }}</th>
-                            <th>{{ get_text('conference_participants') }}</th>
-                            <th>{{ get_text('status') }}</th>
-                            <th>{{ get_text('actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for conf in conferences %}
-                        <tr>
-                            <td><strong>{{ conf.name }}</strong></td>
-                            <td>{{ conf.city|default('-') }}</td>
-                            <td>{{ conf.start_date|default('-') }} - {{ conf.end_date|default('-') }}</td>
-                            <td><span class="badge bg-primary">{{ conf.user_count|default(0) }}</span></td>
-                            <td>
-                                {% if conf.user_count > 0 %}
-                                <span class="badge bg-success">{{ get_text('status_active') }}</span>
+            <div class="row">
+                {% for conf in conferences %}
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="conference-card">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="mb-0">
+                                <i class="bi bi-calendar3 me-2 text-primary"></i>
+                                {{ conf.name }}
+                            </h5>
+                            {% if conf.user_count > 0 %}
+                            <span class="status-active">{{ get_text('status_active') }}</span>
+                            {% else %}
+                            <span class="status-inactive">{{ get_text('status_inactive') }}</span>
+                            {% endif %}
+                        </div>
+
+                        <p class="text-muted mb-2">
+                            <i class="bi bi-geo-alt me-1"></i> {{ conf.city|default(get_text('not_specified')) }}
+                        </p>
+
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>
+                                <i class="bi bi-calendar-range me-1"></i>
+                                {% if conf.start_date and conf.end_date %}
+                                    {{ conf.start_date }} - {{ conf.end_date }}
                                 {% else %}
-                                <span class="badge bg-secondary">{{ get_text('status_inactive') }}</span>
+                                    {{ get_text('not_specified') }}
                                 {% endif %}
-                            </td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-primary" onclick="showConferenceDetails('{{ conf.name }}')">
-                                    <i class="bi bi-eye"></i>
-                                </button>
-                                <button class="btn btn-sm btn-outline-success" onclick="broadcastToConference('{{ conf.name }}')">
-                                    <i class="bi bi-megaphone"></i>
-                                </button>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="6" class="text-center text-muted py-4">
-                                <i class="bi bi-calendar-x fs-1"></i>
-                                <p class="mt-2">{{ get_text('no_data') }}</p>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            </span>
+                            <span>
+                                <i class="bi bi-people me-1"></i>
+                                <span class="badge bg-primary rounded-pill">{{ conf.user_count }}</span>
+                                {{ get_text('participants_lower') }}
+                            </span>
+                        </div>
+
+                        <hr class="my-2">
+
+                        <button class="btn btn-sm btn-outline-primary w-100"
+                                onclick="showConferenceDetails('{{ conf.name }}')">
+                            <i class="bi bi-eye me-1"></i> {{ get_text('view_details') }}
+                        </button>
+                    </div>
+                </div>
+                {% else %}
+                <div class="col-12">
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-calendar-x fs-1"></i>
+                        <p class="mt-2">{{ get_text('no_data') }}</p>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
         </div>
     </div>
 </div>
 
-<!-- Conference Modal -->
+<!-- Conference Details Modal -->
 <div class="modal fade" id="conferenceModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">{{ get_text('conference_details') }}</h5>
+                <h5 class="modal-title">
+                    <i class="bi bi-calendar-event me-2"></i> {{ get_text('conference_details') }}
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="conferenceModalBody"></div>
+            <div class="modal-body" id="conferenceModalBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary"></div>
+                    <p class="mt-2">{{ get_text('loading') }}</p>
+                </div>
+            </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('close') }}</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> {{ get_text('close') }}
+                </button>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
 <script>
-$(document).ready(function() {
-    $('#conferencesTable').DataTable({
-        language: {
-            url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/{{ "ru" if session.get("lang", "ru") == "ru" else "en" }}.json'
-        },
-        pageLength: 25,
-        order: [[2, 'desc']]
-    });
-});
-
 function showConferenceDetails(conferenceName) {
-    fetch(`/api/conferences/${encodeURIComponent(conferenceName)}`)
-        .then(response => response.json())
+    // Показываем модальное окно с загрузкой
+    const modalBody = document.getElementById('conferenceModalBody');
+    modalBody.innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary"></div>
+            <p class="mt-2">{{ get_text('loading') }}</p>
+        </div>
+    `;
+
+    const modal = new bootstrap.Modal(document.getElementById('conferenceModal'));
+    modal.show();
+
+    // Кодируем название конференции для безопасной передачи в URL
+    const encodedName = encodeURIComponent(conferenceName);
+    const apiUrl = `/api/conferences/${encodedName}`;
+
+    console.log('Fetching:', apiUrl); // Для отладки
+
+    // Загружаем данные
+    fetch(apiUrl)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
-            let html = `
-                <h5>${data.name}</h5>
-                <table class="table">
-                    <tr><th>{{ get_text('conference_city') }}:</th><td>${data.city || '-'}</td></tr>
-                    <tr><th>{{ get_text('conference_dates') }}:</th><td>${data.start_date || '-'} - ${data.end_date || '-'}</td></tr>
-                    <tr><th>{{ get_text('conference_participants') }}:</th><td><span class="badge bg-primary">${data.user_count}</span></td></tr>
-                </table>
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            let participantsHtml = '';
+            if (data.users && data.users.length > 0) {
+                participantsHtml = `
+                    <div class="participant-list">
+                        ${data.users.map(u => `
+                            <div class="participant-item">
+                                <div class="participant-avatar">${u.username ? u.username[0].toUpperCase() : '?'}</div>
+                                <div>
+                                    <div><strong>@${escapeHtml(u.username || 'unknown')}</strong></div>
+                                    <small class="text-muted">${escapeHtml(u.full_name || '')}</small>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else {
+                participantsHtml = `
+                    <div class="text-center text-muted py-3">
+                        <i class="bi bi-people fs-3"></i>
+                        <p>{{ get_text('no_participants') }}</p>
+                    </div>
+                `;
+            }
+
+            const html = `
+                <div class="mb-4">
+                    <h4 class="mb-3">${escapeHtml(data.name)}</h4>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">
+                        <i class="bi bi-geo-alt me-1"></i> {{ get_text('conference_city') }}:
+                    </div>
+                    <div class="detail-value">${escapeHtml(data.city || get_text('not_specified'))}</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">
+                        <i class="bi bi-calendar-range me-1"></i> {{ get_text('conference_dates') }}:
+                    </div>
+                    <div class="detail-value">
+                        ${data.start_date ? escapeHtml(data.start_date) : get_text('not_specified')}
+                        ${data.end_date ? ' - ' + escapeHtml(data.end_date) : ''}
+                    </div>
+                </div>
+
+                ${data.bot_link ? `
+                <div class="detail-row">
+                    <div class="detail-label">
+                        <i class="bi bi-robot me-1"></i> {{ get_text('bot_link') }}:
+                    </div>
+                    <div class="detail-value">
+                        <a href="${escapeHtml(data.bot_link)}" target="_blank">${escapeHtml(data.bot_link)}</a>
+                    </div>
+                </div>
+                ` : ''}
+
+                ${data.additional_info ? `
+                <div class="detail-row">
+                    <div class="detail-label">
+                        <i class="bi bi-info-circle me-1"></i> {{ get_text('additional_info') }}:
+                    </div>
+                    <div class="detail-value">${escapeHtml(data.additional_info)}</div>
+                </div>
+                ` : ''}
+
+                <div class="detail-row">
+                    <div class="detail-label">
+                        <i class="bi bi-people me-1"></i> {{ get_text('conference_participants') }}:
+                    </div>
+                    <div class="detail-value">
+                        <span class="badge bg-primary fs-6">${data.user_count || 0}</span> {{ get_text('participants_lower') }}
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <h6 class="mb-3"><i class="bi bi-person-badge me-2"></i> {{ get_text('participants_list') }}</h6>
+                    ${participantsHtml}
+                </div>
             `;
-            document.getElementById('conferenceModalBody').innerHTML = html;
-            new bootstrap.Modal(document.getElementById('conferenceModal')).show();
+
+            modalBody.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error loading conference details:', error);
+            modalBody.innerHTML = `
+                <div class="text-center text-danger py-4">
+                    <i class="bi bi-exclamation-triangle fs-1"></i>
+                    <p class="mt-2">{{ get_text('error_loading_details') }}</p>
+                    <p class="small text-muted">${escapeHtml(error.message)}</p>
+                </div>
+            `;
         });
 }
 
-function broadcastToConference(conferenceName) {
-    window.location.href = `/broadcast?conference=${encodeURIComponent(conferenceName)}`;
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 </script>
 {% endblock %}

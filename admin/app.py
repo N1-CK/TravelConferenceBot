@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import io
 import csv
 from werkzeug.utils import secure_filename
+from urllib.parse import unquote
 
 
 import sys
@@ -934,19 +935,98 @@ def api_business_card_details(request_id):
     return jsonify(data)
 
 
+# В вашем веб-приложении (app.py или web_app.py)
+
+# В app.py найдите и ЗАМЕНИТЕ этот асинхронный маршрут:
+
+from urllib.parse import unquote
+
 
 @app.route('/api/conferences/<path:conference_name>')
 @login_required
-def api_conference_details(conference_name):
-    """API для получения деталей конференции"""
-    return jsonify({
-        'name': conference_name,
-        'city': 'Москва',
-        'start_date': '2024-11-15',
-        'end_date': '2024-11-17',
-        'user_count': 0,
-        'users': []
-    })
+def get_conference_details(conference_name):
+    """API для получения деталей конференции (синхронная версия)"""
+    if not session.get('logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    # Декодируем URL-encoded строку (преобразуем %20 обратно в пробелы)
+    decoded_name = unquote(conference_name)
+
+    print(f"DEBUG: Looking for conference: '{decoded_name}'")  # Для отладки
+
+    try:
+        def _get_details():
+            async def fetch():
+                async with db.pool.acquire() as conn:
+                    # Получаем основную информацию о конференции
+                    conference = await conn.fetchrow(f"""
+                        SELECT 
+                            conference_name as name,
+                            city,
+                            start_date,
+                            end_date,
+                            bot_link,
+                            additional_info,
+                            is_active
+                        FROM {db.db_schema_config}.conferences
+                        WHERE conference_name = $1
+                    """, decoded_name)  # Используем декодированное имя
+
+                    if not conference:
+                        # Попробуем поискать без учета регистра
+                        conference = await conn.fetchrow(f"""
+                            SELECT 
+                                conference_name as name,
+                                city,
+                                start_date,
+                                end_date,
+                                bot_link,
+                                additional_info,
+                                is_active
+                            FROM {db.db_schema_config}.conferences
+                            WHERE LOWER(conference_name) = LOWER($1)
+                        """, decoded_name)
+
+                    if not conference:
+                        print(f"DEBUG: Conference '{decoded_name}' not found in database")
+                        return None
+
+                    # Получаем участников конференции
+                    users = await conn.fetch(f"""
+                        SELECT DISTINCT
+                            up.user_id,
+                            up.username,
+                            up.full_name,
+                            up.company,
+                            up.position
+                        FROM {db.db_schema_config}.user_profiles up
+                        JOIN {db.db_schema}.user_conferences uc ON up.username = uc.username
+                        WHERE uc.conference_name = $1
+                        ORDER BY up.username
+                    """, decoded_name)
+
+                    # Подсчитываем количество участников
+                    user_count = len(users) if users else 0
+
+                    # Формируем ответ
+                    result = dict(conference)
+                    result['user_count'] = user_count
+                    result['users'] = [dict(user) for user in users] if users else []
+
+                    return result
+
+            return run_async(fetch())
+
+        result = _get_details()
+
+        if result is None:
+            return jsonify({'error': f'Conference "{decoded_name}" not found'}), 404
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Error getting conference details for '{decoded_name}': {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/admin_managers')
