@@ -9,7 +9,8 @@ TEXTS = {
         # Навигация
         'dashboard': '📊 Дашборд',
         'broadcast': '📨 Рассылка',
-        'pr_panel': '📢 PR-панель',
+        'pr_panel': 'PR-панель',
+        'pr_panel_sidebar': '📢 PR Panel',
         'event_panel': '🎪 Event-панель',
         'travel_panel': '✈️ Travel-панель',
         'user_chats': '💬 Чаты с пользователями',
@@ -29,8 +30,8 @@ TEXTS = {
         'role_user_desc': 'Обычный пользователь',
 
         # PR
-        'pr_banner': '📸 Заказать баннер',
-        'pr_business_cards': '💳 Заказать визитки',
+        'pr_banner': 'Заказать баннер',
+        'pr_business_cards': 'Заказать визитки',
         'pr_dinner': '🍽️ Бизнес-ужин',
         'pr_conference_bot': '🤖 Бот конференции',
         'pr_conference_rules': '📋 Правила конференции',
@@ -253,12 +254,30 @@ TEXTS = {
         'id': 'ID',
         'status': 'Статус',
         'actions': 'Действия',
+
+        'banner_requests': 'Заявки на баннеры',
+        'business_cards_requests': 'Заявки на визитки',
+        'total_banners': 'Всего заявок на баннеры',
+        'banners_pending': 'Баннеры (в ожидании)',
+        'banners_in_progress': 'Баннеры (в процессе)',
+        'banners_ready': 'Баннеры (готово)',
+        'total_cards': 'Всего заявок на визитки',
+        'cards_pending': 'Визитки (в ожидании)',
+        'cards_in_progress': 'Визитки (в процессе)',
+        'cards_ready': 'Визитки (готово)',
+        'request_details': 'Детали заявки',
+        'no_banner_requests': 'Нет заявок на баннеры',
+        'no_cards_requests': 'Нет заявок на визитки',
+        'brand_style': 'Бренд-стиль',
+        'yes': 'Да',
+        'no': 'Нет',
     },
     'en': {
         # Navigation
         'dashboard': '📊 Dashboard',
         'broadcast': '📨 Broadcast',
-        'pr_panel': '📢 PR Panel',
+        'pr_panel': 'PR Panel',
+        'pr_panel_sidebar': '📢 PR Panel',
         'event_panel': '🎪 Event Panel',
         'travel_panel': '✈️ Travel Panel',
         'user_chats': '💬 User Chats',
@@ -278,8 +297,8 @@ TEXTS = {
         'role_user_desc': 'Regular user',
 
         # PR
-        'pr_banner': '📸 Order Banner',
-        'pr_business_cards': '💳 Order Business Cards',
+        'pr_banner': 'Order Banner',
+        'pr_business_cards': 'Order Business Cards',
         'pr_dinner': '🍽️ Business Dinner',
         'pr_conference_bot': '🤖 Conference Bot',
         'pr_conference_rules': '📋 Conference Rules',
@@ -501,7 +520,24 @@ TEXTS = {
         'no_ticket_requests': 'No ticket requests',
         'all_statuses': 'All statuses',
         'warning': 'Warning',
-        'info': 'Information'
+        'info': 'Information',
+
+        'banner_requests': 'Banner Requests',
+        'business_cards_requests': 'Business Cards Requests',
+        'total_banners': 'Total Banner Requests',
+        'banners_pending': 'Banners (Pending)',
+        'banners_in_progress': 'Banners (In Progress)',
+        'banners_ready': 'Banners (Ready)',
+        'total_cards': 'Total Card Requests',
+        'cards_pending': 'Cards (Pending)',
+        'cards_in_progress': 'Cards (In Progress)',
+        'cards_ready': 'Cards (Ready)',
+        'request_details': 'Request Details',
+        'no_banner_requests': 'No banner requests',
+        'no_cards_requests': 'No business card requests',
+        'brand_style': 'Brand Style',
+        'yes': 'Yes',
+        'no': 'No',
     }
 }
 

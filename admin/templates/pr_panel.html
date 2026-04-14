@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}PR-панель | Управление рекламой{% endblock %}
+{% block title %}{{ get_text('pr_panel') }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -11,119 +11,155 @@
         text-align: center;
         transition: all 0.3s;
         height: 100%;
+        cursor: pointer;
+        transition: all 0.2s;
     }
     .stat-card:hover {
         transform: translateY(-3px);
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
     }
-    .image-preview {
-        max-width: 100px;
-        max-height: 100px;
-        cursor: pointer;
+    .stat-card.active {
+        border: 2px solid #667eea;
+        background: #f8f9ff;
+    }
+    .status-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-in_progress { background: #cfe2ff; color: #084298; }
+    .status-ready { background: #d4edda; color: #155724; }
+    .nav-tabs .nav-link {
+        font-size: 1.1rem;
+        padding: 10px 20px;
+    }
+    .nav-tabs .nav-link i {
+        margin-right: 8px;
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="fade-in">
-    <h2 class="mb-4"><i class="bi bi-megaphone"></i> PR-панель</h2>
-
-    <!-- Stats Cards -->
-    <div class="row mb-4">
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="stat-number text-primary">{{ stats.total_banners }}</div>
-                <div class="stat-label">Заявок на баннеры</div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="stat-number text-warning">{{ stats.pending_banners }}</div>
-                <div class="stat-label">На рассмотрении</div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="stat-number text-info">{{ stats.total_cards }}</div>
-                <div class="stat-label">Заявок на визитки</div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="stat-number text-warning">{{ stats.pending_cards }}</div>
-                <div class="stat-label">На рассмотрении</div>
-            </div>
-        </div>
-    </div>
+    <h2 class="mb-4"><i class="bi bi-megaphone"></i> {{ get_text('pr_panel') }}</h2>
 
     <!-- Tabs -->
     <ul class="nav nav-tabs mb-4" id="prTabs" role="tablist">
-        <li class="nav-item">
-            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#banners" type="button">
-                <i class="bi bi-image"></i> Баннеры
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="banners-tab" data-bs-toggle="tab" data-bs-target="#banners" type="button" role="tab">
+                <i class="bi bi-image"></i> {{ get_text('pr_banner') }}
             </button>
         </li>
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#businessCards" type="button">
-                <i class="bi bi-card-text"></i> Визитки
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="cards-tab" data-bs-toggle="tab" data-bs-target="#cards" type="button" role="tab">
+                <i class="bi bi-card-text"></i> {{ get_text('pr_business_cards') }}
             </button>
         </li>
     </ul>
 
     <div class="tab-content">
-        <!-- Banner Requests -->
-        <div class="tab-pane fade show active" id="banners">
+        <!-- BANNERS TAB -->
+        <div class="tab-pane fade show active" id="banners" role="tabpanel">
+            <!-- Banner Stats Cards -->
+            <div class="mb-4">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card {% if banner_filter == 'all' %}active{% endif %}" onclick="filterBanners('all')">
+                            <div class="stat-number text-primary">{{ banner_stats.total }}</div>
+                            <div class="stat-label">{{ get_text('total_banners') }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card {% if banner_filter == 'pending' %}active{% endif %}" onclick="filterBanners('pending')">
+                            <div class="stat-number text-warning">{{ banner_stats.pending }}</div>
+                            <div class="stat-label">{{ get_text('banners_pending') }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card {% if banner_filter == 'in_progress' %}active{% endif %}" onclick="filterBanners('in_progress')">
+                            <div class="stat-number text-info">{{ banner_stats.in_progress }}</div>
+                            <div class="stat-label">{{ get_text('banners_in_progress') }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card {% if banner_filter == 'ready' %}active{% endif %}" onclick="filterBanners('ready')">
+                            <div class="stat-number text-success">{{ banner_stats.ready }}</div>
+                            <div class="stat-label">{{ get_text('banners_ready') }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Banner Requests Table -->
             <div class="card">
                 <div class="card-header">
-                    <i class="bi bi-image"></i> Заявки на баннеры
+                    <i class="bi bi-image"></i> {{ get_text('banner_requests') }}
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table id="bannersTable" class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Пользователь</th>
-                                    <th>ФИО</th>
-                                    <th>Компания</th>
-                                    <th>Язык</th>
-                                    <th>Фото</th>
-                                    <th>Дата</th>
-                                    <th>Статус</th>
-                                    <th>Действия</th>
+                                    <th>{{ get_text('id') }}</th>
+                                    <th>{{ get_text('username') }}</th>
+                                    <th>{{ get_text('full_name') }}</th>
+                                    <th>{{ get_text('company') }}</th>
+                                    <th>{{ get_text('language') }}</th>
+                                    <th>{{ get_text('created_at') }}</th>
+                                    <th>{{ get_text('status') }}</th>
+                                    <th>{{ get_text('actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for req in banner_requests %}
-                                <tr>
+                                <tr data-status="{{ req.status }}">
                                     <td>{{ req.id }}</td>
                                     <td><strong>@{{ req.username }}</strong></td>
                                     <td>{{ req.full_name or '-' }}</td>
                                     <td>{{ req.company or '-' }}</td>
                                     <td>{{ '🇷🇺 RU' if req.language == 'ru' else '🇬🇧 EN' }}</td>
+                                    <td>{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</td>
                                     <td>
-                                        {% if req.photo_file_id %}
-                                        <span class="badge bg-success">Загружено</span>
-                                        {% else %}
-                                        <span class="badge bg-secondary">Нет</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ req.created_at.strftime('%d.%m.%Y') if req.created_at else '-' }}</td>
-                                    <td>
-                                        <span class="badge bg-{{ 'warning' if req.status == 'pending' else 'success' if req.status == 'approved' else 'danger' }}">
-                                            {{ 'В ожидании' if req.status == 'pending' else 'Одобрено' if req.status == 'approved' else 'Отклонено' }}
+                                        <span class="status-badge status-{{ req.status }}">
+                                            {% if req.status == 'pending' %}
+                                                <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_event') }}
+                                            {% elif req.status == 'in_progress' %}
+                                                <i class="bi bi-arrow-repeat"></i> {{ get_text('status_in_progress') }}
+                                            {% elif req.status == 'ready' %}
+                                                <i class="bi bi-check-lg"></i> {{ get_text('status_ready') }}
+                                            {% endif %}
                                         </span>
                                     </td>
                                     <td>
-                                        <button class="btn btn-sm btn-outline-primary" onclick="viewBanner({{ req.id }})">
-                                            <i class="bi bi-eye"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-success" onclick="updateBannerStatus({{ req.id }}, 'approved')">
-                                            <i class="bi bi-check-lg"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="updateBannerStatus({{ req.id }}, 'rejected')">
-                                            <i class="bi bi-x-lg"></i>
-                                        </button>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button class="btn btn-sm btn-outline-warning"
+                                                    onclick="updateBannerStatus({{ req.id }}, 'pending')"
+                                                    {% if req.status == 'pending' %}disabled{% endif %}
+                                                    title="{{ get_text('set_pending') }}">
+                                                <i class="bi bi-hourglass-split"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-info"
+                                                    onclick="updateBannerStatus({{ req.id }}, 'in_progress')"
+                                                    {% if req.status == 'in_progress' %}disabled{% endif %}
+                                                    title="{{ get_text('set_in_progress') }}">
+                                                <i class="bi bi-arrow-repeat"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-success"
+                                                    onclick="updateBannerStatus({{ req.id }}, 'ready')"
+                                                    {% if req.status == 'ready' %}disabled{% endif %}
+                                                    title="{{ get_text('set_ready') }}">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">
+                                        <i class="bi bi-image fs-1"></i>
+                                        <p class="mt-2">{{ get_text('no_banner_requests') }}</p>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -134,31 +170,62 @@
             </div>
         </div>
 
-        <!-- Business Cards -->
-        <div class="tab-pane fade" id="businessCards">
+        <!-- BUSINESS CARDS TAB -->
+        <div class="tab-pane fade" id="cards" role="tabpanel">
+            <!-- Cards Stats Cards -->
+            <div class="mb-4">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card {% if cards_filter == 'all' %}active{% endif %}" onclick="filterCards('all')">
+                            <div class="stat-number text-primary">{{ cards_stats.total }}</div>
+                            <div class="stat-label">{{ get_text('total_cards') }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card {% if cards_filter == 'pending' %}active{% endif %}" onclick="filterCards('pending')">
+                            <div class="stat-number text-warning">{{ cards_stats.pending }}</div>
+                            <div class="stat-label">{{ get_text('cards_pending') }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card {% if cards_filter == 'in_progress' %}active{% endif %}" onclick="filterCards('in_progress')">
+                            <div class="stat-number text-info">{{ cards_stats.in_progress }}</div>
+                            <div class="stat-label">{{ get_text('cards_in_progress') }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stat-card {% if cards_filter == 'ready' %}active{% endif %}" onclick="filterCards('ready')">
+                            <div class="stat-number text-success">{{ cards_stats.ready }}</div>
+                            <div class="stat-label">{{ get_text('cards_ready') }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Business Cards Table -->
             <div class="card">
                 <div class="card-header">
-                    <i class="bi bi-card-text"></i> Заявки на визитки
+                    <i class="bi bi-card-text"></i> {{ get_text('business_cards_requests') }}
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table id="cardsTable" class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Пользователь</th>
-                                    <th>ФИО</th>
-                                    <th>Должность (EN)</th>
-                                    <th>Компания</th>
-                                    <th>Бренд-стиль</th>
-                                    <th>Дата</th>
-                                    <th>Статус</th>
-                                    <th>Действия</th>
+                                    <th>{{ get_text('id') }}</th>
+                                    <th>{{ get_text('username') }}</th>
+                                    <th>{{ get_text('full_name') }}</th>
+                                    <th>{{ get_text('position') }}</th>
+                                    <th>{{ get_text('company') }}</th>
+                                    <th>{{ get_text('brand_style') }}</th>
+                                    <th>{{ get_text('created_at') }}</th>
+                                    <th>{{ get_text('status') }}</th>
+                                    <th>{{ get_text('actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for card in business_cards %}
-                                <tr>
+                                <tr data-status="{{ card.status }}">
                                     <td>{{ card.id }}</td>
                                     <td><strong>@{{ card.username }}</strong></td>
                                     <td>{{ card.full_name or '-' }}</td>
@@ -166,27 +233,51 @@
                                     <td>{{ card.company or '-' }}</td>
                                     <td>
                                         {% if card.brand_style %}
-                                        <span class="badge bg-success">Да</span>
+                                        <span class="badge bg-success">{{ get_text('yes') }}</span>
                                         {% else %}
-                                        <span class="badge bg-secondary">Нет</span>
+                                        <span class="badge bg-secondary">{{ get_text('no') }}</span>
                                         {% endif %}
                                     </td>
-                                    <td>{{ card.created_at.strftime('%d.%m.%Y') if card.created_at else '-' }}</td>
+                                    <td>{{ card.created_at.strftime('%d.%m.%Y %H:%M') if card.created_at else '-' }}</td>
                                     <td>
-                                        <span class="badge bg-{{ 'warning' if card.status == 'pending' else 'success' if card.status == 'approved' else 'danger' }}">
-                                            {{ 'В ожидании' if card.status == 'pending' else 'Одобрено' if card.status == 'approved' else 'Отклонено' }}
+                                        <span class="status-badge status-{{ card.status }}">
+                                            {% if card.status == 'pending' %}
+                                                <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_event') }}
+                                            {% elif card.status == 'in_progress' %}
+                                                <i class="bi bi-arrow-repeat"></i> {{ get_text('status_in_progress') }}
+                                            {% elif card.status == 'ready' %}
+                                                <i class="bi bi-check-lg"></i> {{ get_text('status_ready') }}
+                                            {% endif %}
                                         </span>
                                     </td>
                                     <td>
-                                        <button class="btn btn-sm btn-outline-primary" onclick="viewCard({{ card.id }})">
-                                            <i class="bi bi-eye"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-success" onclick="updateCardStatus({{ card.id }}, 'approved')">
-                                            <i class="bi bi-check-lg"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="updateCardStatus({{ card.id }}, 'rejected')">
-                                            <i class="bi bi-x-lg"></i>
-                                        </button>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button class="btn btn-sm btn-outline-warning"
+                                                    onclick="updateCardStatus({{ card.id }}, 'pending')"
+                                                    {% if card.status == 'pending' %}disabled{% endif %}
+                                                    title="{{ get_text('set_pending') }}">
+                                                <i class="bi bi-hourglass-split"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-info"
+                                                    onclick="updateCardStatus({{ card.id }}, 'in_progress')"
+                                                    {% if card.status == 'in_progress' %}disabled{% endif %}
+                                                    title="{{ get_text('set_in_progress') }}">
+                                                <i class="bi bi-arrow-repeat"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-success"
+                                                    onclick="updateCardStatus({{ card.id }}, 'ready')"
+                                                    {% if card.status == 'ready' %}disabled{% endif %}
+                                                    title="{{ get_text('set_ready') }}">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="9" class="text-center text-muted py-4">
+                                        <i class="bi bi-card-text fs-1"></i>
+                                        <p class="mt-2">{{ get_text('no_cards_requests') }}</p>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -194,22 +285,6 @@
                         </table>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal для просмотра деталей -->
-<div class="modal fade" id="requestModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Детали заявки</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="requestModalBody"></div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
             </div>
         </div>
     </div>
@@ -218,64 +293,137 @@
 
 {% block extra_js %}
 <script>
+    let currentBannerFilter = '{{ banner_filter if banner_filter else "all" }}';
+    let currentCardsFilter = '{{ cards_filter if cards_filter else "all" }}';
+
     $(document).ready(function() {
         $('#bannersTable, #cardsTable').DataTable({
-            language: { url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/ru.json' },
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/{{ "ru" if session.get("lang", "ru") == "ru" else "en" }}.json'
+            },
             pageLength: 25,
-            order: [[5, 'desc']]
+            order: [[0, 'desc']]
         });
     });
 
-    function viewBanner(id) {
-        fetch(`/api/banner/${id}`)
-            .then(response => response.json())
-            .then(data => {
-                let html = '<table class="table">';
-                for (let [key, value] of Object.entries(data)) {
-                    if (value) {
-                        html += `<tr><th>${key}:</th><td>${value}</td></tr>`;
-                    }
-                }
-                html += '</table>';
-                document.getElementById('requestModalBody').innerHTML = html;
-                new bootstrap.Modal(document.getElementById('requestModal')).show();
-            });
+    function filterBanners(status) {
+        currentBannerFilter = status;
+        const table = $('#bannersTable').DataTable();
+
+        if (status === 'all') {
+            table.search('').columns().search('').draw();
+        } else {
+            table.column(6).search(status).draw();
+        }
+
+        document.querySelectorAll('#banners .stat-card').forEach(card => card.classList.remove('active'));
+        event.currentTarget.classList.add('active');
     }
 
-    function viewCard(id) {
-        fetch(`/api/business_card/${id}`)
-            .then(response => response.json())
-            .then(data => {
-                let html = '<table class="table">';
-                for (let [key, value] of Object.entries(data)) {
-                    if (value) {
-                        html += `<tr><th>${key}:</th><td>${value}</td></tr>`;
-                    }
-                }
-                html += '</table>';
-                document.getElementById('requestModalBody').innerHTML = html;
-                new bootstrap.Modal(document.getElementById('requestModal')).show();
-            });
+    function filterCards(status) {
+        currentCardsFilter = status;
+        const table = $('#cardsTable').DataTable();
+
+        if (status === 'all') {
+            table.search('').columns().search('').draw();
+        } else {
+            table.column(7).search(status).draw();
+        }
+
+        document.querySelectorAll('#cards .stat-card').forEach(card => card.classList.remove('active'));
+        event.currentTarget.classList.add('active');
     }
 
     function updateBannerStatus(id, status) {
-        if (confirm(`Изменить статус заявки на баннер #${id} на "${status}"?`)) {
+        const statusNames = {
+            'pending': '{{ get_text("status_pending_event") }}',
+            'in_progress': '{{ get_text("status_in_progress") }}',
+            'ready': '{{ get_text("status_ready") }}'
+        };
+
+        if (confirm(`{{ get_text("confirm_status_change") }} ${statusNames[status]}?`)) {
             fetch(`/api/banner/${id}/status`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: `status=${status}`
-            }).then(() => location.reload());
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(`{{ get_text("status_changed") }} ${statusNames[status]}`, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast('{{ get_text("error_status_change") }}', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('{{ get_text("error_status_change") }}', 'danger');
+            });
         }
     }
 
     function updateCardStatus(id, status) {
-        if (confirm(`Изменить статус заявки на визитки #${id} на "${status}"?`)) {
+        const statusNames = {
+            'pending': '{{ get_text("status_pending_event") }}',
+            'in_progress': '{{ get_text("status_in_progress") }}',
+            'ready': '{{ get_text("status_ready") }}'
+        };
+
+        if (confirm(`{{ get_text("confirm_status_change") }} ${statusNames[status]}?`)) {
             fetch(`/api/business_card/${id}/status`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: `status=${status}`
-            }).then(() => location.reload());
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(`{{ get_text("status_changed") }} ${statusNames[status]}`, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast('{{ get_text("error_status_change") }}', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('{{ get_text("error_status_change") }}', 'danger');
+            });
         }
+    }
+
+    function showToast(message, type) {
+        const toastContainer = document.querySelector('.toast-container');
+        const typeMap = {
+            success: 'check-circle-fill text-success',
+            danger: 'exclamation-triangle-fill text-danger',
+            warning: 'exclamation-triangle-fill text-warning',
+            info: 'info-circle-fill text-info'
+        };
+        const typeText = {
+            success: '{{ get_text("operation_success") }}',
+            danger: '{{ get_text("error_occurred") }}',
+            warning: '{{ get_text("warning") }}',
+            info: '{{ get_text("info") }}'
+        };
+
+        const toastHtml = `
+            <div class="toast show" role="alert" data-bs-autohide="true" data-bs-delay="3000">
+                <div class="toast-header">
+                    <i class="bi ${typeMap[type] || typeMap.info} me-2"></i>
+                    <strong class="me-auto">${typeText[type] || typeText.info}</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                </div>
+                <div class="toast-body">${message}</div>
+            </div>
+        `;
+
+        toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+
+        setTimeout(() => {
+            const toast = toastContainer.lastElementChild;
+            if (toast) toast.remove();
+        }, 3000);
     }
 </script>
 {% endblock %}

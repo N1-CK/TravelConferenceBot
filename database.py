@@ -148,7 +148,9 @@ class Database:
                         language TEXT,
                         photo_required BOOLEAN,
                         photo_file_id TEXT,
+                        status TEXT DEFAULT 'pending',
                         created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW(),
                         comments TEXT DEFAULT ''
                     )
                     ''',
@@ -282,7 +284,9 @@ class Database:
                         company TEXT,
                         contacts TEXT,
                         brand_style BOOLEAN DEFAULT FALSE,
-                        created_at TIMESTAMP DEFAULT NOW()
+                        status TEXT DEFAULT 'pending',
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
                     )
                     ''',
 
@@ -1833,112 +1837,6 @@ class Database:
             return []
 
 
-    async def create_groups_tables(self):
-        """Создание таблиц для групп и функций"""
-        try:
-            async with self.pool.acquire() as conn:
-                # Таблица групп
-                await conn.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.user_groups (
-                        id SERIAL PRIMARY KEY,
-                        name TEXT NOT NULL UNIQUE,
-                        description TEXT,
-                        color TEXT DEFAULT '#667eea',
-                        created_at TIMESTAMP DEFAULT NOW(),
-                        updated_at TIMESTAMP DEFAULT NOW()
-                    )
-                """)
-
-                # Таблица функций
-                await conn.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.features (
-                        id SERIAL PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        code TEXT NOT NULL UNIQUE,
-                        description TEXT,
-                        icon TEXT DEFAULT 'bi-grid',
-                        created_at TIMESTAMP DEFAULT NOW()
-                    )
-                """)
-
-                # Таблица связи пользователей с группами
-                await conn.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.user_group_membership (
-                        user_id BIGINT NOT NULL,
-                        group_id INTEGER NOT NULL REFERENCES {self.db_schema}.user_groups(id) ON DELETE CASCADE,
-                        created_at TIMESTAMP DEFAULT NOW(),
-                        PRIMARY KEY (user_id, group_id)
-                    )
-                """)
-
-
-                # Добавить базовые функции, если их нет
-                basic_features = [
-                    ('PR-баннеры', 'pr_banner', 'Заказ баннеров для конференций', 'bi-megaphone'),
-                    ('PR-визитки', 'pr_business_cards', 'Заказ визиток', 'bi-card-text'),
-                    ('Визы', 'travel_visa', 'Оформление виз', 'bi-passport'),
-                    ('Авиабилеты', 'travel_flights', 'Бронирование авиабилетов', 'bi-airplane'),
-                    ('Отели', 'travel_hotels', 'Бронирование отелей', 'bi-building'),
-                    ('Суточные', 'travel_per_diem', 'Оформление суточных', 'bi-cash'),
-                    ('Бронирование столиков', 'affiliate_bookings', 'Бронь в ресторанах', 'bi-calendar-check'),
-                    ('Отчеты', 'affiliate_reports', 'Отчеты о встречах', 'bi-file-earmark-text')
-                ]
-
-                for name, code, desc, icon in basic_features:
-                    await conn.execute(f"""
-                        INSERT INTO {self.db_schema}.features (name, code, description, icon)
-                        VALUES ($1, $2, $3, $4)
-                        ON CONFLICT (code) DO NOTHING
-                    """, name, code, desc, icon)
-
-                return True
-        except Exception as e:
-            logger.error(f"Error creating groups tables: {e}")
-            return False
-
-    async def get_all_features(self) -> list:
-        """Получить все доступные функции"""
-        try:
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(f"""
-                    SELECT * FROM {self.db_schema}.features
-                    ORDER BY name
-                """)
-                return [dict(row) for row in rows]
-        except Exception as e:
-            logger.error(f"Error getting features: {e}")
-            return []
-
-    async def add_feature(self, name: str, code: str, description: str = None,
-                          icon: str = 'bi-grid') -> bool:
-        """Добавить новую функцию"""
-        try:
-            async with self.pool.acquire() as conn:
-                await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.features (name, code, description, icon)
-                    VALUES ($1, $2, $3, $4)
-                    ON CONFLICT (code) DO UPDATE
-                    SET name = EXCLUDED.name,
-                        description = EXCLUDED.description,
-                        icon = EXCLUDED.icon
-                """, name, code, description, icon)
-                return True
-        except Exception as e:
-            logger.error(f"Error adding feature: {e}")
-            return False
-
-    async def delete_feature(self, feature_id: int) -> bool:
-        """Удалить функцию"""
-        try:
-            async with self.pool.acquire() as conn:
-                await conn.execute(f"""
-                    DELETE FROM {self.db_schema}.features WHERE id = $1
-                """, feature_id)
-                return True
-        except Exception as e:
-            logger.error(f"Error deleting feature: {e}")
-            return False
-
     async def get_all_companies_from_config(self) -> list:
         """Получить список всех компаний из конфига"""
         try:
@@ -2101,10 +1999,37 @@ class Database:
             logger.error(f"Error getting available flights: {e}")
             return []
 
+    async def get_banner_request_by_id(self, request_id: int) -> dict:
+        """Получить заявку на баннер по ID"""
+        try:
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(f"""
+                    SELECT * FROM {self.db_schema_pr}.pr_banner_requests 
+                    WHERE id = $1
+                """, request_id)
+                return dict(row) if row else {}
+        except Exception as e:
+            logger.error(f"Error getting banner request by id: {e}")
+            return {}
+
+    async def get_business_card_request_by_id(self, request_id: int) -> dict:
+        """Получить заявку на визитки по ID"""
+        try:
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(f"""
+                    SELECT * FROM {self.db_schema_pr}.pr_business_cards 
+                    WHERE id = $1
+                """, request_id)
+                return dict(row) if row else {}
+        except Exception as e:
+            logger.error(f"Error getting business card request by id: {e}")
+            return {}
+
     async def update_banner_status(self, request_id: int, status: str) -> bool:
         """Обновить статус заявки на баннер"""
         try:
             async with self.pool.acquire() as conn:
+
                 await conn.execute(f"""
                     UPDATE {self.db_schema_pr}.pr_banner_requests 
                     SET status = $1, updated_at = NOW()
@@ -2113,6 +2038,21 @@ class Database:
                 return True
         except Exception as e:
             logger.error(f"Error updating banner status: {e}")
+            return False
+
+    async def update_business_card_status(self, request_id: int, status: str) -> bool:
+        """Обновить статус заявки на визитки"""
+        try:
+            async with self.pool.acquire() as conn:
+
+                await conn.execute(f"""
+                    UPDATE {self.db_schema_pr}.pr_business_cards 
+                    SET status = $1, updated_at = NOW()
+                    WHERE id = $2
+                """, status, request_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error updating business card status: {e}")
             return False
 
 
@@ -2595,7 +2535,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 # Таблица менеджеров
                 await conn.execute(f"""
-                                   CREATE TABLE IF NOT EXISTS {self.db_schema}.managers
+                                   CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.managers
                                    (
                                        id            SERIAL PRIMARY KEY,
                                        username      TEXT UNIQUE NOT NULL,
@@ -2610,7 +2550,7 @@ class Database:
 
                 # Таблица групп
                 await conn.execute(f"""
-                                   CREATE TABLE IF NOT EXISTS {self.db_schema}.manager_groups
+                                   CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.manager_groups
                                    (
                                        id          SERIAL PRIMARY KEY,
                                        name        TEXT UNIQUE NOT NULL,
@@ -2621,10 +2561,10 @@ class Database:
 
                 # Связь менеджеров с группами
                 await conn.execute(f"""
-                                   CREATE TABLE IF NOT EXISTS {self.db_schema}.manager_group_membership
+                                   CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.manager_group_membership
                                    (
-                                       manager_id  INTEGER REFERENCES {self.db_schema}.managers (id) ON DELETE CASCADE,
-                                       group_id    INTEGER REFERENCES {self.db_schema}.manager_groups (id) ON DELETE CASCADE,
+                                       manager_id  INTEGER REFERENCES {self.db_schema_admin}.managers (id) ON DELETE CASCADE,
+                                       group_id    INTEGER REFERENCES {self.db_schema_admin}.manager_groups (id) ON DELETE CASCADE,
                                        assigned_at TIMESTAMP DEFAULT NOW(),
                                        PRIMARY KEY (manager_id, group_id)
                                    )
@@ -2640,7 +2580,7 @@ class Database:
 
                 for name, desc in base_groups:
                     await conn.execute(f"""
-                                       INSERT INTO {self.db_schema}.manager_groups (name, description)
+                                       INSERT INTO {self.db_schema_admin}.manager_groups (name, description)
                                        VALUES ($1, $2)
                                        ON CONFLICT (name) DO NOTHING
                                        """, name, desc)
@@ -2652,7 +2592,7 @@ class Database:
 
                 # Добавляем админа
                 admin_id = await conn.fetchval(f"""
-                                               INSERT INTO {self.db_schema}.managers (username, password_hash, full_name, role)
+                                               INSERT INTO {self.db_schema_admin}.managers (username, password_hash, full_name, role)
                                                VALUES ($1, $2, $3, $4)
                                                ON CONFLICT (username) DO NOTHING
                                                RETURNING id
@@ -2662,12 +2602,12 @@ class Database:
                 if admin_id:
                     admin_group_id = await conn.fetchval(f"""
                                                          SELECT id
-                                                         FROM {self.db_schema}.manager_groups
+                                                         FROM {self.db_schema_admin}.manager_groups
                                                          WHERE name = 'admin'
                                                          """)
                     if admin_group_id:
                         await conn.execute(f"""
-                                           INSERT INTO {self.db_schema}.manager_group_membership (manager_id, group_id)
+                                           INSERT INTO {self.db_schema_admin}.manager_group_membership (manager_id, group_id)
                                            VALUES ($1, $2)
                                            ON CONFLICT DO NOTHING
                                            """, admin_id, admin_group_id)
@@ -2688,7 +2628,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 manager = await conn.fetchrow(f"""
                                               SELECT id, username, full_name, role, is_active
-                                              FROM {self.db_schema}.managers
+                                              FROM {self.db_schema_admin}.managers
                                               WHERE username = $1
                                                 AND password_hash = $2
                                                 AND is_active = TRUE
@@ -2698,14 +2638,14 @@ class Database:
                     # Получаем группы менеджера
                     groups = await conn.fetch(f"""
                                               SELECT g.name, g.description
-                                              FROM {self.db_schema}.manager_groups g
-                                                       JOIN {self.db_schema}.manager_group_membership mgm ON g.id = mgm.group_id
+                                              FROM {self.db_schema_admin}.manager_groups g
+                                                       JOIN {self.db_schema_admin}.manager_group_membership mgm ON g.id = mgm.group_id
                                               WHERE mgm.manager_id = $1
                                               """, manager['id'])
 
                     # Обновляем время последнего входа
                     await conn.execute(f"""
-                                       UPDATE {self.db_schema}.managers
+                                       UPDATE {self.db_schema_admin}.managers
                                        SET last_login = NOW()
                                        WHERE id = $1
                                        """, manager['id'])
@@ -2733,7 +2673,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 # Добавляем менеджера
                 manager_id = await conn.fetchval(f"""
-                                                 INSERT INTO {self.db_schema}.managers (username, password_hash, full_name, role)
+                                                 INSERT INTO {self.db_schema_admin}.managers (username, password_hash, full_name, role)
                                                  VALUES ($1, $2, $3, 'manager')
                                                  RETURNING id
                                                  """, username, password_hash, full_name)
@@ -2743,12 +2683,12 @@ class Database:
                     for group_name in groups:
                         group_id = await conn.fetchval(f"""
                                                        SELECT id
-                                                       FROM {self.db_schema}.manager_groups
+                                                       FROM {self.db_schema_admin}.manager_groups
                                                        WHERE name = $1
                                                        """, group_name)
                         if group_id:
                             await conn.execute(f"""
-                                               INSERT INTO {self.db_schema}.manager_group_membership (manager_id, group_id)
+                                               INSERT INTO {self.db_schema_admin}.manager_group_membership (manager_id, group_id)
                                                VALUES ($1, $2)
                                                ON CONFLICT DO NOTHING
                                                """, manager_id, group_id)
@@ -2765,20 +2705,20 @@ class Database:
                 # Не даем удалить последнего админа
                 admin_count = await conn.fetchval(f"""
                                                   SELECT COUNT(*)
-                                                  FROM {self.db_schema}.managers
+                                                  FROM {self.db_schema_admin}.managers
                                                   WHERE role = 'admin'
                                                   """)
 
                 if admin_count <= 1:
                     manager = await conn.fetchval(f"""
                                                   SELECT role
-                                                  FROM {self.db_schema}.managers
+                                                  FROM {self.db_schema_admin}.managers
                                                   WHERE id = $1
                                                   """, manager_id)
                     if manager == 'admin':
                         return False
 
-                await conn.execute(f"DELETE FROM {self.db_schema}.managers WHERE id = $1", manager_id)
+                await conn.execute(f"DELETE FROM {self.db_schema_admin}.managers WHERE id = $1", manager_id)
                 return True
         except Exception as e:
             print(f"Error deleting manager: {e}")
@@ -2790,7 +2730,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
                                         SELECT *
-                                        FROM {self.db_schema}.manager_groups
+                                        FROM {self.db_schema_admin}.manager_groups
                                         ORDER BY id
                                         """)
                 return [dict(row) for row in rows]
@@ -2805,7 +2745,7 @@ class Database:
                 # Удаляем старые связи
                 await conn.execute(f"""
                                    DELETE
-                                   FROM {self.db_schema}.manager_group_membership
+                                   FROM {self.db_schema_admin}.manager_group_membership
                                    WHERE manager_id = $1
                                    """, manager_id)
 
@@ -2813,12 +2753,12 @@ class Database:
                 for group_name in groups:
                     group_id = await conn.fetchval(f"""
                                                    SELECT id
-                                                   FROM {self.db_schema}.manager_groups
+                                                   FROM {self.db_schema_admin}.manager_groups
                                                    WHERE name = $1
                                                    """, group_name)
                     if group_id:
                         await conn.execute(f"""
-                                           INSERT INTO {self.db_schema}.manager_group_membership (manager_id, group_id)
+                                           INSERT INTO {self.db_schema_admin}.manager_group_membership (manager_id, group_id)
                                            VALUES ($1, $2)
                                            """, manager_id, group_id)
 
@@ -2835,14 +2775,14 @@ class Database:
                 # Обновляем основные данные
                 if full_name is not None:
                     await conn.execute(f"""
-                        UPDATE {self.db_schema}.managers 
+                        UPDATE {self.db_schema_admin}.managers 
                         SET full_name = $1
                         WHERE id = $2
                     """, full_name, manager_id)
 
                 if is_active is not None:
                     await conn.execute(f"""
-                        UPDATE {self.db_schema}.managers 
+                        UPDATE {self.db_schema_admin}.managers 
                         SET is_active = $1
                         WHERE id = $2
                     """, is_active, manager_id)
@@ -2851,19 +2791,19 @@ class Database:
                 if groups is not None:
                     # Удаляем старые связи
                     await conn.execute(f"""
-                        DELETE FROM {self.db_schema}.manager_group_membership
+                        DELETE FROM {self.db_schema_admin}.manager_group_membership
                         WHERE manager_id = $1
                     """, manager_id)
 
                     # Добавляем новые
                     for group_name in groups:
                         group_id = await conn.fetchval(f"""
-                            SELECT id FROM {self.db_schema}.manager_groups 
+                            SELECT id FROM {self.db_schema_admin}.manager_groups 
                             WHERE name = $1
                         """, group_name)
                         if group_id:
                             await conn.execute(f"""
-                                INSERT INTO {self.db_schema}.manager_group_membership (manager_id, group_id)
+                                INSERT INTO {self.db_schema_admin}.manager_group_membership (manager_id, group_id)
                                 VALUES ($1, $2)
                             """, manager_id, group_id)
 
@@ -2880,7 +2820,7 @@ class Database:
 
             async with self.pool.acquire() as conn:
                 await conn.execute(f"""
-                    UPDATE {self.db_schema}.managers 
+                    UPDATE {self.db_schema_admin}.managers 
                     SET password_hash = $1
                     WHERE id = $2
                 """, password_hash, manager_id)
@@ -2895,9 +2835,9 @@ class Database:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
                     SELECT m.*, array_agg(g.name) as groups
-                    FROM {self.db_schema}.managers m
-                    LEFT JOIN {self.db_schema}.manager_group_membership mgm ON m.id = mgm.manager_id
-                    LEFT JOIN {self.db_schema}.manager_groups g ON mgm.group_id = g.id
+                    FROM {self.db_schema_admin}.managers m
+                    LEFT JOIN {self.db_schema_admin}.manager_group_membership mgm ON m.id = mgm.manager_id
+                    LEFT JOIN {self.db_schema_admin}.manager_groups g ON mgm.group_id = g.id
                     GROUP BY m.id
                     ORDER BY m.id
                 """)

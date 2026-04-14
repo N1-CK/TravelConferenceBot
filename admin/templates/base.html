@@ -398,7 +398,7 @@
                     <a class="nav-link {% if request.endpoint == 'conferences_page' %}active{% endif %}" href="/conferences">{{ get_text('conferences') }}</a>
 
                     {% if 'pr' in session.get('groups', []) or session.role == 'admin' %}
-                    <a class="nav-link {% if request.endpoint == 'pr_panel' %}active{% endif %}" href="/pr">{{ get_text('pr_panel') }}</a>
+                    <a class="nav-link {% if request.endpoint == 'pr_panel' %}active{% endif %}" href="/pr">{{ get_text('pr_panel_sidebar') }}</a>
                     {% endif %}
 
                     {% if 'event' in session.get('groups', []) or session.role == 'admin' %}

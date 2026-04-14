@@ -60,10 +60,8 @@ async def send_question_to_manager(bot: Bot, manager_chat_id: int, user_data: di
 
     message_text = (
         f"❓ Новый вопрос ({question_type.upper()})\n\n"
-        f"👤 Пользователь: @{user_data['username']}\n"
-        f"🆔 ID: {user_data['user_id']}\n"
-        f"📂 Категория: {user_data.get('category', 'general')}\n"
-        f"📝 Вопрос: {question_text}\n"
+        f"Пользователь: @{user_data['username']}\n\n"
+        f"Вопрос: {question_text}\n"
     )
 
     try:

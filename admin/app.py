@@ -16,7 +16,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utility.notifications import notify_ticket_status_change
+from utility.notifications import *
 from database import db
 
 from locales import get_text
@@ -126,7 +126,7 @@ def init_db():
             run_async(db.create_pool())
 
             # КРИТИЧЕСКИ ВАЖНО: создаем таблицы для групп и функций
-            run_async(db.create_groups_tables())
+            # run_async(db.create_groups_tables())
 
             # СОЗДАЕМ ТАБЛИЦЫ ДЛЯ МЕНЕДЖЕРОВ
             run_async(db.create_managers_tables())
@@ -709,17 +709,50 @@ def pr_panel():
     banner_requests = run_async(db.get_all_banner_requests())
     business_cards = run_async(db.get_all_business_cards())
 
-    stats = {
-        'total_banners': len(banner_requests),
-        'pending_banners': len([r for r in banner_requests if r.get('status', 'pending') == 'pending']),
-        'total_cards': len(business_cards),
-        'pending_cards': len([c for c in business_cards if c.get('status', 'pending') == 'pending'])
+    # Убеждаемся, что у каждой заявки есть статус
+    for req in banner_requests:
+        if 'status' not in req or not req.get('status'):
+            req['status'] = 'pending'
+    for card in business_cards:
+        if 'status' not in card or not card.get('status'):
+            card['status'] = 'pending'
+
+    # Получаем фильтры
+    banner_filter = request.args.get('banner_filter', 'all')
+    cards_filter = request.args.get('cards_filter', 'all')
+
+    # Применяем фильтры для отображения
+    filtered_banners = banner_requests
+    if banner_filter != 'all':
+        filtered_banners = [r for r in banner_requests if r.get('status') == banner_filter]
+
+    filtered_cards = business_cards
+    if cards_filter != 'all':
+        filtered_cards = [c for c in business_cards if c.get('status') == cards_filter]
+
+    # Статистика для баннеров
+    banner_stats = {
+        'total': len(banner_requests),
+        'pending': len([r for r in banner_requests if r.get('status') == 'pending']),
+        'in_progress': len([r for r in banner_requests if r.get('status') == 'in_progress']),
+        'ready': len([r for r in banner_requests if r.get('status') == 'ready'])
+    }
+
+    # Статистика для визиток
+    cards_stats = {
+        'total': len(business_cards),
+        'pending': len([c for c in business_cards if c.get('status') == 'pending']),
+        'in_progress': len([c for c in business_cards if c.get('status') == 'in_progress']),
+        'ready': len([c for c in business_cards if c.get('status') == 'ready'])
     }
 
     return render_template('pr_panel.html',
-                           banner_requests=banner_requests,
-                           business_cards=business_cards,
-                           stats=stats,
+                           banner_requests=filtered_banners,
+                           business_cards=filtered_cards,
+                           banner_stats=banner_stats,
+                           cards_stats=cards_stats,
+                           banner_filter=banner_filter,
+                           cards_filter=cards_filter,
                            username=session.get('username'))
 
 
@@ -799,14 +832,69 @@ def update_visa_status(request_id):
 @app.route('/api/banner/<int:request_id>/status', methods=['POST'])
 @login_required
 def update_banner_status(request_id):
-    """Обновить статус заявки на баннер"""
+    """Обновить статус заявки на баннер с уведомлением"""
     status = request.form.get('status')
+    if status not in ['pending', 'in_progress', 'ready']:
+        return jsonify({'success': False, 'error': 'Invalid status'}), 400
+
+    # Получаем текущий статус
+    current_request = run_async(db.get_banner_request_by_id(request_id))
+    old_status = current_request.get('status') if current_request else None
+
     success = run_async(db.update_banner_status(request_id, status))
-    if success:
-        flash(f'Статус заявки #{request_id} обновлен', 'success')
-    else:
-        flash('Ошибка при обновлении статуса', 'danger')
-    return redirect(url_for('pr_panel'))
+
+    if success and current_request and old_status != status:
+        # Получаем язык пользователя
+        user_data = run_async(db.get_user_data(current_request.get('user_id')))
+        lang = user_data.get('language', 'ru') if user_data else 'ru'
+
+        # Отправляем уведомление с языком
+        run_async(notify_banner_status_change(
+            user_id=current_request.get('user_id'),
+            request_id=request_id,
+            old_status=old_status or 'pending',
+            new_status=status,
+            username=current_request.get('username'),
+            lang=lang  # Добавляем явную передачу языка
+        ))
+
+        return jsonify({'success': True})
+
+    return jsonify({'success': False}), 500
+
+
+@app.route('/api/business_card/<int:request_id>/status', methods=['POST'])
+@login_required
+def update_business_card_status(request_id):
+    """Обновить статус заявки на визитки с уведомлением"""
+    status = request.form.get('status')
+    if status not in ['pending', 'in_progress', 'ready']:
+        return jsonify({'success': False, 'error': 'Invalid status'}), 400
+
+    # Получаем текущий статус
+    current_request = run_async(db.get_business_card_request_by_id(request_id))
+    old_status = current_request.get('status') if current_request else None
+
+    success = run_async(db.update_business_card_status(request_id, status))
+
+    if success and current_request and old_status != status:
+        # Получаем язык пользователя
+        user_data = run_async(db.get_user_data(current_request.get('user_id')))
+        lang = user_data.get('language', 'ru') if user_data else 'ru'
+
+        # Отправляем уведомление с языком
+        run_async(notify_business_card_status_change(
+            user_id=current_request.get('user_id'),
+            request_id=request_id,
+            old_status=old_status or 'pending',
+            new_status=status,
+            username=current_request.get('username'),
+            lang=lang  # Добавляем явную передачу языка
+        ))
+
+        return jsonify({'success': True})
+
+    return jsonify({'success': False}), 500
 
 
 # ============================================
