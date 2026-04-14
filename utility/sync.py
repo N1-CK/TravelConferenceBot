@@ -100,7 +100,7 @@ class GoogleSheetsSync:
 
                 # Move to main table
                 await conn.execute(f"""
-                    INSERT INTO {db.db_schema}.restaurants 
+                    INSERT INTO {db.db_schema_pr}.affil_restaurants 
                     (city, restaurant, address, cost, link, comment, created_at)
                     SELECT city, restaurant, address, cost, link, comment, NOW()
                     FROM temp_restaurants
@@ -129,7 +129,7 @@ class GoogleSheetsSync:
             async with db.pool.acquire() as conn:
                 bookings = await conn.fetch(f"""
                     SELECT b.*, w.company as user_company
-                    FROM {db.db_schema}.bookings b
+                    FROM {db.db_schema_pr}.affil_bookings b
                     LEFT JOIN {db.db_schema_config}.whitelist w ON b.username = w.username
                     ORDER BY b.created_at
                 """)

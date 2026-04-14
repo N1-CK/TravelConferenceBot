@@ -185,7 +185,7 @@ class Database:
 
                     # Рестораны
                     f'''
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.restaurants (
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_pr}.affil_restaurants (
                         id SERIAL PRIMARY KEY,
                         city TEXT,
                         conference TEXT,
@@ -200,7 +200,7 @@ class Database:
 
                     # Бронирования
                     f'''
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.bookings (
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_pr}.affil_bookings (
                         id SERIAL PRIMARY KEY,
                         username TEXT NOT NULL,
                         user_id BIGINT NOT NULL,
@@ -218,7 +218,7 @@ class Database:
 
                     # Отчеты
                     f'''
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.reports (
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_pr}.affil_reports (
                         id SERIAL PRIMARY KEY,
                         username TEXT NOT NULL,
                         company TEXT NOT NULL,
@@ -492,25 +492,6 @@ class Database:
 
     # ===== AFFILIATE BOT МЕТОДЫ =====
 
-    async def check_affiliate_auth(self, username: str) -> bool:
-        """Проверка авторизации Affiliate Bot с временем жизни"""
-        try:
-            async with self.pool.acquire() as conn:
-                # Проверяем, есть ли пользователь в whitelist и активен ли он
-                result = await conn.fetchval(
-                    f"""
-                    SELECT au.flag 
-                    FROM {self.db_schema}.affiliate_auth_users au
-                    JOIN {self.db_schema_config}.whitelist w ON au.username = w.username
-                    WHERE au.username = $1 AND w.is_active = TRUE
-                    """,
-                    username
-                )
-                return bool(result)
-        except Exception as e:
-            logger.error(f"Error checking affiliate auth: {e}")
-            return False
-
     async def add_affiliate_user(self, username: str, company: str) -> bool:
         """Добавление пользователя Affiliate Bot"""
         try:
@@ -544,8 +525,8 @@ class Database:
                     select city
                     from (
                         SELECT distinct max(id) as idd, city
-                        FROM {db.db_schema}.restaurants
-                        WHERE created_at = (select max(created_at) from {db.db_schema}.restaurants)
+                        FROM {db.db_schema_pr}.affil_restaurants
+                        WHERE created_at = (select max(created_at) from {db.db_schema_pr}.affil_restaurants)
                         group by city) t1
                 """)
                 print(records)
@@ -560,7 +541,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 count = await conn.fetchval(
                     f"""
-                    SELECT COUNT(*) FROM {self.db_schema}.bookings 
+                    SELECT COUNT(*) FROM {self.db_schema_pr}.affil_bookings 
                     WHERE username = $1 AND datetime = $2 AND partner = $3
                     """,
                     username, datetime_str, partner
@@ -633,10 +614,10 @@ class Database:
             async with self.pool.acquire() as conn:
                 records = await conn.fetch(f"""
                     SELECT id, restaurant, address, cost, link, comment
-                    FROM {db.db_schema}.restaurants
+                    FROM {self.db_schema_pr}.affil_restaurants
                     WHERE city = $1 
                     AND created_at = (
-                        SELECT MAX(created_at) FROM {db.db_schema}.restaurants
+                        SELECT MAX(created_at) FROM {self.db_schema_pr}.affil_restaurants
                     )
                     ORDER BY restaurant
                 """, city)
@@ -651,7 +632,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 record = await conn.fetchrow(f"""
                     SELECT city, restaurant, address, cost, link, comment
-                    FROM {self.db_schema}.restaurants
+                    FROM {self.db_schema_pr}.affil_restaurants
                     WHERE id = $1
                 """, rest_id)
                 return record
@@ -753,7 +734,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.bookings 
+                    INSERT INTO {self.db_schema_pr}.affil_bookings 
                     (username, user_id, manager, datetime, company, partner, 
                      restaurant, people, payment_method, partnertype)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -778,7 +759,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 records = await conn.fetch(f"""
-                    SELECT * FROM {self.db_schema}.bookings 
+                    SELECT * FROM {self.db_schema_pr}.affil_bookings 
                     WHERE username = $1 
                     ORDER BY created_at DESC
                 """, username)
@@ -937,7 +918,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.reports 
+                    INSERT INTO {self.db_schema_pr}.affil_reports 
                     (username, company, meeting_date, manager, partner, result, budget)
                     VALUES ($1, $2, $3, $4, $5, $6, $7)
                 """,

@@ -1,16 +1,15 @@
-# handlers/dinner/affiliate_integrated.py - ПОЛНЫЙ ФАЙЛ С ПРАВКАМИ
+# handlers/dinner/affiliate_integrated.py - ПОЛНАЯ ЛОКАЛИЗАЦИЯ НА РУССКИЙ ЯЗЫК
 import logging
 import os
 import re
 from datetime import datetime, timedelta
-from functools import wraps
 from typing import Union, Optional
 
 import asyncio
 from aiogram import Router, F
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-from aiogram.filters import Command, StateFilter
+from aiogram.filters import Command
 from aiogram.types import (
     Message, CallbackQuery,
     InlineKeyboardMarkup, InlineKeyboardButton,
@@ -21,41 +20,11 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.enums import ParseMode
 
 from database import db
+from utility.lang_utils import t, get_user_lang, get_text_sync
 
 
 router = Router()
 logger = logging.getLogger(__name__)
-
-
-# ============================================
-# DECORATORS AND AUTHORIZATION
-# ============================================
-
-# def affiliate_auth_required(func):
-#     """Decorator for affiliate module access check"""
-#
-#     @wraps(func)
-#     async def wrapper(*args, **kwargs):
-#         update = args[0]
-#         username = update.from_user.username
-#
-#         if not username:
-#             if isinstance(update, Message):
-#                 await update.answer("Please set username in Telegram")
-#             elif isinstance(update, CallbackQuery):
-#                 await update.answer("Username required", show_alert=True)
-#             return
-#
-#         if not await db.check_affiliate_auth(username):
-#             if isinstance(update, Message):
-#                 await update.answer("For access to partner dinners, use /affiliate_start")
-#             elif isinstance(update, CallbackQuery):
-#                 await update.answer("Authorization required /affiliate_start", show_alert=True)
-#             return
-#
-#         return await func(*args, **kwargs)
-#
-#     return wrapper
 
 
 # ============================================
@@ -69,42 +38,44 @@ class AffiliateAuthStates(StatesGroup):
 
 @router.message(Command("affiliate_start"))
 async def affiliate_start_command(msg: Message, state: FSMContext):
-    """Start affiliate module authorization"""
+    """Начало авторизации в модуле партнерских ужинов"""
+    user_id = msg.from_user.id
     username = msg.from_user.username
 
     if not username:
-        await msg.answer("Please set username in Telegram settings")
+        await msg.answer(await t(user_id, 'error_no_username'))
         return
 
-    if await db.check_affiliate_auth(username):
-        await show_affiliate_main_menu(msg)  # Оставляем как есть для Message
+    if await db.check_whitelist(username):
+        await show_affiliate_main_menu(msg)
     else:
         await state.set_state(AffiliateAuthStates.waiting_for_password)
-        await msg.answer("Enter password for partner dinners access:")
+        await msg.answer(await t(user_id, 'affiliate_enter_password'))
 
-
-# В функции process_affiliate_password заменить клавиатуру на текстовый запрос:
 
 @router.message(AffiliateAuthStates.waiting_for_password)
 async def process_affiliate_password(msg: Message, state: FSMContext):
-    """Process password"""
+    """Обработка пароля"""
+    user_id = msg.from_user.id
     password = os.getenv('AFFILIATE_PASSWORD', 'affil123')
 
     if msg.text == password:
-        await msg.answer("Password correct! Enter your partner program name:")
+        await msg.answer(await t(user_id, 'affiliate_password_correct'))
         await state.set_state(AffiliateAuthStates.waiting_for_company)
+        await msg.answer(await t(user_id, 'affiliate_enter_company'))
     else:
-        await msg.answer("Wrong password. Try again.")
+        await msg.answer(await t(user_id, 'affiliate_wrong_password'))
 
 
 @router.message(AffiliateAuthStates.waiting_for_company)
 async def process_affiliate_company(msg: Message, state: FSMContext):
-    """Process company selection - ТЕКСТОВЫЙ ВВОД как в оригинале"""
+    """Обработка названия компании"""
+    user_id = msg.from_user.id
     username = msg.from_user.username
     company_input = msg.text.strip()
 
     if not company_input:
-        await msg.answer("Company name cannot be empty. Please enter your partner program name:")
+        await msg.answer(await t(user_id, 'affiliate_company_empty'))
         return
 
     companies_list = os.getenv('COMPANIES_LIST', 'Betmen,ToTheMoon,ChinChin,FTD,Chilli').split(',')
@@ -113,7 +84,6 @@ async def process_affiliate_company(msg: Message, state: FSMContext):
     matches = [c for c in companies_list if company_input.lower() in c.lower()]
 
     if matches:
-        # Совпадение найдено - показываем кнопки для подтверждения
         builder = InlineKeyboardBuilder()
         for match in matches:
             builder.add(InlineKeyboardButton(
@@ -122,34 +92,40 @@ async def process_affiliate_company(msg: Message, state: FSMContext):
             ))
         builder.adjust(1)
 
-        await msg.answer(f"Found matching partner programs. Select one:", reply_markup=builder.as_markup())
+        await msg.answer(
+            await t(user_id, 'affiliate_matches_found'),
+            reply_markup=builder.as_markup()
+        )
         await state.set_state(AffiliateAuthStates.waiting_for_company)
     else:
-        # Совпадений нет - предлагаем отправить как есть
         builder = InlineKeyboardBuilder()
         builder.add(InlineKeyboardButton(
-            text=f"Submit as '{company_input}'",
+            text=await t(user_id, 'affiliate_submit_as', company=company_input),
             callback_data=f"aff_company_{company_input}"
         ))
         builder.add(InlineKeyboardButton(
-            text="Try again",
+            text=await t(user_id, 'affiliate_try_again'),
             callback_data="aff_retry_company"
         ))
 
         await msg.answer(
-            f"No exact matches found. Your partner program will be saved as '{company_input}'.\n\n"
-            f"If this is correct, click Submit. Otherwise, try entering a different name.",
+            await t(user_id, 'affiliate_no_matches', company=company_input),
             reply_markup=builder.as_markup()
         )
         await state.set_state(AffiliateAuthStates.waiting_for_company)
 
+
 @router.callback_query(F.data == "aff_retry_company", AffiliateAuthStates.waiting_for_company)
 async def retry_company_input(call: CallbackQuery, state: FSMContext):
-    await call.message.edit_text("Please enter your partner program name again:")
+    """Повторный ввод компании"""
+    user_id = call.from_user.id
+    await call.message.edit_text(await t(user_id, 'affiliate_enter_company_again'))
+
 
 @router.callback_query(F.data.startswith("aff_company_"), AffiliateAuthStates.waiting_for_company)
-async def process_affiliate_company(call: CallbackQuery, state: FSMContext):
-    """Process company selection"""
+async def process_affiliate_company_callback(call: CallbackQuery, state: FSMContext):
+    """Обработка выбора компании"""
+    user_id = call.from_user.id
     username = call.from_user.username
     company = call.data.split("_")[2]
 
@@ -157,74 +133,82 @@ async def process_affiliate_company(call: CallbackQuery, state: FSMContext):
         await state.clear()
         await show_affiliate_main_menu(call)
     else:
-        await call.answer("Error saving", show_alert=True)
+        await call.answer(await t(user_id, 'affiliate_save_error'), show_alert=True)
 
 
 # ============================================
 # MAIN MENU
 # ============================================
 
-# В функции get_affiliate_main_keyboard() исправить:
-
-async def get_affiliate_main_keyboard() -> InlineKeyboardMarkup:
+async def get_affiliate_main_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура главного меню с локализацией"""
     builder = InlineKeyboardBuilder()
 
     builder.row(
-        InlineKeyboardButton(text="🍽 Restaurants", callback_data="aff_restaurants"),
-        InlineKeyboardButton(text="📝 Expense Report", callback_data="aff_report")
+        InlineKeyboardButton(text=get_text_sync(await get_user_lang(user_id), 'affiliate_restaurants'),
+                            callback_data="aff_restaurants"),
+        InlineKeyboardButton(text=get_text_sync(await get_user_lang(user_id), 'affiliate_report'),
+                            callback_data="aff_report")
     )
     builder.row(
-        InlineKeyboardButton(text="ℹ️ Conference policy", callback_data="aff_rules"),
-        InlineKeyboardButton(text="ℹ️ Spending Limits", callback_data="aff_limits")
+        InlineKeyboardButton(text=get_text_sync(await get_user_lang(user_id), 'affiliate_rules'),
+                            callback_data="aff_rules"),
+        InlineKeyboardButton(text=get_text_sync(await get_user_lang(user_id), 'affiliate_limits'),
+                            callback_data="aff_limits")
     )
     builder.row(
-        InlineKeyboardButton(text="◀️ Back", callback_data="menu_pr"),  # Назад в меню PR
-        InlineKeyboardButton(text="🏠 Main Menu", callback_data="menu_main")
+        InlineKeyboardButton(text=get_text_sync(await get_user_lang(user_id), 'back'),
+                            callback_data="menu_pr"),
+        InlineKeyboardButton(text=get_text_sync(await get_user_lang(user_id), 'main_menu'),
+                            callback_data="menu_main")
     )
 
     return builder.as_markup()
 
 
 async def show_affiliate_main_menu(update: Union[Message, CallbackQuery]):
-    """Show main menu - now always edits if CallbackQuery"""
-    keyboard = await get_affiliate_main_keyboard()
-    text = "Hey! I'm AffilMeet Module.\nHow can I help you?"
+    """Показать главное меню"""
+    user_id = update.from_user.id
+    keyboard = await get_affiliate_main_keyboard(user_id)
+    text = await t(user_id, 'affiliate_welcome')
 
     if isinstance(update, Message):
-        await update.answer(text)
         await update.answer(text, reply_markup=keyboard)
     else:
         try:
             await update.message.edit_text(text, reply_markup=keyboard)
-        except Exception as e:
+        except Exception:
             await update.message.answer(text, reply_markup=keyboard)
         await update.answer()
 
 
 @router.callback_query(F.data == "aff_main")
-# @affiliate_auth_required
 async def back_to_affiliate_main(call: CallbackQuery, state: FSMContext):
-    """Back to main menu"""
+    """Вернуться в главное меню"""
     await state.clear()
+    try:
+        await call.message.delete()
+    except:
+        pass
     await show_affiliate_main_menu(call)
-
 
 
 @router.callback_query(F.data == "menu_main")
 async def main_menu_callback(call: CallbackQuery, state: FSMContext):
-    """Return to main menu"""
+    """Вернуться в главное меню"""
     await state.clear()
+    user_id = call.from_user.id
 
     try:
         await call.message.edit_text(
-            "🏠 Main Menu",
-            reply_markup=await get_main_menu_keyboard()
+            await t(user_id, 'main_menu_title'),
+            reply_markup=await get_main_menu_keyboard(user_id)
         )
-    except:
+    except Exception:
         await call.message.delete()
-        await call.answer(
-            "🏠 Main Menu",
-            reply_markup=await get_main_menu_keyboard()
+        await call.message.answer(
+            await t(user_id, 'main_menu_title'),
+            reply_markup=await get_main_menu_keyboard(user_id)
         )
 
 
@@ -233,69 +217,66 @@ async def main_menu_callback(call: CallbackQuery, state: FSMContext):
 # ============================================
 
 @router.callback_query(F.data == "aff_restaurants")
-# @affiliate_auth_required
 async def show_restaurants_menu(call: CallbackQuery):
-    """Restaurants menu - IDENTICAL TO ORIGINAL"""
+    """Меню ресторанов"""
+    user_id = call.from_user.id
     builder = InlineKeyboardBuilder()
 
     builder.row(
-        InlineKeyboardButton(text="📅 Cities list", callback_data="aff_city_list"),
-        InlineKeyboardButton(text="✅ My Bookings", callback_data="aff_my_bookings")
+        InlineKeyboardButton(text=await t(user_id, 'affiliate_cities_list'), callback_data="aff_city_list"),
+        InlineKeyboardButton(text=await t(user_id, 'affiliate_my_bookings'), callback_data="aff_my_bookings")
     )
     builder.row(
-        InlineKeyboardButton(text="◀️ Back", callback_data="aff_main"),
-        InlineKeyboardButton(text="🏠 Main Menu", callback_data="menu_main")
+        InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="aff_main"),
+        InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")
     )
 
-    await call.message.edit_text("Choose action:", reply_markup=builder.as_markup())
+    await call.message.edit_text(await t(user_id, 'affiliate_choose_action'), reply_markup=builder.as_markup())
 
 
 @router.callback_query(F.data == "aff_city_list")
-# @affiliate_auth_required
 async def show_cities_list(call: CallbackQuery):
-    """Show cities list - IDENTICAL TO ORIGINAL"""
+    """Показать список городов"""
+    user_id = call.from_user.id
     cities = await db.get_cities_from_restaurants()
     cities_reversed = cities[::-1]
 
     if not cities_reversed:
         builder = InlineKeyboardBuilder()
         builder.row(
-            InlineKeyboardButton(text="🏠 Main Menu", callback_data="aff_main")
+            InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="aff_main")
         )
-        await call.message.edit_text("📭 No cities available", reply_markup=builder.as_markup())
+        await call.message.edit_text(await t(user_id, 'affiliate_no_cities'), reply_markup=builder.as_markup())
         return
 
     builder = InlineKeyboardBuilder()
-    # Специальная логика эмодзи как в оригинале:
-    # Первый город - светлый эмодзи 🌆, остальные - темный 🏙
-
     for i, city in enumerate(cities_reversed):
         if i == 0:
-            emoji = "🌆"  # Light icon for first city
+            emoji = "🌆"
         else:
-            emoji = "🏙"  # Dark icon for others
+            emoji = "🏙"
 
         builder.add(InlineKeyboardButton(
             text=f"{emoji} {city}",
             callback_data=f"aff_city_{city}"
         ))
-    builder.adjust(2)  # 2 кнопки в ряд как в оригинале
+    builder.adjust(2)
 
     builder.row(
-        InlineKeyboardButton(text="🏠 Main Menu", callback_data="aff_main")
+        InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="aff_main")
     )
 
     await call.message.edit_text(
-        "🏙 *Select city:*",
+        await t(user_id, 'affiliate_select_city'),
         reply_markup=builder.as_markup(),
         parse_mode=ParseMode.MARKDOWN
     )
 
 
 @router.callback_query(F.data.startswith("aff_city_"))
-# @affiliate_auth_required
 async def show_city_restaurants(call: CallbackQuery):
-    """Show city restaurants"""
+    """Показать рестораны города"""
+    user_id = call.from_user.id
     city = call.data.split("_", 2)[2]
 
     restaurants = await db.get_restaurants_by_city(city)
@@ -303,10 +284,13 @@ async def show_city_restaurants(call: CallbackQuery):
     if not restaurants:
         builder = InlineKeyboardBuilder()
         builder.row(
-            InlineKeyboardButton(text="◀️ Back", callback_data="aff_city_list"),
-            InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")
+            InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="aff_city_list"),
+            InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")
         )
-        await call.message.edit_text(f"🍽 No restaurants in {city}", reply_markup=builder.as_markup())
+        await call.message.edit_text(
+            await t(user_id, 'affiliate_no_restaurants', city=city),
+            reply_markup=builder.as_markup()
+        )
         return
 
     builder = InlineKeyboardBuilder()
@@ -318,50 +302,45 @@ async def show_city_restaurants(call: CallbackQuery):
     builder.adjust(2)
 
     builder.row(
-        InlineKeyboardButton(text="◀️ Back", callback_data="aff_city_list"),
-        InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")
+        InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="aff_city_list"),
+        InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")
     )
 
     await call.message.edit_text(
-        f"🍽 *Restaurants in {city}:*",
+        await t(user_id, 'affiliate_restaurants_in_city', city=city),
         reply_markup=builder.as_markup(),
         parse_mode=ParseMode.MARKDOWN
     )
 
 
 @router.callback_query(F.data.startswith("aff_rest_"))
-# @affiliate_auth_required
 async def show_restaurant_info(call: CallbackQuery):
-    """Show restaurant info"""
+    """Показать информацию о ресторане"""
+    user_id = call.from_user.id
     rest_id = int(call.data.split("_", 2)[2])
 
     restaurant = await db.get_restaurant_by_id(rest_id)
 
     if not restaurant:
-        await call.answer("❌ Restaurant not found", show_alert=True)
+        await call.answer(await t(user_id, 'affiliate_restaurant_not_found'), show_alert=True)
         return
 
     info_text = (
-            "<b>Restaurant:</b> " + restaurant['restaurant'] + "\n\n"
-                                                               "<i>City:</i> " + restaurant['city'] + "\n"
-                                                                                                      "<i>Address:</i> " +
-            restaurant['address'] + "\n"
-                                    "<i>Average bill:</i>\n<b>" + (
-                restaurant['cost'] if restaurant['cost'] else "Not specified") + "</b>\n\n"
-                                                                                 "<i>Link:</i>\n" + (
-                restaurant['link'] if restaurant['link'] else "Not specified") + "\n\n"
-                                                                                 "<i>Info:</i> " + (
-                restaurant['comment'] if restaurant['comment'] else "No additional info")
+        f"<b>{await t(user_id, 'affiliate_restaurant')}:</b> {restaurant['restaurant']}\n\n"
+        f"<i>{await t(user_id, 'affiliate_city')}:</i> {restaurant['city']}\n"
+        f"<i>{await t(user_id, 'affiliate_address')}:</i> {restaurant['address']}\n"
+        f"<i>{await t(user_id, 'affiliate_average_bill')}:</i>\n<b>{restaurant['cost'] if restaurant['cost'] else await t(user_id, 'affiliate_not_specified')}</b>\n\n"
+        f"<i>{await t(user_id, 'affiliate_link')}:</i>\n{restaurant['link'] if restaurant['link'] else await t(user_id, 'affiliate_not_specified')}\n\n"
+        f"<i>{await t(user_id, 'affiliate_info')}:</i> {restaurant['comment'] if restaurant['comment'] else await t(user_id, 'affiliate_no_info')}"
     )
 
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="📅 Book here", callback_data=f"aff_book_rest_{rest_id}"),
-        InlineKeyboardButton(text="◀️ Back to list", callback_data=f"aff_city_{restaurant['city']}")  # Новая кнопка
+        InlineKeyboardButton(text=await t(user_id, 'affiliate_back_to_list'),
+                             callback_data=f"aff_city_{restaurant['city']}")
     )
     builder.row(
-        InlineKeyboardButton(text="◀️ Back to menu", callback_data="aff_restaurants"),
-        InlineKeyboardButton(text="🏠 Main", callback_data="menu_main")
+        InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")
     )
 
     await call.message.edit_text(
@@ -391,18 +370,21 @@ class BookingStates(StatesGroup):
 
 class BookingCalendar:
     @staticmethod
-    async def start_calendar(year: int = datetime.now().year,
+    async def start_calendar(user_id: int, year: int = datetime.now().year,
                              month: int = datetime.now().month) -> InlineKeyboardMarkup:
-        """Calendar for date selection"""
+        """Календарь для выбора даты с локализацией"""
         builder = InlineKeyboardBuilder()
+
+        months_ru = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                     "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]
 
         builder.row(
             InlineKeyboardButton(text="<", callback_data=f"book_prev_{year}_{month}"),
-            InlineKeyboardButton(text=f"{BookingCalendar.get_month_name(month)} {year}", callback_data="ignore"),
+            InlineKeyboardButton(text=f"{months_ru[month-1]} {year}", callback_data="ignore"),
             InlineKeyboardButton(text=">", callback_data=f"book_next_{year}_{month}"),
         )
 
-        week_days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        week_days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
         builder.row(*[InlineKeyboardButton(text=day, callback_data="ignore") for day in week_days])
 
         month_days = BookingCalendar.get_month_days(year, month)
@@ -417,16 +399,9 @@ class BookingCalendar:
         return builder.as_markup()
 
     @staticmethod
-    def get_month_name(month: int) -> str:
-        months = ["January", "February", "March", "April", "May", "June",
-                  "July", "August", "September", "October", "November", "December"]
-        return months[month - 1]
-
-    @staticmethod
     def get_month_days(year: int, month: int) -> list[list[int]]:
         first_day = datetime(year, month, 1)
-        last_day = datetime(year, month + 1, 1) - timedelta(days=1) if month < 12 else datetime(year + 1, 1,
-                                                                                                1) - timedelta(days=1)
+        last_day = datetime(year, month + 1, 1) - timedelta(days=1) if month < 12 else datetime(year + 1, 1, 1) - timedelta(days=1)
         start_weekday = first_day.weekday()
         days = []
         current_day = 1
@@ -446,49 +421,59 @@ class BookingCalendar:
 
 
 @router.callback_query(F.data == "aff_bookings")
-# @affiliate_auth_required
 async def start_booking_process(call: CallbackQuery, state: FSMContext):
-    """Start booking process"""
-    await call.message.edit_text("Enter your name (manager attending the meeting):")
+    """Начать процесс бронирования"""
+    user_id = call.from_user.id
+    await call.message.edit_text(await t(user_id, 'affiliate_enter_manager_name'))
     await state.set_state(BookingStates.waiting_for_manager)
 
 
 @router.message(BookingStates.waiting_for_manager)
-# @affiliate_auth_required
 async def process_manager_name(msg: Message, state: FSMContext):
-    """Process manager name"""
+    """Обработка имени менеджера"""
+    user_id = msg.from_user.id
     await state.update_data(manager=msg.text)
-    await msg.answer("Select meeting date:", reply_markup=await BookingCalendar.start_calendar())
+    await msg.answer(
+        await t(user_id, 'affiliate_select_date'),
+        reply_markup=await BookingCalendar.start_calendar(user_id)
+    )
     await state.set_state(BookingStates.waiting_for_datetime)
 
 
 @router.callback_query(F.data.startswith("book_prev_"), BookingStates.waiting_for_datetime)
 async def booking_prev_month(callback: CallbackQuery):
-    """Previous month in calendar"""
+    """Предыдущий месяц"""
+    user_id = callback.from_user.id
     _, year, month = callback.data.split("_")[1:]
     year = int(year)
     month = int(month) - 1
     if month < 1:
         month = 12
         year -= 1
-    await callback.message.edit_reply_markup(reply_markup=await BookingCalendar.start_calendar(year, month))
+    await callback.message.edit_reply_markup(
+        reply_markup=await BookingCalendar.start_calendar(user_id, year, month)
+    )
 
 
 @router.callback_query(F.data.startswith("book_next_"), BookingStates.waiting_for_datetime)
 async def booking_next_month(callback: CallbackQuery):
-    """Next month in calendar"""
+    """Следующий месяц"""
+    user_id = callback.from_user.id
     _, year, month = callback.data.split("_")[1:]
     year = int(year)
     month = int(month) + 1
     if month > 12:
         month = 1
         year += 1
-    await callback.message.edit_reply_markup(reply_markup=await BookingCalendar.start_calendar(year, month))
+    await callback.message.edit_reply_markup(
+        reply_markup=await BookingCalendar.start_calendar(user_id, year, month)
+    )
 
 
 @router.callback_query(F.data.startswith("book_day_"), BookingStates.waiting_for_datetime)
 async def booking_select_day(callback: CallbackQuery, state: FSMContext):
-    """Select day in calendar"""
+    """Выбор дня в календаре"""
+    user_id = callback.from_user.id
     _, year, month, day = callback.data.split("_")[1:]
     formatted_month = f"{int(month):02d}"
     formatted_day = f"{int(day):02d}"
@@ -496,17 +481,18 @@ async def booking_select_day(callback: CallbackQuery, state: FSMContext):
 
     await state.update_data(selected_date=selected_date)
     await callback.message.edit_text(
-        f"Date selected: {selected_date}\n\nEnter meeting time (HH:MM, e.g. 14:30):"
+        await t(user_id, 'affiliate_date_selected', date=selected_date) + "\n\n" +
+        await t(user_id, 'affiliate_enter_time')
     )
     await state.set_state(BookingStates.waiting_for_time)
 
 
 @router.message(BookingStates.waiting_for_time)
-# @affiliate_auth_required
 async def process_booking_time(msg: Message, state: FSMContext):
-    """Process booking time"""
+    """Обработка времени встречи"""
+    user_id = msg.from_user.id
     if not re.match(r'^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$', msg.text):
-        await msg.answer("Wrong time format. Use HH:MM (e.g., 14:30)")
+        await msg.answer(await t(user_id, 'affiliate_wrong_time_format'))
         return
 
     data = await state.get_data()
@@ -516,48 +502,48 @@ async def process_booking_time(msg: Message, state: FSMContext):
     try:
         datetime.strptime(datetime_str, '%d.%m.%Y %H:%M')
         await state.update_data(datetime=datetime_str)
-        await msg.answer("Enter partner company name:")
+        await msg.answer(await t(user_id, 'affiliate_enter_partner_company'))
         await state.set_state(BookingStates.waiting_for_company)
     except ValueError:
-        await msg.answer("Wrong date/time format")
+        await msg.answer(await t(user_id, 'affiliate_wrong_datetime_format'))
 
 
 @router.message(BookingStates.waiting_for_company)
-# @affiliate_auth_required
 async def process_partner_company(msg: Message, state: FSMContext):
-    """Process partner company"""
+    """Обработка компании партнера"""
+    user_id = msg.from_user.id
     await state.update_data(company=msg.text)
-    await msg.answer("Enter partner name:")
+    await msg.answer(await t(user_id, 'affiliate_enter_partner_name'))
     await state.set_state(BookingStates.waiting_for_partner)
 
 
 @router.message(BookingStates.waiting_for_partner)
-# @affiliate_auth_required
 async def process_partner_name(msg: Message, state: FSMContext):
-    """Process partner name"""
+    """Обработка имени партнера"""
+    user_id = msg.from_user.id
     await state.update_data(partner=msg.text)
 
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="VIP Partner", callback_data="aff_partner_vip"),
-        InlineKeyboardButton(text="Regular Partner", callback_data="aff_partner_regular")
+        InlineKeyboardButton(text=await t(user_id, 'affiliate_vip_partner'), callback_data="aff_partner_vip"),
+        InlineKeyboardButton(text=await t(user_id, 'affiliate_regular_partner'), callback_data="aff_partner_regular")
     )
 
-    await msg.answer("Choose partner type:", reply_markup=builder.as_markup())
+    await msg.answer(await t(user_id, 'affiliate_choose_partner_type'), reply_markup=builder.as_markup())
     await state.set_state(BookingStates.waiting_for_partner_type)
 
 
 @router.callback_query(F.data.startswith("aff_partner_"), BookingStates.waiting_for_partner_type)
 async def process_partner_type(call: CallbackQuery, state: FSMContext):
-    """Process partner type"""
-    partner_type = "VIP" if "vip" in call.data else "Regular"
+    """Обработка типа партнера"""
+    user_id = call.from_user.id
+    partner_type = "VIP" if "vip" in call.data else await t(user_id, 'affiliate_regular')
     await state.update_data(partnertype=partner_type)
 
-    # Get cities list
     cities = await db.get_cities_from_restaurants()
 
     if not cities:
-        await call.message.edit_text("No cities available")
+        await call.message.edit_text(await t(user_id, 'affiliate_no_cities'))
         return
 
     builder = InlineKeyboardBuilder()
@@ -568,13 +554,14 @@ async def process_partner_type(call: CallbackQuery, state: FSMContext):
         ))
     builder.adjust(2)
 
-    await call.message.edit_text("Choose meeting city:", reply_markup=builder.as_markup())
+    await call.message.edit_text(await t(user_id, 'affiliate_choose_city'), reply_markup=builder.as_markup())
     await state.set_state(BookingStates.waiting_for_city)
 
 
 @router.callback_query(F.data.startswith("aff_book_city_"), BookingStates.waiting_for_city)
 async def process_booking_city(call: CallbackQuery, state: FSMContext):
-    """Process city selection"""
+    """Обработка выбора города"""
+    user_id = call.from_user.id
     city = call.data.split("_")[3]
     await state.update_data(city=city)
 
@@ -583,10 +570,13 @@ async def process_booking_city(call: CallbackQuery, state: FSMContext):
     if not restaurants:
         builder = InlineKeyboardBuilder()
         builder.row(
-            InlineKeyboardButton(text="◀️ Choose other city", callback_data="aff_bookings_start_over"),
-            InlineKeyboardButton(text="❌ Cancel", callback_data="aff_main")
+            InlineKeyboardButton(text=await t(user_id, 'affiliate_choose_other_city'), callback_data="aff_bookings_start_over"),
+            InlineKeyboardButton(text=await t(user_id, 'cancel'), callback_data="aff_main")
         )
-        await call.message.edit_text(f"No restaurants in {city}", reply_markup=builder.as_markup())
+        await call.message.edit_text(
+            await t(user_id, 'affiliate_no_restaurants_in_city', city=city),
+            reply_markup=builder.as_markup()
+        )
         return
 
     builder = InlineKeyboardBuilder()
@@ -597,13 +587,17 @@ async def process_booking_city(call: CallbackQuery, state: FSMContext):
         ))
     builder.adjust(2)
 
-    await call.message.edit_text(f"Choose restaurant in {city}:", reply_markup=builder.as_markup())
+    await call.message.edit_text(
+        await t(user_id, 'affiliate_choose_restaurant_in_city', city=city),
+        reply_markup=builder.as_markup()
+    )
     await state.set_state(BookingStates.waiting_for_restaurant)
 
 
 @router.callback_query(F.data.startswith("aff_select_rest_"), BookingStates.waiting_for_restaurant)
 async def process_booking_restaurant(call: CallbackQuery, state: FSMContext):
-    """Process restaurant selection"""
+    """Обработка выбора ресторана"""
+    user_id = call.from_user.id
     rest_id = int(call.data.split("_")[3])
     restaurant = await db.get_restaurant_by_id(rest_id)
 
@@ -612,29 +606,30 @@ async def process_booking_restaurant(call: CallbackQuery, state: FSMContext):
 
         builder = InlineKeyboardBuilder()
         builder.row(
-            InlineKeyboardButton(text="💳 Card", callback_data="aff_payment_card"),
-            InlineKeyboardButton(text="💵 Cash", callback_data="aff_payment_cash")
+            InlineKeyboardButton(text=await t(user_id, 'affiliate_payment_card'), callback_data="aff_payment_card"),
+            InlineKeyboardButton(text=await t(user_id, 'affiliate_payment_cash'), callback_data="aff_payment_cash")
         )
 
-        await call.message.edit_text("Choose payment method:", reply_markup=builder.as_markup())
+        await call.message.edit_text(await t(user_id, 'affiliate_choose_payment'), reply_markup=builder.as_markup())
         await state.set_state(BookingStates.waiting_for_payment)
 
 
 @router.callback_query(F.data.startswith("aff_payment_"), BookingStates.waiting_for_payment)
 async def process_booking_payment(call: CallbackQuery, state: FSMContext):
-    """Process payment method"""
-    payment = "Card" if "card" in call.data else "Cash"
+    """Обработка способа оплаты"""
+    user_id = call.from_user.id
+    payment = await t(user_id, 'affiliate_payment_card_type') if "card" in call.data else await t(user_id, 'affiliate_payment_cash_type')
     await state.update_data(payment=payment)
-    await call.message.edit_text("Enter number of people (including you):")
+    await call.message.edit_text(await t(user_id, 'affiliate_enter_people_count'))
     await state.set_state(BookingStates.waiting_for_people)
 
 
 @router.message(BookingStates.waiting_for_people)
-# @affiliate_auth_required
 async def process_booking_people(msg: Message, state: FSMContext):
-    """Process people count"""
+    """Обработка количества человек"""
+    user_id = msg.from_user.id
     if not msg.text.isdigit() or int(msg.text) < 1:
-        await msg.answer("Enter correct number (minimum 1)")
+        await msg.answer(await t(user_id, 'affiliate_enter_correct_people'))
         return
 
     await state.update_data(people=msg.text)
@@ -642,26 +637,27 @@ async def process_booking_people(msg: Message, state: FSMContext):
 
 
 async def show_booking_confirmation(msg: Union[Message, CallbackQuery], state: FSMContext):
-    """Show booking confirmation"""
+    """Показать подтверждение бронирования"""
     data = await state.get_data()
+    user_id = msg.from_user.id if hasattr(msg, 'from_user') else msg.message.from_user.id
 
     confirmation_text = (
-        "📝 *Booking Confirmation*\n\n"
-        f"👨‍💼 Manager: {data.get('manager', 'Not specified')}\n"
-        f"📅 Date & Time: {data.get('datetime', 'Not specified')}\n"
-        f"🏢 Partner Company: {data.get('company', 'Not specified')}\n"
-        f"🤝 Partner: {data.get('partner', 'Not specified')}\n"
-        f"🔹 Partner Type: {data.get('partnertype', 'Not specified')}\n"
-        f"🍽 Restaurant: {data.get('restaurant', 'Not specified')}\n"
-        f"👥 People: {data.get('people', 'Not specified')}\n"
-        f"💳 Payment: {data.get('payment', 'Not specified')}\n\n"
-        "Is everything correct?"
+        f"📝 {await t(user_id, 'affiliate_booking_confirmation')}\n\n"
+        f"👨‍💼 {await t(user_id, 'affiliate_manager')}: {data.get('manager', await t(user_id, 'affiliate_not_specified'))}\n"
+        f"📅 {await t(user_id, 'affiliate_datetime')}: {data.get('datetime', await t(user_id, 'affiliate_not_specified'))}\n"
+        f"🏢 {await t(user_id, 'affiliate_partner_company')}: {data.get('company', await t(user_id, 'affiliate_not_specified'))}\n"
+        f"🤝 {await t(user_id, 'affiliate_partner')}: {data.get('partner', await t(user_id, 'affiliate_not_specified'))}\n"
+        f"🔹 {await t(user_id, 'affiliate_partner_type')}: {data.get('partnertype', await t(user_id, 'affiliate_not_specified'))}\n"
+        f"🍽 {await t(user_id, 'affiliate_restaurant')}: {data.get('restaurant', await t(user_id, 'affiliate_not_specified'))}\n"
+        f"👥 {await t(user_id, 'affiliate_people')}: {data.get('people', await t(user_id, 'affiliate_not_specified'))}\n"
+        f"💳 {await t(user_id, 'affiliate_payment')}: {data.get('payment', await t(user_id, 'affiliate_not_specified'))}\n\n"
+        f"{await t(user_id, 'affiliate_is_correct')}"
     )
 
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="✅ Yes, confirm", callback_data="aff_booking_confirm"),
-        InlineKeyboardButton(text="❌ No, cancel", callback_data="aff_main")
+        InlineKeyboardButton(text=await t(user_id, 'affiliate_confirm_yes'), callback_data="aff_booking_confirm"),
+        InlineKeyboardButton(text=await t(user_id, 'affiliate_confirm_no'), callback_data="aff_main")
     )
 
     if isinstance(msg, Message):
@@ -674,15 +670,13 @@ async def show_booking_confirmation(msg: Union[Message, CallbackQuery], state: F
 
 @router.callback_query(F.data == "aff_booking_confirm", BookingStates.waiting_for_confirmation)
 async def confirm_booking(call: CallbackQuery, state: FSMContext):
-    """Confirm booking"""
+    """Подтверждение бронирования"""
     data = await state.get_data()
-    username = call.from_user.username
     user_id = call.from_user.id
+    username = call.from_user.username
 
-    # Проверка на дубликат
     if await db.check_duplicate_booking(username, data.get('datetime', ''), data.get('partner', '')):
-        await call.answer("❌ Duplicate booking found! You already have a booking at this time with this partner.",
-                          show_alert=True)
+        await call.answer(await t(user_id, 'affiliate_duplicate_booking'), show_alert=True)
         await state.clear()
         return
 
@@ -695,19 +689,15 @@ async def confirm_booking(call: CallbackQuery, state: FSMContext):
         'partner': data.get('partner', ''),
         'restaurant': data.get('restaurant', ''),
         'people': data.get('people', '1'),
-        'payment_method': data.get('payment', 'Card'),
-        'partnertype': data.get('partnertype', 'Regular')
+        'payment_method': data.get('payment', await t(user_id, 'affiliate_payment_card_type')),
+        'partnertype': data.get('partnertype', await t(user_id, 'affiliate_regular'))
     }
 
     if await db.save_booking(booking_data):
         await call.message.edit_text(
-            "✅ Booking saved successfully!\n\n"
-            f"Restaurant: {data.get('restaurant', '')}\n"
-            f"Date: {data.get('datetime', '')}\n"
-            f"With {data.get('partner', '')} from {data.get('company', '')}"
+            await t(user_id, 'affiliate_booking_saved') + "\n\n"
         )
 
-        # Log action
         await db.log_user_action(
             user_id=user_id,
             username=username,
@@ -715,14 +705,13 @@ async def confirm_booking(call: CallbackQuery, state: FSMContext):
             details=booking_data
         )
     else:
-        await call.message.edit_text("❌ Error saving booking")
+        await call.message.edit_text(await t(user_id, 'affiliate_booking_error'))
 
     await state.clear()
 
-    # Show menu
-    keyboard = await get_affiliate_main_keyboard()
+    keyboard = await get_affiliate_main_keyboard(user_id)
     await call.message.edit_text(
-        "✅ Booking saved!\n\nWhat's next?",
+        await t(user_id, 'affiliate_booking_saved_whats_next'),
         reply_markup=keyboard
     )
 
@@ -732,34 +721,34 @@ async def confirm_booking(call: CallbackQuery, state: FSMContext):
 # ============================================
 
 @router.callback_query(F.data == "aff_my_bookings")
-# @affiliate_auth_required
 async def show_my_bookings(call: CallbackQuery):
-    """Show user bookings"""
+    """Показать бронирования пользователя"""
+    user_id = call.from_user.id
     username = call.from_user.username
     bookings = await db.get_user_bookings(username)
 
     if not bookings:
         builder = InlineKeyboardBuilder()
         builder.row(
-            InlineKeyboardButton(text="📅 Create booking", callback_data="aff_bookings"),
-            InlineKeyboardButton(text="◀️ Back", callback_data="aff_main")
+            InlineKeyboardButton(text=await t(user_id, 'affiliate_create_booking'), callback_data="aff_bookings"),
+            InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="aff_main")
         )
-        await call.message.edit_text("No bookings yet", reply_markup=builder.as_markup())
+        await call.message.edit_text(await t(user_id, 'affiliate_no_bookings'), reply_markup=builder.as_markup())
         return
 
-    response = "📋 *Your bookings:*\n\n"
+    response = f"📋 *{await t(user_id, 'affiliate_your_bookings')}:*\n\n"
     for i, booking in enumerate(bookings, 1):
         response += (
             f"{i}. {booking['restaurant']}\n"
             f"   📅 {booking['datetime']}\n"
             f"   🤝 {booking['partner']} ({booking['company']})\n"
-            f"   👥 {booking['people']} people | 💳 {booking['payment_method']}\n\n"
+            f"   👥 {booking['people']} {await t(user_id, 'affiliate_people_lower')} | 💳 {booking['payment_method']}\n\n"
         )
 
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="📅 New booking", callback_data="aff_bookings"),
-        InlineKeyboardButton(text="◀️ Back", callback_data="aff_main")
+        InlineKeyboardButton(text=await t(user_id, 'affiliate_new_booking'), callback_data="aff_bookings"),
+        InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="aff_main")
     )
 
     await call.message.edit_text(response, reply_markup=builder.as_markup())
@@ -779,79 +768,78 @@ class ReportStates(StatesGroup):
 
 
 @router.callback_query(F.data == "aff_report")
-# @affiliate_auth_required
 async def start_report(call: CallbackQuery, state: FSMContext):
-    """Start report"""
-    await call.message.edit_text("Enter manager name who attended the meeting:")
+    """Начать отчет"""
+    user_id = call.from_user.id
+    await call.message.edit_text(await t(user_id, 'affiliate_enter_manager_name_report'))
     await state.set_state(ReportStates.waiting_for_manager)
 
 
 @router.message(ReportStates.waiting_for_manager)
-# @affiliate_auth_required
 async def process_report_manager(msg: Message, state: FSMContext):
-    """Process manager in report"""
+    """Обработка менеджера в отчете"""
+    user_id = msg.from_user.id
     await state.update_data(manager=msg.text)
-    await msg.answer("Enter meeting date (DD.MM.YYYY):")
+    await msg.answer(await t(user_id, 'affiliate_enter_meeting_date'))
     await state.set_state(ReportStates.waiting_for_date)
 
 
 @router.message(ReportStates.waiting_for_date)
-# @affiliate_auth_required
 async def process_report_date(msg: Message, state: FSMContext):
-    """Process date in report"""
+    """Обработка даты в отчете"""
+    user_id = msg.from_user.id
     try:
         datetime.strptime(msg.text, '%d.%m.%Y')
         await state.update_data(meeting_date=msg.text)
-        await msg.answer("Enter partner name:")
+        await msg.answer(await t(user_id, 'affiliate_enter_partner_name_report'))
         await state.set_state(ReportStates.waiting_for_partner)
     except ValueError:
-        await msg.answer("Wrong date format. Use DD.MM.YYYY")
+        await msg.answer(await t(user_id, 'affiliate_wrong_date_format'))
 
 
 @router.message(ReportStates.waiting_for_partner)
-# @affiliate_auth_required
 async def process_report_partner(msg: Message, state: FSMContext):
-    """Process partner in report"""
+    """Обработка партнера в отчете"""
+    user_id = msg.from_user.id
     await state.update_data(partner=msg.text)
-    await msg.answer("Describe meeting results:")
+    await msg.answer(await t(user_id, 'affiliate_describe_results'))
     await state.set_state(ReportStates.waiting_for_result)
 
 
 @router.message(ReportStates.waiting_for_result)
-# @affiliate_auth_required
 async def process_report_result(msg: Message, state: FSMContext):
-    """Process results in report"""
+    """Обработка результатов в отчете"""
+    user_id = msg.from_user.id
     await state.update_data(result=msg.text)
-    await msg.answer("Enter meeting budget (if any):")
+    await msg.answer(await t(user_id, 'affiliate_enter_budget'))
     await state.set_state(ReportStates.waiting_for_budget)
 
 
 @router.message(ReportStates.waiting_for_budget)
-# @affiliate_auth_required
 async def process_report_budget(msg: Message, state: FSMContext):
-    """Process budget in report"""
+    """Обработка бюджета в отчете"""
+    user_id = msg.from_user.id
     await state.update_data(budget=msg.text)
 
-    # Show confirmation
     data = await state.get_data()
     username = msg.from_user.username
-    company = await db.get_user_company(username)
+    company = await db.get_user_company(user_id)
 
     report_text = (
-        "📝 **Meeting Report**\n\n"
-        f"📅 Date: {data.get('meeting_date', 'Not specified')}\n"
-        f"👨‍💼 Manager: {data.get('manager', 'Not specified')}\n"
-        f"🏢 Company: {company}\n"
-        f"🤝 Partner: {data.get('partner', 'Not specified')}\n"
-        f"📌 Results: {data.get('result', 'Not specified')}\n"
-        f"💰 Budget: {data.get('budget', 'Not specified')}\n\n"
-        "Is everything correct?"
+        f"📝 {await t(user_id, 'affiliate_meeting_report')}\n\n"
+        f"📅 {await t(user_id, 'affiliate_date')}: {data.get('meeting_date', await t(user_id, 'affiliate_not_specified'))}\n"
+        f"👨‍💼 {await t(user_id, 'affiliate_manager')}: {data.get('manager', await t(user_id, 'affiliate_not_specified'))}\n"
+        f"🏢 {await t(user_id, 'affiliate_company')}: {company}\n"
+        f"🤝 {await t(user_id, 'affiliate_partner')}: {data.get('partner', await t(user_id, 'affiliate_not_specified'))}\n"
+        f"📌 {await t(user_id, 'affiliate_results')}: {data.get('result', await t(user_id, 'affiliate_not_specified'))}\n"
+        f"💰 {await t(user_id, 'affiliate_budget')}: {data.get('budget', await t(user_id, 'affiliate_not_specified'))}\n\n"
+        f"{await t(user_id, 'affiliate_is_correct')}"
     )
 
     builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="✅ Yes, send", callback_data="aff_report_confirm"),
-        InlineKeyboardButton(text="❌ No, cancel", callback_data="aff_main")
+        InlineKeyboardButton(text=await t(user_id, 'affiliate_send'), callback_data="aff_report_confirm"),
+        InlineKeyboardButton(text=await t(user_id, 'cancel'), callback_data="aff_main")
     )
 
     await msg.answer(report_text, reply_markup=builder.as_markup())
@@ -860,10 +848,11 @@ async def process_report_budget(msg: Message, state: FSMContext):
 
 @router.callback_query(F.data == "aff_report_confirm", ReportStates.waiting_for_confirmation)
 async def confirm_report(call: CallbackQuery, state: FSMContext):
-    """Confirm report"""
+    """Подтверждение отчета"""
     data = await state.get_data()
+    user_id = call.from_user.id
     username = call.from_user.username
-    company = await db.get_user_company(username)
+    company = await db.get_user_company(user_id)
 
     report_data = {
         'username': username,
@@ -877,28 +866,23 @@ async def confirm_report(call: CallbackQuery, state: FSMContext):
 
     if await db.save_report(report_data):
         await call.message.edit_text(
-            "✅ Report saved successfully!\n\n"
-            f"Date: {data.get('meeting_date', '')}\n"
-            f"With partner: {data.get('partner', '')}\n"
-            f"Results: {data.get('result', '')[:100]}..."
+            await t(user_id, 'affiliate_report_saved') + "\n\n"
         )
 
-        # Log action
         await db.log_user_action(
-            user_id=call.from_user.id,
+            user_id=user_id,
             username=username,
             action="report_submitted",
             details=report_data
         )
     else:
-        await call.message.edit_text("❌ Error saving report")
+        await call.message.edit_text(await t(user_id, 'affiliate_report_error'))
 
     await state.clear()
 
-    # Show menu
-    keyboard = await get_affiliate_main_keyboard()
-    await call.message.edit_text(  # Изменено: edit_text вместо answer
-        "✅ Report saved!\n\nWhat's next?",
+    keyboard = await get_affiliate_main_keyboard(user_id)
+    await call.message.edit_text(
+        await t(user_id, 'affiliate_report_saved_whats_next'),
         reply_markup=keyboard
     )
 
@@ -908,14 +892,13 @@ async def confirm_report(call: CallbackQuery, state: FSMContext):
 # ============================================
 
 @router.callback_query(F.data == "aff_rules")
-# @affiliate_auth_required
 async def show_affiliate_rules(call: CallbackQuery):
-    """Show rules - with working back button"""
+    """Показать правила"""
+    user_id = call.from_user.id
     try:
         username = call.from_user.username
-        company = await db.get_user_company(username)
+        company = await db.get_user_company(user_id)
 
-        # Пути к файлам
         base_path = './instructions/conferences/'
         company_file = f'{company} - Conference Rules.pdf'
         base_file = 'Conference Rules.pdf'
@@ -931,29 +914,22 @@ async def show_affiliate_rules(call: CallbackQuery):
                 continue
 
         if not file_to_send:
-            # Fallback
             file_to_send = FSInputFile('./instructions/conferences/123.pdf')
 
-        # Создаем клавиатуру с callback_data, а не URL
         builder = InlineKeyboardBuilder()
         builder.row(
-            InlineKeyboardButton(text="◀️ Back", callback_data="menu_main")
-        )
-        builder.row(
-            InlineKeyboardButton(text="🏠 Main", callback_data="aff_main")
+            InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="aff_main")
         )
         keyboard = builder.as_markup()
 
-        # Удаляем старое сообщение с кнопками
         try:
             await call.message.delete()
         except:
             pass
 
-        # Отправляем документ
         await call.message.answer_document(
             document=file_to_send,
-            caption="📄 Conference Policy",
+            caption=await t(user_id, 'affiliate_conference_policy'),
             reply_markup=keyboard
         )
 
@@ -963,12 +939,12 @@ async def show_affiliate_rules(call: CallbackQuery):
 
 
 @router.callback_query(F.data == "aff_limits")
-# @affiliate_auth_required
 async def show_affiliate_limits(call: CallbackQuery):
-    """Show limits - with working back button"""
+    """Показать лимиты"""
+    user_id = call.from_user.id
     try:
         username = call.from_user.username
-        company = await db.get_user_company(username)
+        company = await db.get_user_company(user_id)
 
         base_path = './instructions/limits/'
         company_file = f'{company} - Policy Limits.pdf'
@@ -987,13 +963,9 @@ async def show_affiliate_limits(call: CallbackQuery):
         if not file_to_send:
             file_to_send = FSInputFile('./instructions/limits/123.pdf')
 
-        # Клавиатура с callback_data
         builder = InlineKeyboardBuilder()
         builder.row(
-            InlineKeyboardButton(text="◀️ Back", callback_data="menu_main")
-        )
-        builder.row(
-            InlineKeyboardButton(text="🏠 Main", callback_data="aff_main")
+            InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="aff_main")
         )
         keyboard = builder.as_markup()
 
@@ -1004,7 +976,7 @@ async def show_affiliate_limits(call: CallbackQuery):
 
         await call.message.answer_document(
             document=file_to_send,
-            caption="💰 Spending Limits",
+            caption=await t(user_id, 'affiliate_spending_limits'),
             reply_markup=keyboard
         )
 
@@ -1019,22 +991,16 @@ async def show_affiliate_limits(call: CallbackQuery):
 
 @router.callback_query(F.data == "pr_dinner")
 async def start_affiliate_from_pr(call: CallbackQuery, state: FSMContext):
-    """Start Affiliate module from PR section"""
+    """Запуск модуля партнерских ужинов из PR раздела"""
+    user_id = call.from_user.id
     username = call.from_user.username
 
     if not username:
-        await call.answer("Username required", show_alert=True)
+        await call.answer(await t(user_id, 'error_no_username'), show_alert=True)
         return
 
-    if await db.check_affiliate_auth(username):
-        await show_affiliate_main_menu(call)  # Изменено: call вместо call.message
-    else:
-        await call.message.edit_text(
-            "🍽 **Partner Dinners**\n\n"
-            "Authorization required for partner dinners module.\n\n"
-            "Send command /affiliate_start",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🔐 Authorize", callback_data="start_auth")],
-                [InlineKeyboardButton(text="◀️ Back", callback_data="pr_menu")]
-            ])
-        )
+    if not await db.check_whitelist(username):
+        await call.answer(await t(user_id, 'affiliate_no_access'), show_alert=True)
+        return
+
+    await show_affiliate_main_menu(call)
