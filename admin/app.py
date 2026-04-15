@@ -1145,6 +1145,72 @@ def user_chats():
     return render_template('user_chats.html', conversations=conversations)
 
 
+@app.route('/api/questions/forward', methods=['POST'])
+@login_required
+def api_forward_question():
+    """API для пересылки вопроса в другой отдел"""
+    data = request.get_json()
+
+    question_id = data.get('question_id')
+    source_department = data.get('source_department')
+    target_department = data.get('target_department')
+    source_table = data.get('source_table')
+
+    if not all([question_id, source_department, target_department, source_table]):
+        return jsonify({'error': 'Missing required fields'}), 400
+
+    # Проверяем права доступа менеджера к исходному отделу
+    manager_groups = session.get('groups', [])
+    role = session.get('role')
+
+    if role != 'admin' and source_department not in manager_groups:
+        return jsonify({'error': 'Access denied'}), 403
+
+    # Получаем вопрос из исходной таблицы
+    question = run_async(db.get_question_by_id(source_table, question_id))
+
+    if not question:
+        return jsonify({'error': 'Question not found'}), 404
+
+    # Определяем целевую таблицу (уже с полным именем)
+    target_tables = {
+        'pr': f'{db.db_schema_pr}.pr_questions',
+        'event': f'{db.db_schema_event}.event_questions',
+        'travel': f'{db.db_schema_travel}.travel_questions'
+    }
+
+    target_table = target_tables.get(target_department)
+    if not target_table:
+        return jsonify({'error': 'Invalid target department'}), 400
+
+    # Сохраняем пересланный вопрос в целевой таблице
+    forwarded_question = {
+        'username': question.get('username'),
+        'user_id': question.get('user_id'),
+        'category': f"forwarded_from_{source_department}",
+        'question': f"[Переслано из отдела {source_department.upper()} менеджером {session.get('username')}]\n\nОригинальный вопрос:\n{question.get('question')}",
+        'created_at': question.get('created_at')
+    }
+
+    success = run_async(db.save_forwarded_question(target_table, forwarded_question))
+
+    if success:
+        run_async(db.log_user_action(
+            user_id=session.get('manager_id', 0),
+            username=session.get('username'),
+            action="question_forwarded",
+            details={
+                "question_id": question_id,
+                "source": source_department,
+                "target": target_department,
+                "source_table": source_table
+            }
+        ))
+        return jsonify({'success': True})
+
+    return jsonify({'error': 'Failed to forward question'}), 500
+
+
 @app.route('/api/user_messages/<int:user_id>')
 @login_required
 def api_get_user_messages(user_id):
@@ -1273,30 +1339,43 @@ def api_get_file(file_id):
 
 
 # Добавьте эти маршруты в app.py
-
-@app.route('/api/questions/<department>')
+@app.route('/api/questions')
 @login_required
-def api_get_questions_by_department(department):
-    """API для получения вопросов по отделу"""
+def api_get_my_questions():
+    """API для получения вопросов, доступных текущему менеджеру (свои + пересланные)"""
     manager_groups = session.get('groups', [])
+    role = session.get('role')
 
-    # Проверяем доступ к отделу
-    if department not in manager_groups and session.get('role') != 'admin':
-        return jsonify({'error': 'Access denied'}), 403
+    # Админ видит все вопросы
+    if role == 'admin':
+        manager_groups = ['pr', 'event', 'travel']
 
-    # Определяем таблицу
-    table_map = {
-        'pr': 'pr_questions',
-        'event': 'event_questions',
-        'travel': 'travel_questions'
+    all_questions = []
+
+    # Определяем соответствие групп и таблиц (полные имена таблиц)
+    tables_map = {
+        'pr': f'{db.db_schema_pr}.pr_questions',
+        'event': f'{db.db_schema_event}.event_questions',
+        'travel': f'{db.db_schema_travel}.travel_questions'
     }
 
-    table = table_map.get(department)
-    if not table:
-        return jsonify({'error': 'Invalid department'}), 400
+    for group in manager_groups:
+        if group not in tables_map:
+            continue
 
-    questions = run_async(db.get_all_questions_by_table(table))
-    return jsonify(questions)
+        full_table = tables_map[group]
+
+        # Получаем вопросы для этого отдела
+        questions = run_async(db.get_all_questions_by_table(full_table))
+
+        for q in questions:
+            q['department'] = group
+            all_questions.append(q)
+
+    # Сортируем по дате (новые сверху)
+    all_questions.sort(key=lambda x: x.get('created_at', datetime.min), reverse=True)
+
+    return jsonify(all_questions)
 
 # Добавьте эти маршруты в app.py
 

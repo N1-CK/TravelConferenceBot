@@ -150,48 +150,75 @@
 <script>
     let currentUserId = null;
     let currentQuestions = [];
+    let currentUserGroups = {{ session.get('groups', [])|tojson }};
+    let currentUserRole = "{{ session.get('role', 'user') }}";
+
+    // Доступные отделы для пересылки
+    const allDepartments = [
+        { id: 'pr', name: '📢 PR отдел' },
+        { id: 'event', name: '🎪 Event отдел' },
+        { id: 'travel', name: '✈️ Travel отдел' }
+    ];
 
     function switchTab(tab) {
-        document.getElementById('chatsTab').style.display = tab === 'chats' ? 'flex' : 'none';
-        document.getElementById('questionsTab').style.display = tab === 'questions' ? 'block' : 'none';
-        if (tab === 'questions') {
-            loadAllQuestions();
+        const chatsTab = document.getElementById('chatsTab');
+        const questionsTab = document.getElementById('questionsTab');
+
+        if (tab === 'chats') {
+            chatsTab.style.display = 'flex';  // Явно устанавливаем display: flex
+            questionsTab.style.display = 'none';
+            // Небольшой "толчок" для перерисовки, чтобы браузер пересчитал размеры
+            setTimeout(() => {
+                if (window.dispatchEvent) {
+                    window.dispatchEvent(new Event('resize'));
+                }
+            }, 100);
+        } else if (tab === 'questions') {
+            chatsTab.style.display = 'none';
+            questionsTab.style.display = 'block';
+            loadAllQuestions(); // Загружаем вопросы, когда показываем вкладку
         }
+
+        // Обновляем активный класс для кнопок табов
+        document.querySelectorAll('.nav-link').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.getAttribute('data-tab') === tab) {
+                btn.classList.add('active');
+            }
+        });
     }
 
     async function loadAllQuestions() {
         const container = document.getElementById('questionsList');
-        container.innerHTML = '<div class="text-center text-muted py-4">Загрузка...</div>';
+        container.innerHTML = '<div class="text-center text-muted py-4">{{ get_text("loading") }}</div>';
 
         try {
-            const [prRes, eventRes, travelRes] = await Promise.all([
-                fetch('/api/questions/pr'),
-                fetch('/api/questions/event'),
-                fetch('/api/questions/travel')
-            ]);
+            const response = await fetch('/api/questions');
+            if (!response.ok) throw new Error('Failed to load questions');
 
-            const prQuestions = await prRes.json();
-            const eventQuestions = await eventRes.json();
-            const travelQuestions = await travelRes.json();
+            const questions = await response.json();
+            currentQuestions = questions;
 
-            currentQuestions = [
-                ...prQuestions.map(q => ({ ...q, department: 'pr' })),
-                ...eventQuestions.map(q => ({ ...q, department: 'event' })),
-                ...travelQuestions.map(q => ({ ...q, department: 'travel' }))
-            ];
-
-            currentQuestions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             renderQuestions(currentQuestions);
         } catch (e) {
             console.error(e);
-            container.innerHTML = '<div class="text-center text-muted py-4">Ошибка загрузки вопросов</div>';
+            container.innerHTML = '<div class="text-center text-muted py-4">{{ get_text("error_loading_details") }}</div>';
         }
+    }
+
+    function getAvailableDepartmentsForForward(sourceDept) {
+        // Админ может пересылать в любой отдел
+        if (currentUserRole === 'admin') {
+            return allDepartments.filter(d => d.id !== sourceDept);
+        }
+        // Менеджер может пересылать только в те отделы, к которым у него есть доступ
+        return allDepartments.filter(d => d.id !== sourceDept && currentUserGroups.includes(d.id));
     }
 
     function renderQuestions(questions) {
         const container = document.getElementById('questionsList');
         if (!questions.length) {
-            container.innerHTML = '<div class="text-center text-muted py-4">Нет вопросов</div>';
+            container.innerHTML = '<div class="text-center text-muted py-4">{{ get_text("no_data") }}</div>';
             return;
         }
 
@@ -199,6 +226,23 @@
         for (const q of questions) {
             const deptNames = { pr: 'PR', event: 'EVENT', travel: 'TRAVEL' };
             const deptColors = { pr: '#0d6efd', event: '#198754', travel: '#fd7e14' };
+
+            // Определяем, из какого отдела вопрос (оригинальный или пересланный)
+            let isForwarded = q.category && q.category.startsWith('forwarded_from_');
+            let originalDept = '';
+            if (isForwarded) {
+                originalDept = q.category.replace('forwarded_from_', '');
+            }
+
+            const forwardDepts = getAvailableDepartmentsForForward(q.department);
+            const forwardButtons = forwardDepts.map(dept =>
+                `<button class="btn btn-sm btn-outline-secondary ms-1"
+                    onclick="forwardQuestion(${q.id}, '${q.department}', '${dept.id}')"
+                    title="Переслать в ${dept.name}">
+                    <i class="bi bi-share"></i> ${dept.name}
+                </button>`
+            ).join('');
+
             html += `
                 <div class="question-item">
                     <div class="d-flex justify-content-between align-items-start">
@@ -206,12 +250,17 @@
                             <span class="question-department ${q.department}" style="background: ${deptColors[q.department]};">
                                 ${deptNames[q.department]}
                             </span>
-                            <strong class="ms-2">@${q.username}</strong>
+                            ${isForwarded ? `<span class="badge bg-secondary ms-1">Переслано из ${originalDept.toUpperCase()}</span>` : ''}
+                            <strong class="ms-2">@${escapeHtml(q.username)}</strong>
                             <small class="text-muted ms-2">${new Date(q.created_at).toLocaleString()}</small>
                         </div>
-                        <button class="btn btn-sm btn-outline-primary" onclick="openReplyModal(${q.user_id}, '${q.department}', '${escapeHtml(q.question)}')">
-                            <i class="bi bi-reply"></i> Ответить
-                        </button>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary"
+                                onclick="openReplyModal(${q.user_id}, '${q.department}', '${escapeHtml(q.question)}')">
+                                <i class="bi bi-reply"></i> {{ get_text("answer") }}
+                            </button>
+                            ${forwardButtons}
+                        </div>
                     </div>
                     <div class="question-text mt-2">${escapeHtml(q.question)}</div>
                 </div>
@@ -220,14 +269,43 @@
         container.innerHTML = html;
     }
 
-    function filterQuestions(dept) {
-        document.querySelectorAll('.dept-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector(`.dept-btn[data-dept="${dept}"]`).classList.add('active');
+    async function forwardQuestion(questionId, sourceDept, targetDept) {
+        if (!confirm(`Переслать вопрос в отдел ${targetDept.toUpperCase()}?`)) {
+            return;
+        }
 
-        if (dept === 'all') {
-            renderQuestions(currentQuestions);
-        } else {
-            renderQuestions(currentQuestions.filter(q => q.department === dept));
+        // Определяем таблицу-источник
+        const sourceTables = {
+            'pr': 'travelconference_pr.pr_questions',
+            'event': 'travelconference_event.event_questions',
+            'travel': 'travelconference_travel.travel_questions'
+        };
+
+        const sourceTable = sourceTables[sourceDept];
+
+        try {
+            const response = await fetch('/api/questions/forward', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question_id: questionId,
+                    source_department: sourceDept,
+                    target_department: targetDept,
+                    source_table: sourceTable
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showToast(`Вопрос переслан в отдел ${targetDept.toUpperCase()}`, 'success');
+                loadAllQuestions(); // Обновляем список
+            } else {
+                showToast('Ошибка при пересылке вопроса', 'danger');
+            }
+        } catch (e) {
+            console.error(e);
+            showToast('Ошибка при пересылке вопроса', 'danger');
         }
     }
 
@@ -245,7 +323,7 @@
         const answer = document.getElementById('replyAnswer').value.trim();
 
         if (!answer) {
-            showToast('Введите ответ', 'warning');
+            showToast('{{ get_text("field_required") }}', 'warning');
             return;
         }
 
@@ -259,14 +337,14 @@
             const data = await resp.json();
 
             if (data.success) {
-                showToast('Ответ отправлен пользователю', 'success');
+                showToast('{{ get_text("operation_success") }}', 'success');
                 bootstrap.Modal.getInstance(document.getElementById('replyModal')).hide();
                 loadAllQuestions();
             } else {
-                showToast('Ошибка: ' + (data.error || 'Неизвестная ошибка'), 'danger');
+                showToast('{{ get_text("error_occurred") }}: ' + (data.error || 'Unknown error'), 'danger');
             }
         } catch (e) {
-            showToast('Ошибка отправки', 'danger');
+            showToast('{{ get_text("error_occurred") }}', 'danger');
         }
     }
 
@@ -321,22 +399,56 @@
             document.getElementById('replyMessage').value = '';
             loadChat(currentUserId);
         } else {
-            showToast('Ошибка отправки', 'danger');
+            showToast('{{ get_text("error_occurred") }}', 'danger');
         }
     }
 
     function escapeHtml(text) {
+        if (!text) return '';
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
 
+    function showToast(message, type) {
+        const toastContainer = document.querySelector('.toast-container');
+        if (!toastContainer) return;
+
+        const typeMap = {
+            success: 'check-circle-fill text-success',
+            danger: 'exclamation-triangle-fill text-danger',
+            warning: 'exclamation-triangle-fill text-warning',
+            info: 'info-circle-fill text-info'
+        };
+        const typeText = {
+            success: '{{ get_text("operation_success") }}',
+            danger: '{{ get_text("error_occurred") }}',
+            warning: '{{ get_text("warning") }}',
+            info: '{{ get_text("info") }}'
+        };
+
+        const toastHtml = `
+            <div class="toast show" role="alert" data-bs-autohide="true" data-bs-delay="5000">
+                <div class="toast-header">
+                    <i class="bi ${typeMap[type] || typeMap.info} me-2"></i>
+                    <strong class="me-auto">${typeText[type] || typeText.info}</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                </div>
+                <div class="toast-body">${message}</div>
+            </div>
+        `;
+
+        toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+        setTimeout(() => {
+            const toast = toastContainer.lastElementChild;
+            if (toast) toast.remove();
+        }, 5000);
+    }
+
+    // Интервал обновления чата
     setInterval(() => { if (currentUserId) loadChat(currentUserId); }, 30000);
 
-    document.querySelectorAll('[data-tab]').forEach(btn => {
-        btn.addEventListener('click', function() { switchTab(this.dataset.tab); });
-    });
-
+    // Инициализация
     loadAllQuestions();
 </script>
 {% endblock %}

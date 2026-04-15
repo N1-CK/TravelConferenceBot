@@ -582,6 +582,41 @@ class Database:
             logger.error(f"Error updating ticket request status: {e}")
             return False
 
+    async def get_question_by_id(self, table_name: str, question_id: int) -> dict:
+        """Получить вопрос по ID из указанной таблицы"""
+        try:
+            async with self.pool.acquire() as conn:
+                # table_name уже содержит полное имя таблицы (например travelconference_pr.pr_questions)
+                query = f'SELECT * FROM {table_name} WHERE id = $1'
+                row = await conn.fetchrow(query, question_id)
+                return dict(row) if row else {}
+        except Exception as e:
+            logger.error(f"Error getting question by id from {table_name}: {e}")
+            return {}
+
+    async def save_forwarded_question(self, target_table: str, question_data: dict) -> bool:
+        """Сохранить пересланный вопрос в целевую таблицу"""
+        try:
+            async with self.pool.acquire() as conn:
+                # target_table уже содержит полное имя таблицы
+                query = f"""
+                    INSERT INTO {target_table} 
+                    (username, user_id, category, question, created_at)
+                    VALUES ($1, $2, $3, $4, $5)
+                """
+                await conn.execute(
+                    query,
+                    question_data.get('username'),
+                    question_data.get('user_id'),
+                    question_data.get('category'),
+                    question_data.get('question'),
+                    question_data.get('created_at')
+                )
+                return True
+        except Exception as e:
+            logger.error(f"Error saving forwarded question: {e}")
+            return False
+
     async def get_ticket_request_stats(self) -> dict:
         """Получить статистику по заявкам на билеты"""
         try:
@@ -1356,21 +1391,10 @@ class Database:
         """Получить все вопросы из таблицы"""
         try:
             async with self.pool.acquire() as conn:
-                if table == 'event_questions':
-                    rows = await conn.fetch(f"""
-                        SELECT * FROM {self.db_schema_event}.{table}
-                        ORDER BY created_at DESC
-                    """)
-                elif table == 'travel_questions':
-                    rows = await conn.fetch(f"""
-                        SELECT * FROM {self.db_schema_travel}.{table}
-                        ORDER BY created_at DESC
-                    """)
-                else:
-                    rows = await conn.fetch(f"""
-                        SELECT * FROM {self.db_schema_pr}.{table}
-                        ORDER BY created_at DESC
-                    """)
+                # table уже содержит полное имя таблицы (например travelconference_pr.pr_questions)
+                # Не нужно добавлять схему повторно
+                query = f'SELECT * FROM {table} ORDER BY created_at DESC'
+                rows = await conn.fetch(query)
                 return [dict(row) for row in rows]
         except Exception as e:
             logger.error(f"Error getting questions from {table}: {e}")
