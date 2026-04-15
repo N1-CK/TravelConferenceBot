@@ -157,7 +157,7 @@ class Database:
 
                     # TRAVEL таблицы
                     f'''
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.travel_visa_requests (
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_travel}.travel_flight_request (
                         id SERIAL PRIMARY KEY,
                         username TEXT,
                         user_id BIGINT,
@@ -325,18 +325,6 @@ class Database:
                                 )
                                 ''',
 
-                    f'''
-                                CREATE TABLE IF NOT EXISTS {self.db_schema}.user_hotels (
-                                    id SERIAL PRIMARY KEY,
-                                    username TEXT NOT NULL,
-                                    conference TEXT NOT NULL,
-                                    hotel_name TEXT,
-                                    hotel_address TEXT,
-                                    hotel_link TEXT,
-                                    hotel_dates TEXT,
-                                    created_at TIMESTAMP DEFAULT NOW()
-                                )
-                                ''',
 
                     f'''
                                 CREATE TABLE IF NOT EXISTS {self.db_schema}.airlines (
@@ -404,18 +392,6 @@ class Database:
                                 )
                             """)
 
-                # Таблица ролей для обычных пользователей
-                await conn.execute(f"""
-                                CREATE TABLE IF NOT EXISTS {self.db_schema}.user_roles (
-                                    user_id BIGINT PRIMARY KEY,
-                                    username TEXT NOT NULL,
-                                    role TEXT NOT NULL DEFAULT 'user',
-                                    permissions JSONB DEFAULT '{{}}'::jsonb,
-                                    assigned_by TEXT,
-                                    assigned_at TIMESTAMP DEFAULT NOW(),
-                                    updated_at TIMESTAMP DEFAULT NOW()
-                                )
-                            """)
 
                 # Таблица сессий админки
                 await conn.execute(f"""
@@ -507,13 +483,6 @@ class Database:
                     ON CONFLICT (username) DO UPDATE
                     SET is_active = TRUE
                 """, username)
-
-                await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.affiliate_auth_users (username, company, flag)
-                    VALUES ($1, $2, TRUE)
-                    ON CONFLICT (username) DO UPDATE
-                    SET flag = TRUE, company = EXCLUDED.company
-                """, username, company)
 
                 return True
         except Exception as e:
@@ -703,10 +672,24 @@ class Database:
         """Сохранение заявки на визу"""
         try:
             async with self.pool.acquire() as conn:
+                # Добавляем колонку status если нет
+                try:
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
+                        ADD COLUMN IF NOT EXISTS visa_request_status TEXT DEFAULT 'pending'
+                    """)
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
+                        ADD COLUMN IF NOT EXISTS flight_request_status TEXT DEFAULT 'pending'
+                    """)
+                except:
+                    pass
+
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.travel_visa_requests 
-                    (username, user_id, visa_status, passport_data, city_from, city_to, needs_baggage, preferences)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    INSERT INTO {self.db_schema_travel}.travel_flight_request 
+                    (username, user_id, visa_status, passport_data, city_from, city_to, needs_baggage, preferences, 
+                     visa_request_status, flight_request_status)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', 'pending')
                 """,
                                    data['username'],
                                    data['user_id'],
@@ -721,6 +704,198 @@ class Database:
         except Exception as e:
             logger.error(f"Error saving visa request: {e}")
             return False
+
+    async def save_per_diem_request(self, data: dict) -> bool:
+        """Сохранение заявки на суточные"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Создаем таблицу если её нет
+                await conn.execute(f"""
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_travel}.travel_per_diem_requests (
+                        id SERIAL PRIMARY KEY,
+                        username TEXT NOT NULL,
+                        user_id BIGINT NOT NULL,
+                        payment_type TEXT,
+                        payment_details TEXT,
+                        consent_given BOOLEAN DEFAULT FALSE,
+                        status TEXT DEFAULT 'pending',
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
+                    )
+                """)
+
+                await conn.execute(f"""
+                    INSERT INTO {self.db_schema_travel}.travel_per_diem_requests 
+                    (username, user_id, payment_type, payment_details, consent_given, status)
+                    VALUES ($1, $2, $3, $4, $5, 'pending')
+                """,
+                                   data['username'],
+                                   data['user_id'],
+                                   data.get('payment_type', ''),
+                                   data.get('payment_details', ''),
+                                   data.get('consent_given', False)
+                                   )
+                return True
+        except Exception as e:
+            logger.error(f"Error saving per diem request: {e}")
+            return False
+
+    async def get_all_per_diem_requests(self) -> list:
+        """Получить все заявки на суточные"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT * FROM {self.db_schema_travel}.travel_per_diem_requests 
+                    ORDER BY created_at DESC
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting per diem requests: {e}")
+            return []
+
+    async def update_per_diem_status(self, request_id: int, status: str) -> bool:
+        """Обновить статус заявки на суточные"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    UPDATE {self.db_schema_travel}.travel_per_diem_requests 
+                    SET status = $1, updated_at = NOW()
+                    WHERE id = $2
+                """, status, request_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error updating per diem status: {e}")
+            return False
+
+    # database.py - Добавьте эти методы в класс Database
+
+    async def get_all_travel_flight_requests(self) -> list:
+        """Получить все заявки на билеты из travel_flight_request"""
+        try:
+            async with self.pool.acquire() as conn:
+                # Убедимся, что нужные колонки существуют
+                try:
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
+                        ADD COLUMN IF NOT EXISTS visa_request_status TEXT DEFAULT 'pending'
+                    """)
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
+                        ADD COLUMN IF NOT EXISTS flight_request_status TEXT DEFAULT 'pending'
+                    """)
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
+                        ADD COLUMN IF NOT EXISTS first_name TEXT
+                    """)
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
+                        ADD COLUMN IF NOT EXISTS last_name TEXT
+                    """)
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
+                        ADD COLUMN IF NOT EXISTS phone TEXT
+                    """)
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
+                        ADD COLUMN IF NOT EXISTS departure_from TEXT
+                    """)
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
+                        ADD COLUMN IF NOT EXISTS return_to TEXT
+                    """)
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
+                        ADD COLUMN IF NOT EXISTS hotel_needed BOOLEAN DEFAULT FALSE
+                    """)
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
+                        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()
+                    """)
+                except Exception as e:
+                    logger.warning(f"Error adding columns: {e}")
+
+                rows = await conn.fetch(f"""
+                    SELECT * FROM {self.db_schema_travel}.travel_flight_request 
+                    ORDER BY created_at DESC
+                """)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting travel flight requests: {e}")
+            return []
+
+    async def get_travel_flight_request_by_id(self, request_id: int) -> dict:
+        """Получить заявку на билет по ID"""
+        try:
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(f"""
+                    SELECT * FROM {self.db_schema_travel}.travel_flight_request 
+                    WHERE id = $1
+                """, request_id)
+                return dict(row) if row else {}
+        except Exception as e:
+            logger.error(f"Error getting travel flight request {request_id}: {e}")
+            return {}
+
+    async def update_travel_visa_request_status(self, request_id: int, status: str) -> bool:
+        """Обновить статус визовой заявки"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    UPDATE {self.db_schema_travel}.travel_flight_request 
+                    SET visa_request_status = $1, updated_at = NOW()
+                    WHERE id = $2
+                """, status, request_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error updating travel visa status: {e}")
+            return False
+
+    async def update_travel_flight_request_status(self, request_id: int, status: str) -> bool:
+        """Обновить статус заявки на билет"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    UPDATE {self.db_schema_travel}.travel_flight_request 
+                    SET flight_request_status = $1, updated_at = NOW()
+                    WHERE id = $2
+                """, status, request_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error updating travel flight status: {e}")
+            return False
+
+    async def get_travel_stats(self) -> dict:
+        """Получить статистику для Travel панели"""
+        try:
+            async with self.pool.acquire() as conn:
+                total_requests = await conn.fetchval(f"""
+                    SELECT COUNT(*) FROM {self.db_schema_travel}.travel_flight_request
+                """) or 0
+
+                visa_pending = await conn.fetchval(f"""
+                    SELECT COUNT(*) FROM {self.db_schema_travel}.travel_flight_request 
+                    WHERE visa_request_status = 'pending'
+                """) or 0
+
+                flight_pending = await conn.fetchval(f"""
+                    SELECT COUNT(*) FROM {self.db_schema_travel}.travel_flight_request 
+                    WHERE flight_request_status = 'pending'
+                """) or 0
+
+                flight_purchased = await conn.fetchval(f"""
+                    SELECT COUNT(*) FROM {self.db_schema_travel}.travel_flight_request 
+                    WHERE flight_request_status = 'purchased'
+                """) or 0
+
+                return {
+                    'total_requests': total_requests,
+                    'visa_pending': visa_pending,
+                    'flight_pending': flight_pending,
+                    'flight_purchased': flight_purchased
+                }
+        except Exception as e:
+            logger.error(f"Error getting travel stats: {e}")
+            return {'total_requests': 0, 'visa_pending': 0, 'flight_pending': 0, 'flight_purchased': 0}
 
     async def save_banner_request(self, data: dict) -> bool:
         """Сохранение заявки на баннер"""
@@ -930,21 +1105,30 @@ class Database:
         """Save flight request to database"""
         try:
             async with self.pool.acquire() as conn:
+                # Проверяем, есть ли колонка status, если нет - добавляем
+                try:
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
+                        ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'
+                    """)
+                except:
+                    pass
+
                 query = f"""
-                    INSERT INTO {self.db_schema}.travel_visa_requests 
-                    (username, user_id, visa_status, passport_data, city_from, city_to, needs_baggage, preferences)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    INSERT INTO {self.db_schema_travel}.travel_flight_request 
+                    (username, user_id, visa_status, passport_data, city_from, city_to, needs_baggage, preferences, status)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
                 """
                 await conn.execute(
                     query,
                     flight_data['username'],
                     flight_data['user_id'],
-                    flight_data.get('visa_status'),
-                    flight_data['passport_data'],
-                    flight_data['city_from'],
-                    flight_data['city_to'],
-                    flight_data['needs_baggage'],
-                    flight_data['preferences']
+                    flight_data.get('visa_status', 'not_have'),
+                    flight_data.get('passport_data', ''),
+                    flight_data.get('city_from', ''),
+                    flight_data.get('city_to', ''),
+                    flight_data.get('needs_baggage', False),
+                    flight_data.get('preferences', '')
                 )
                 return True
         except Exception as e:
@@ -1005,32 +1189,6 @@ class Database:
             logger.error(f"Error syncing flights data: {e}")
             return False
 
-    async def sync_hotels_data(self, hotels_data: list):
-        """Синхронизация данных об отелях"""
-        try:
-            async with self.pool.acquire() as conn:
-                # Удаляем старые данные для пользователей
-                usernames = list(set([h['username'] for h in hotels_data]))
-                for username in usernames:
-                    await conn.execute(f"""
-                        DELETE FROM {self.db_schema}.user_hotels 
-                        WHERE username = $1
-                    """, username)
-
-                # Вставляем новые данные
-                for hotel in hotels_data:
-                    await conn.execute(f"""
-                        INSERT INTO {self.db_schema}.user_hotels 
-                        (username, conference, hotel_name, hotel_address, hotel_link, hotel_dates)
-                        VALUES ($1, $2, $3, $4, $5, $6)
-                    """,
-                                       hotel['username'], hotel['conference'], hotel['hotel_name'],
-                                       hotel['hotel_address'], hotel['hotel_link'], hotel['hotel_dates'])
-
-                return True
-        except Exception as e:
-            logger.error(f"Error syncing hotels data: {e}")
-            return False
 
     async def check_whitelist(self, username: str) -> bool:
         """Проверка пользователя в whitelist"""
@@ -1173,7 +1331,7 @@ class Database:
             async with self.pool.acquire() as conn:
                 # Сначала создайте таблицу если её нет
                 await conn.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.travel_per_diem_requests (
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_travel}.travel_per_diem_requests (
                         id SERIAL PRIMARY KEY,
                         username TEXT,
                         user_id BIGINT,
@@ -1186,7 +1344,7 @@ class Database:
                 """)
 
                 await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.travel_per_diem_requests 
+                    INSERT INTO {self.db_schema_travel}.travel_per_diem_requests 
                     (username, user_id, payment_details, currency, comments, consent_given)
                     VALUES ($1, $2, $3, $4, $5, $6)
                 """,
@@ -1636,10 +1794,10 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 if request_type == "visa":
-                    table = f"{self.db_schema}.travel_visa_requests"
+                    table = f"{self.db_schema_travel}.travel_flight_request"
                     status_col = "status"
                 elif request_type == "flight":
-                    table = f"{self.db_schema}.travel_visa_requests"  # временно, нужна отдельная таблица
+                    table = f"{self.db_schema_travel}.travel_flight_request"  # временно, нужна отдельная таблица
                     status_col = "status"
                 else:
                     return {"status": "unknown", "details": {}}
@@ -1799,44 +1957,6 @@ class Database:
             logger.error(f"Error deleting admin user: {e}")
             return False
 
-    async def set_user_role(self, user_id: int, username: str, role: str,
-                            permissions: dict = None, assigned_by: str = None) -> bool:
-        """Установка роли для пользователя"""
-        try:
-            async with self.pool.acquire() as conn:
-                await conn.execute(f"""
-                    INSERT INTO {self.db_schema}.user_roles 
-                    (user_id, username, role, permissions, assigned_by, updated_at)
-                    VALUES ($1, $2, $3, $4, $5, NOW())
-                    ON CONFLICT (user_id) DO UPDATE
-                    SET role = EXCLUDED.role,
-                        permissions = EXCLUDED.permissions,
-                        assigned_by = EXCLUDED.assigned_by,
-                        updated_at = NOW()
-                """, user_id, username, role, permissions or {}, assigned_by)
-
-                return True
-        except Exception as e:
-            logger.error(f"Error setting user role: {e}")
-            return False
-
-    async def get_user_role(self, user_id: int) -> dict:
-        """Получить роль пользователя"""
-        try:
-            async with self.pool.acquire() as conn:
-                role = await conn.fetchrow(f"""
-                    SELECT role, permissions, assigned_at
-                    FROM {self.db_schema}.user_roles
-                    WHERE user_id = $1
-                """, user_id)
-
-                if role:
-                    return dict(role)
-                return {'role': 'user', 'permissions': {}}
-        except Exception as e:
-            logger.error(f"Error getting user role: {e}")
-            return {'role': 'user', 'permissions': {}}
-
     async def log_admin_action(self, admin_id: int, action: str, details: dict = None,
                                ip_address: str = None) -> bool:
         """Логирование действий администратора"""
@@ -1894,7 +2014,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
-                    SELECT * FROM {self.db_schema}.travel_visa_requests 
+                    SELECT * FROM {self.db_schema_travel}.travel_flight_request 
                     ORDER BY created_at DESC
                 """)
                 return [dict(row) for row in rows]
@@ -1996,7 +2116,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 await conn.execute(f"""
-                    UPDATE {self.db_schema}.travel_visa_requests 
+                    UPDATE {self.db_schema_travel}.travel_flight_request 
                     SET status = $1, updated_at = NOW()
                     WHERE id = $2
                 """, status, request_id)
@@ -2184,7 +2304,7 @@ class Database:
                 """) or 0
 
                 visa_requests = await conn.fetchval(f"""
-                    SELECT COUNT(*) FROM {self.db_schema}.travel_visa_requests
+                    SELECT COUNT(*) FROM {self.db_schema_travel}.travel_flight_request
                 """) or 0
 
                 active_conferences = await conn.fetchval(f"""
@@ -2366,7 +2486,7 @@ class Database:
                     user['conferences'] = [c['conference_name'] for c in confs]
 
                     requests_count = 0
-                    for table in ['pr_banner_requests', 'pr_business_cards', 'travel_visa_requests']:
+                    for table in ['pr_banner_requests', 'pr_business_cards', 'travel_flight_request']:
                         try:
                             if table in ('pr_banner_requests', 'pr_business_cards'):
                                 cnt = await conn.fetchval(f"""
@@ -2375,7 +2495,7 @@ class Database:
                                 requests_count += cnt
                             else:
                                 cnt = await conn.fetchval(f"""
-                                    SELECT COUNT(*) FROM {self.db_schema}.{table} WHERE username = $1
+                                    SELECT COUNT(*) FROM {self.db_schema_travel}.{table} WHERE username = $1
                                 """, user['username'])
                                 requests_count += cnt
                         except:
@@ -2572,7 +2692,7 @@ class Database:
                 request_tables = [
                     ('pr_banner_requests', 'Баннер'),
                     ('pr_business_cards', 'Визитки'),
-                    ('travel_visa_requests', 'Виза')
+                    ('travel_flight_request', 'Виза')
                 ]
                 for table, type_name in request_tables:
                     try:
@@ -2587,7 +2707,7 @@ class Database:
                         else:
                             rows = await conn.fetch(f"""
                                 SELECT id, created_at, 'pending' as status
-                                FROM {self.db_schema}.{table}
+                                FROM {self.db_schema_travel}.{table}
                                 WHERE username = $1
                                 ORDER BY created_at DESC
                                 LIMIT 5

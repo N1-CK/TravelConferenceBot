@@ -767,34 +767,30 @@ async def send_request_to_manager(update: Union[Message, CallbackQuery], state: 
     data = await state.get_data()
     username = update.from_user.username if hasattr(update, 'from_user') else update.message.from_user.username
 
+    # Формируем строку паспортных данных из отдельных полей
+    passport_data_str = (
+        f"First Name: {data.get('first_name', '')}\n"
+        f"Last Name: {data.get('last_name', '')}\n"
+        f"Phone: {data.get('phone', '')}\n"
+        f"Passport Number: {data.get('passport_number', '')}\n"
+        f"Birth Date: {data.get('birth_date', '')}\n"
+        f"Passport Country: {data.get('passport_country', '')}\n"
+        f"Issue Date: {data.get('issue_date', '')}\n"
+        f"Expiry Date: {data.get('expiry_date', '')}"
+    )
+
     flight_data = {
         'username': username,
         'user_id': user_id,
-        'visa_status': data.get('visa_status'),
-        'first_name': data.get('first_name'),
-        'last_name': data.get('last_name'),
-        'phone': data.get('phone'),
-        'passport_number': data.get('passport_number'),
-        'birth_date': data.get('birth_date'),
-        'passport_country': data.get('passport_country'),
-        'issue_date': data.get('issue_date'),
-        'expiry_date': data.get('expiry_date'),
-        'departure_from': data.get('departure_from'),
-        'return_to': data.get('return_to'),
+        'visa_status': data.get('visa_status', 'not_have'),
+        'passport_data': passport_data_str,
+        'city_from': data.get('departure_from', ''),
+        'city_to': data.get('return_to', ''),
         'needs_baggage': data.get('needs_baggage', False),
-        'hotel_needed': data.get('hotel_needed', False),
         'preferences': data.get('preferences', '')
     }
 
     await db.save_flight_request(flight_data)
-
-    await send_question_to_manager(
-        bot=update.bot if hasattr(update, 'bot') else update.message.bot,
-        manager_chat_id=TRAVEL_MANAGER_CHAT_ID,
-        user_data=flight_data,
-        question_text=f"New flight request from {username}\nFrom: {data.get('departure_from')}\nTo: {data.get('return_to')}",
-        question_type="travel_flight"
-    )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_back_to_menu")]

@@ -320,11 +320,12 @@ bot = TelegramBot(os.getenv('TG_BOT_TOKEN', ''))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Страница входа для менеджеров"""
+    """Страница входа для менеджеров и администраторов"""
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
 
+        # Сначала проверяем в таблице managers
         manager = run_async(db.verify_manager(username, password))
 
         if manager:
@@ -332,11 +333,27 @@ def login():
             session['username'] = manager['username']
             session['manager_id'] = manager['id']
             session['full_name'] = manager['full_name']
-            session['role'] = manager['role']
+            session['role'] = manager['role']  # 'admin' или 'manager'
             session['groups'] = manager['group_names']  # ['pr', 'event', 'travel']
             session['login_time'] = datetime.now().isoformat()
 
             flash(f'Добро пожаловать, {manager["full_name"] or manager["username"]}!', 'success')
+            return redirect(url_for('dashboard'))
+
+        # Если не нашли в managers, проверяем в admin_users (старые админы)
+        admin = run_async(db.verify_admin(username, password))
+
+        if admin:
+            # Конвертируем старого админа в менеджера
+            session['logged_in'] = True
+            session['username'] = admin['username']
+            session['manager_id'] = admin['id']
+            session['full_name'] = admin['full_name']
+            session['role'] = admin['role']  # 'admin'
+            session['groups'] = ['admin', 'pr', 'event', 'travel']  # Все группы
+            session['login_time'] = datetime.now().isoformat()
+
+            flash(f'Добро пожаловать, {admin["full_name"] or admin["username"]}!', 'success')
             return redirect(url_for('dashboard'))
         else:
             flash('Неверное имя пользователя или пароль', 'danger')
@@ -681,23 +698,23 @@ def event_panel():
                            username=session.get('username'))
 
 
+# app.py - ЗАМЕНИТЕ существующую функцию travel_panel
+
 @app.route('/travel')
 @login_required
 @group_required(['travel', 'admin'])
 def travel_panel():
     """Панель Travel-менеджера"""
-    visa_requests = run_async(db.get_all_visa_requests())
-    flight_requests = run_async(db.get_all_flight_requests())
+    # Получаем статистику
+    stats = run_async(db.get_travel_stats())
 
-    stats = {
-        'total_visa': len(visa_requests),
-        'pending_visa': len([r for r in visa_requests if r.get('status', 'pending') == 'pending']),
-        'total_flights': len(flight_requests),
-    }
+    # Получаем заявки на билеты и суточные
+    requests = run_async(db.get_all_travel_flight_requests())
+    per_diem_requests = run_async(db.get_all_per_diem_requests())
 
     return render_template('travel_panel.html',
-                           visa_requests=visa_requests,
-                           flight_requests=flight_requests,
+                           requests=requests,
+                           per_diem_requests=per_diem_requests,
                            stats=stats,
                            username=session.get('username'))
 
@@ -772,26 +789,137 @@ def change_password():
     if request.method == 'POST':
         old_password = request.form.get('old_password')
         new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
 
-        # ИСПРАВЛЕНИЕ: Используем verify_manager вместо старого verify_admin
-        manager = run_async(db.verify_manager(session['username'], old_password))
-        if not manager:
-            flash(get_text('invalid_current_password', session.get('lang', 'ru')), 'danger')
+        # Проверка совпадения паролей
+        if new_password != confirm_password:
+            flash(get_text('passwords_not_match', session.get('lang', 'ru')), 'danger')
             return redirect(url_for('change_password'))
 
-        # ИСПРАВЛЕНИЕ: Используем manager_id из сессии и правильный метод БД
-        success = run_async(db.update_manager_password(
-            session['manager_id'],
-            new_password
-        ))
+        # Проверка длины
+        if len(new_password) < 6:
+            flash(get_text('password_min_length', session.get('lang', 'ru')), 'danger')
+            return redirect(url_for('change_password'))
 
-        if success:
-            flash(get_text('password_changed_success', session.get('lang', 'ru')), 'success')
-            return redirect(url_for('dashboard'))
+        # Пытаемся найти пользователя сначала в таблице managers, потом в admin_users
+        manager = run_async(db.verify_manager(session['username'], old_password))
+
+        if manager:
+            # Это менеджер из таблицы managers
+            success = run_async(db.update_manager_password(
+                session['manager_id'],
+                new_password
+            ))
+            if success:
+                flash(get_text('password_changed_success', session.get('lang', 'ru')), 'success')
+                return redirect(url_for('dashboard'))
+            else:
+                flash(get_text('error_occurred', session.get('lang', 'ru')), 'danger')
         else:
-            flash(get_text('error', session.get('lang', 'ru')), 'danger')
+            # Проверяем в старой таблице admin_users
+            admin = run_async(db.verify_admin(session['username'], old_password))
+            if admin:
+                # Обновляем пароль в admin_users
+                success = run_async(db.update_admin_password(session['username'], new_password))
+                if success:
+                    flash(get_text('password_changed_success', session.get('lang', 'ru')), 'success')
+                    return redirect(url_for('dashboard'))
+                else:
+                    flash(get_text('error_occurred', session.get('lang', 'ru')), 'danger')
+            else:
+                flash(get_text('invalid_current_password', session.get('lang', 'ru')), 'danger')
 
     return render_template('change_password.html')
+
+
+# Добавьте после других API маршрутов
+
+@app.route('/api/per_diem/requests')
+@login_required
+def api_get_per_diem_requests():
+    """API для получения заявок на суточные"""
+    if session.get('role') != 'admin' and 'travel' not in session.get('groups', []):
+        return jsonify({'error': 'Access denied'}), 403
+
+    requests = run_async(db.get_all_per_diem_requests())
+    return jsonify(requests)
+
+
+@app.route('/api/per_diem/<int:request_id>/status', methods=['POST'])
+@login_required
+def api_update_per_diem_status(request_id):
+    """Обновить статус заявки на суточные"""
+    if session.get('role') != 'admin' and 'travel' not in session.get('groups', []):
+        return jsonify({'error': 'Access denied'}), 403
+
+    status = request.form.get('status')
+    if status not in ['pending', 'in_progress', 'completed']:
+        return jsonify({'error': 'Invalid status'}), 400
+
+    success = run_async(db.update_per_diem_status(request_id, status))
+    return jsonify({'success': success})
+
+
+# app.py - Добавьте этот маршрут
+
+@app.route('/api/travel/requests')
+@login_required
+def api_get_travel_requests():
+    """API для получения всех заявок на билеты (travel_flight_request)"""
+    if session.get('role') != 'admin' and 'travel' not in session.get('groups', []):
+        return jsonify({'error': 'Access denied'}), 403
+
+    try:
+        # Получаем данные напрямую через run_async
+        requests = run_async(db.get_all_travel_flight_requests())
+        return jsonify(requests)
+    except Exception as e:
+        logger.error(f"Error getting travel requests: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/travel/request/<int:request_id>')
+@login_required
+def api_get_travel_request(request_id):
+    """API для получения деталей заявки на билет"""
+    if session.get('role') != 'admin' and 'travel' not in session.get('groups', []):
+        return jsonify({'error': 'Access denied'}), 403
+
+    try:
+        request_data = run_async(db.get_travel_flight_request_by_id(request_id))
+        if request_data:
+            return jsonify(request_data)
+        return jsonify({'error': 'Request not found'}), 404
+    except Exception as e:
+        logger.error(f"Error getting travel request {request_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/travel/request/<int:request_id>/visa_status', methods=['POST'])
+@login_required
+def api_update_travel_visa_status(request_id):
+    """Обновить статус визовой заявки (из таблицы travel_flight_request)"""
+    if session.get('role') != 'admin' and 'travel' not in session.get('groups', []):
+        return jsonify({'error': 'Access denied'}), 403
+
+    status = request.form.get('status')
+    if status not in ['pending', 'in_progress', 'ready']:
+        return jsonify({'error': 'Invalid status'}), 400
+
+    success = run_async(db.update_travel_visa_request_status(request_id, status))
+    return jsonify({'success': success})
+
+@app.route('/api/travel/request/<int:request_id>/flight_status', methods=['POST'])
+@login_required
+def api_update_travel_flight_status(request_id):
+    """Обновить статус заявки на билет (из таблицы travel_flight_request)"""
+    if session.get('role') != 'admin' and 'travel' not in session.get('groups', []):
+        return jsonify({'error': 'Access denied'}), 403
+
+    status = request.form.get('status')
+    if status not in ['pending', 'in_progress', 'purchased']:
+        return jsonify({'error': 'Invalid status'}), 400
+
+    success = run_async(db.update_travel_flight_request_status(request_id, status))
+    return jsonify({'success': success})
 
 
 @app.route('/set_language/<lang>')
@@ -806,9 +934,22 @@ def set_language(lang):
 def utility_processor():
     """Добавляет функцию get_text во все шаблоны с учетом выбранного языка"""
 
-    def _get_text(key):
+    def _get_text(key, default=None, **kwargs):
         lang = session.get('lang', 'ru')
-        return get_text(key, lang)
+        text = get_text(key, lang)
+
+        # Если текст не найден (вернулся сам ключ) и указан default - используем default
+        if text == key and default is not None:
+            text = default
+
+        # Применяем форматирование если есть kwargs
+        if kwargs:
+            try:
+                text = text.format(**kwargs)
+            except (KeyError, IndexError):
+                pass
+
+        return text
 
     return dict(get_text=_get_text)
 

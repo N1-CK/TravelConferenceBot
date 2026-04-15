@@ -80,7 +80,7 @@ async def show_stats(callback: CallbackQuery):
             # Статистика по заявкам
             banner_requests = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema_pr}.pr_banner_requests")
             business_cards = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema_pr}.pr_business_cards")
-            visa_requests = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema}.travel_visa_requests")
+            visa_requests = await conn.fetchval(f"SELECT COUNT(*) FROM {db.db_schema_travel}.travel_flight_request")
 
             stats_text = (
                 "📊 Статистика бота:\n\n"

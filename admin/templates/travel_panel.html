@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Event-панель | Управление мероприятиями{% endblock %}
+{% block title %}{{ get_text('travel_panel') }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -11,89 +11,255 @@
         text-align: center;
         transition: all 0.3s;
         height: 100%;
+        cursor: pointer;
     }
     .stat-card:hover {
         transform: translateY(-3px);
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
     }
-    .conference-card {
-        background: white;
-        border-radius: 12px;
-        padding: 15px;
-        margin-bottom: 15px;
-        border-left: 4px solid #667eea;
+    .stat-card.active {
+        border: 2px solid #667eea;
+        background: #f8f9ff;
+    }
+    .status-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        display: inline-block;
+        margin: 2px;
+    }
+    .status-pending { background: #fff3cd; color: #856404; }
+    .status-in_progress { background: #cfe2ff; color: #084298; }
+    .status-ready { background: #d4edda; color: #155724; }
+    .status-purchased { background: #d1e7dd; color: #0f5132; }
+    .status-completed { background: #d4edda; color: #155724; }
+    .detail-row {
+        display: flex;
+        padding: 8px 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .detail-label {
+        width: 140px;
+        font-weight: 600;
+        color: #495057;
+    }
+    .detail-value {
+        flex: 1;
+        color: #212529;
+    }
+    .status-group {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .nav-tabs .nav-link {
+        font-size: 0.9rem;
+        padding: 8px 16px;
+    }
+    .nav-tabs .nav-link i {
+        margin-right: 6px;
+    }
+    .filter-badge {
+        cursor: pointer;
         transition: all 0.2s;
     }
-    .conference-card:hover {
-        transform: translateX(5px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    .filter-badge.active {
+        transform: scale(1.05);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="fade-in">
-    <h2 class="mb-4"><i class="bi bi-calendar-event"></i> Event-панель</h2>
-
-    <!-- Stats Cards -->
-    <div class="row mb-4">
-        <div class="col-md-4 mb-3">
-            <div class="stat-card">
-                <div class="stat-number text-success">{{ stats.active_conferences }}</div>
-                <div class="stat-label">Активных конференций</div>
-            </div>
-        </div>
-        <div class="col-md-4 mb-3">
-            <div class="stat-card">
-                <div class="stat-number text-info">{{ stats.total_conferences }}</div>
-                <div class="stat-label">Всего конференций</div>
-            </div>
-        </div>
-    </div>
+    <h2 class="mb-4"><i class="bi bi-airplane"></i> {{ get_text('travel_panel') }}</h2>
 
     <!-- Tabs -->
-    <ul class="nav nav-tabs mb-4" id="eventTabs" role="tablist">
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#conferences" type="button">
-                <i class="bi bi-calendar3"></i> Конференции
+    <ul class="nav nav-tabs mb-4" id="travelTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="flights-tab" data-bs-toggle="tab" data-bs-target="#flights" type="button" role="tab">
+                <i class="bi bi-airplane"></i> {{ get_text('travel_flight_request') }}
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="perdiem-tab" data-bs-toggle="tab" data-bs-target="#perdiem" type="button" role="tab">
+                <i class="bi bi-cash-stack"></i> {{ get_text('travel_per_diem') }}
             </button>
         </li>
     </ul>
 
     <div class="tab-content">
-        <!-- Conferences -->
-        <div class="tab-pane fade" id="conferences">
+        <!-- FLIGHTS TAB -->
+        <div class="tab-pane fade show active" id="flights" role="tabpanel">
+            <!-- Stats Cards -->
+            <div class="row mb-4">
+                <div class="col-md-3 mb-3">
+                    <div class="stat-card" onclick="filterRequests('all')" id="statAll">
+                        <div class="stat-number text-primary">{{ stats.total_requests|default(0) }}</div>
+                        <div class="stat-label">{{ get_text('total_requests') }}</div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="stat-card" onclick="filterVisaStatus('pending')" id="statVisaPending">
+                        <div class="stat-number text-warning">{{ stats.visa_pending|default(0) }}</div>
+                        <div class="stat-label">{{ get_text('visa_pending') }}</div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="stat-card" onclick="filterFlightStatus('pending')" id="statFlightPending">
+                        <div class="stat-number text-warning">{{ stats.flight_pending|default(0) }}</div>
+                        <div class="stat-label">{{ get_text('flights_pending') }}</div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="stat-card" onclick="filterFlightStatus('purchased')" id="statFlightPurchased">
+                        <div class="stat-number text-success">{{ stats.flight_purchased|default(0) }}</div>
+                        <div class="stat-label">{{ get_text('flights_purchased') }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Requests Table -->
             <div class="card">
-                <div class="card-header">
-                    <i class="bi bi-calendar3"></i> Конференции
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-airplane"></i> {{ get_text('travel_requests') }}</span>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary filter-btn active" data-status="all">{{ get_text('all_statuses') }}</button>
+                        <button type="button" class="btn btn-outline-warning filter-btn" data-status="visa_pending">{{ get_text('visa_pending') }}</button>
+                        <button type="button" class="btn btn-outline-warning filter-btn" data-status="flight_pending">{{ get_text('flights_pending') }}</button>
+                        <button type="button" class="btn btn-outline-success filter-btn" data-status="flight_purchased">{{ get_text('flights_purchased') }}</button>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        {% for conf in conferences %}
-                        <div class="col-md-6">
-                            <div class="conference-card">
-                                <h5><i class="bi bi-calendar-check me-2"></i>{{ conf.name }}</h5>
-                                <p class="text-muted mb-2">
-                                    <i class="bi bi-geo-alt"></i> {{ conf.city or 'Город не указан' }}
-                                </p>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span><i class="bi bi-people"></i> {{ conf.user_count }} участников</span>
-                                    <span class="badge bg-primary">{{ conf.status|default('active') }}</span>
-                                </div>
-                                <hr class="my-2">
-                                <button class="btn btn-sm btn-outline-primary" onclick="viewConference('{{ conf.name }}')">
-                                    <i class="bi bi-eye"></i> Детали
-                                </button>
-                            </div>
-                        </div>
-                        {% else %}
-                        <div class="col-12">
-                            <div class="text-center text-muted py-4">
-                                <i class="bi bi-calendar-x fs-1"></i>
-                                <p class="mt-2">Нет конференций</p>
-                            </div>
-                        </div>
-                        {% endfor %}
+                    <div class="table-responsive">
+                        <table id="requestsTable" class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>{{ get_text('id') }}</th>
+                                    <th>{{ get_text('username') }}</th>
+                                    <th>{{ get_text('full_name') }}</th>
+                                    <th>{{ get_text('departure_from') }}</th>
+                                    <th>{{ get_text('return_to') }}</th>
+                                    <th>{{ get_text('visa_status') }}</th>
+                                    <th>{{ get_text('visa_request_status') }}</th>
+                                    <th>{{ get_text('flight_request_status') }}</th>
+                                    <th>{{ get_text('created_at') }}</th>
+                                    <th>{{ get_text('actions') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in requests %}
+                                <tr data-visa-status="{{ req.visa_request_status }}" data-flight-status="{{ req.flight_request_status }}">
+                                    <td>{{ req.id }}</td>
+                                    <td><strong>@{{ req.username }}</strong></td>
+                                    <td>{{ req.first_name or '' }} {{ req.last_name or '' }}</td>
+                                    <td>{{ req.departure_from or '-' }}</td>
+                                    <td>{{ req.return_to or '-' }}</td>
+                                    <td>
+                                        {% if req.visa_status == 'have' %}
+                                            <span class="badge bg-success">{{ get_text('visa_have') }}</span>
+                                        {% elif req.visa_status == 'not_have' %}
+                                            <span class="badge bg-warning">{{ get_text('visa_not_have') }}</span>
+                                        {% else %}
+                                            <span class="badge bg-info">{{ get_text('visa_special') }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-{{ req.visa_request_status }}">
+                                            {% if req.visa_request_status == 'pending' %}
+                                                ⏳ {{ get_text('status_pending') }}
+                                            {% elif req.visa_request_status == 'in_progress' %}
+                                                🔄 {{ get_text('status_in_progress') }}
+                                            {% elif req.visa_request_status == 'ready' %}
+                                                ✅ {{ get_text('status_ready') }}
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-{{ req.flight_request_status }}">
+                                            {% if req.flight_request_status == 'pending' %}
+                                                ⏳ {{ get_text('status_pending') }}
+                                            {% elif req.flight_request_status == 'in_progress' %}
+                                                🔄 {{ get_text('status_in_progress') }}
+                                            {% elif req.flight_request_status == 'purchased' %}
+                                                🎫 {{ get_text('flights_purchased') }}
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td>{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button class="btn btn-sm btn-outline-primary"
+                                                    onclick="viewRequestDetails({{ req.id }})"
+                                                    title="{{ get_text('view_details') }}">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="10" class="text-center text-muted py-4">
+                                        <i class="bi bi-airplane fs-1"></i>
+                                        <p class="mt-2">{{ get_text('no_requests') }}</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PER DIEM TAB -->
+        <div class="tab-pane fade" id="perdiem" role="tabpanel">
+            <!-- Stats Cards -->
+            <div class="row mb-4">
+                <div class="col-md-4 mb-3">
+                    <div class="stat-card" onclick="filterPerDiem('all')" id="statPerDiemAll">
+                        <div class="stat-number text-primary" id="perDiemTotal">0</div>
+                        <div class="stat-label">{{ get_text('total_requests') }}</div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="stat-card" onclick="filterPerDiem('pending')" id="statPerDiemPending">
+                        <div class="stat-number text-warning" id="perDiemPending">0</div>
+                        <div class="stat-label">{{ get_text('status_pending') }}</div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="stat-card" onclick="filterPerDiem('completed')" id="statPerDiemCompleted">
+                        <div class="stat-number text-success" id="perDiemCompleted">0</div>
+                        <div class="stat-label">{{ get_text('status_ready') }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Per Diem Table -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-cash-stack"></i> {{ get_text('travel_per_diem') }}
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="perDiemTable" class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Username</th>
+                                    <th>{{ get_text('payment_type') }}</th>
+                                    <th>{{ get_text('payment_details') }}</th>
+                                    <th>{{ get_text('status') }}</th>
+                                    <th>{{ get_text('created_at') }}</th>
+                                    <th>{{ get_text('actions') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="perDiemTableBody">
+                                <tr><td colspan="7" class="text-center">{{ get_text('loading') }}</td></tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -101,49 +267,467 @@
     </div>
 </div>
 
-<!-- Modal для просмотра справки -->
-<div class="modal fade" id="certificateModal" tabindex="-1">
+<!-- Request Details Modal -->
+<div class="modal fade" id="requestModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Детали справки-вызова</h5>
+                <h5 class="modal-title"><i class="bi bi-airplane"></i> {{ get_text('request_details') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="certificateModalBody"></div>
+            <div class="modal-body" id="requestModalBody"></div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
-                <button type="button" class="btn btn-primary" onclick="generatePDF()">
-                    <i class="bi bi-file-pdf"></i> Сформировать PDF
-                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('close') }}</button>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
+<!-- Per Diem Details Modal -->
+<div class="modal fade" id="perDiemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-cash-stack"></i> {{ get_text('request_details') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="perDiemModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('close') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+    let currentFilter = 'all';
+    let currentVisaFilter = null;
+    let currentFlightFilter = null;
+    let currentPerDiemFilter = 'all';
+    let perDiemRequests = [];
+    let requestsTable;
 
-    function viewConference(name) {
-        fetch(`/api/conferences/${encodeURIComponent(name)}`)
+    $(document).ready(function() {
+        requestsTable = $('#requestsTable').DataTable({
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/{{ "ru" if session.get("lang", "ru") == "ru" else "en" }}.json'
+            },
+            pageLength: 25,
+            order: [[0, 'desc']]
+        });
+
+        loadPerDiemRequests();
+
+        // Обработчики фильтров
+        $('.filter-btn').on('click', function() {
+            $('.filter-btn').removeClass('active');
+            $(this).addClass('active');
+
+            const status = $(this).data('status');
+            if (status === 'all') {
+                requestsTable.search('').columns().search('').draw();
+            } else if (status === 'visa_pending') {
+                requestsTable.column(6).search('pending').draw();
+            } else if (status === 'flight_pending') {
+                requestsTable.column(7).search('pending').draw();
+            } else if (status === 'flight_purchased') {
+                requestsTable.column(7).search('purchased').draw();
+            }
+        });
+    });
+
+    // ============================================
+    // FLIGHT REQUESTS FUNCTIONS
+    // ============================================
+
+    function filterRequests(type) {
+        currentFilter = type;
+        currentVisaFilter = null;
+        currentFlightFilter = null;
+
+        document.querySelectorAll('#flights .stat-card').forEach(card => card.classList.remove('active'));
+        document.getElementById('statAll').classList.add('active');
+
+        requestsTable.search('').columns().search('').draw();
+    }
+
+    function filterVisaStatus(status) {
+        currentVisaFilter = status;
+        currentFlightFilter = null;
+
+        document.querySelectorAll('#flights .stat-card').forEach(card => card.classList.remove('active'));
+        document.getElementById('statVisaPending').classList.add('active');
+
+        requestsTable.column(6).search(status).draw();
+    }
+
+    function filterFlightStatus(status) {
+        currentFlightFilter = status;
+        currentVisaFilter = null;
+
+        document.querySelectorAll('#flights .stat-card').forEach(card => card.classList.remove('active'));
+        if (status === 'pending') {
+            document.getElementById('statFlightPending').classList.add('active');
+        } else if (status === 'purchased') {
+            document.getElementById('statFlightPurchased').classList.add('active');
+        }
+
+        requestsTable.column(7).search(status).draw();
+    }
+
+    // travel_panel.html - ЗАМЕНИТЕ функцию viewRequestDetails
+
+    function viewRequestDetails(id) {
+        fetch(`/api/travel/request/${id}`)
             .then(response => response.json())
             .then(data => {
-                let html = `
-                    <h5>${data.name}</h5>
-                    <p><i class="bi bi-geo-alt"></i> Город: ${data.city || '-'}</p>
-                    <p><i class="bi bi-calendar-range"></i> Даты: ${data.start_date || '??'} - ${data.end_date || '??'}</p>
-                    <h6><i class="bi bi-people"></i> Участники:</h6>
-                    <ul>
-                        ${data.users ? data.users.map(u => `<li>@${u.username}</li>`).join('') : '<li>Нет данных</li>'}
-                    </ul>
+                const visaStatusText = {
+                    'have': '✅ {{ get_text("visa_have") }}',
+                    'not_have': '❌ {{ get_text("visa_not_have") }}',
+                    'special': '🔄 {{ get_text("visa_special") }}'
+                };
+
+                const html = `
+                    <h6 class="mb-3"><i class="bi bi-person"></i> {{ get_text('personal_info') }}</h6>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('full_name') }}:</div>
+                        <div class="detail-value">${escapeHtml(data.first_name || '')} ${escapeHtml(data.last_name || '')}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('phone') }}:</div>
+                        <div class="detail-value">${escapeHtml(data.phone || '-')}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('passport_number') }}:</div>
+                        <div class="detail-value">${escapeHtml(data.passport_number || '-')}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('birth_date') }}:</div>
+                        <div class="detail-value">${escapeHtml(data.birth_date || '-')}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('passport_country') }}:</div>
+                        <div class="detail-value">${escapeHtml(data.passport_country || '-')}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('issue_date') }}:</div>
+                        <div class="detail-value">${escapeHtml(data.issue_date || '-')}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('expiry_date') }}:</div>
+                        <div class="detail-value">${escapeHtml(data.expiry_date || '-')}</div>
+                    </div>
+
+                    <h6 class="mt-3 mb-3"><i class="bi bi-geo-alt"></i> {{ get_text('route_info') }}</h6>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('departure_from') }}:</div>
+                        <div class="detail-value">${escapeHtml(data.departure_from || '-')}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('return_to') }}:</div>
+                        <div class="detail-value">${escapeHtml(data.return_to || '-')}</div>
+                    </div>
+
+                    <h6 class="mt-3 mb-3"><i class="bi bi-passport"></i> {{ get_text('visa_info') }}</h6>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('visa_status') }}:</div>
+                        <div class="detail-value">${visaStatusText[data.visa_status] || '-'}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('visa_request_status') }}:</div>
+                        <div class="detail-value">
+                            <select class="form-select form-select-sm" style="width: auto; display: inline-block;" id="visaStatusSelect" onchange="updateVisaStatus(${data.id}, this.value)">
+                                <option value="pending" ${data.visa_request_status === 'pending' ? 'selected' : ''}>⏳ {{ get_text('status_pending') }}</option>
+                                <option value="in_progress" ${data.visa_request_status === 'in_progress' ? 'selected' : ''}>🔄 {{ get_text('status_in_progress') }}</option>
+                                <option value="ready" ${data.visa_request_status === 'ready' ? 'selected' : ''}>✅ {{ get_text('status_ready') }}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <h6 class="mt-3 mb-3"><i class="bi bi-airplane"></i> {{ get_text('flight_info') }}</h6>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('flight_request_status') }}:</div>
+                        <div class="detail-value">
+                            <select class="form-select form-select-sm" style="width: auto; display: inline-block;" id="flightStatusSelect" onchange="updateFlightStatus(${data.id}, this.value)">
+                                <option value="pending" ${data.flight_request_status === 'pending' ? 'selected' : ''}>⏳ {{ get_text('status_pending') }}</option>
+                                <option value="in_progress" ${data.flight_request_status === 'in_progress' ? 'selected' : ''}>🔄 {{ get_text('status_in_progress') }}</option>
+                                <option value="purchased" ${data.flight_request_status === 'purchased' ? 'selected' : ''}>🎫 {{ get_text('flights_purchased') }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('needs_baggage') }}:</div>
+                        <div class="detail-value">${data.needs_baggage ? '✅ {{ get_text("yes") }}' : '❌ {{ get_text("no") }}'}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('hotel_needed') }}:</div>
+                        <div class="detail-value">${data.hotel_needed ? '✅ {{ get_text("yes") }}' : '❌ {{ get_text("no") }}'}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('preferences') }}:</div>
+                        <div class="detail-value">${escapeHtml(data.preferences || '-')}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('created_at') }}:</div>
+                        <div class="detail-value">${new Date(data.created_at).toLocaleString()}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">{{ get_text('updated_at') }}:</div>
+                        <div class="detail-value">${data.updated_at ? new Date(data.updated_at).toLocaleString() : '-'}</div>
+                    </div>
                 `;
-                document.getElementById('certificateModalBody').innerHTML = html;
-                new bootstrap.Modal(document.getElementById('certificateModal')).show();
+                document.getElementById('requestModalBody').innerHTML = html;
+                new bootstrap.Modal(document.getElementById('requestModal')).show();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('{{ get_text("error_loading_details") }}', 'danger');
             });
     }
 
-    function generatePDF() {
-        alert('Функция генерации PDF в разработке');
+    function updateVisaStatus(id, status) {
+        const statusNames = {
+            'pending': '{{ get_text("status_pending") }}',
+            'in_progress': '{{ get_text("status_in_progress") }}',
+            'ready': '{{ get_text("status_ready") }}'
+        };
+
+        fetch(`/api/travel/request/${id}/visa_status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `status=${status}`
+        }).then(response => response.json()).then(data => {
+            if (data.success) {
+                showToast(`{{ get_text("visa_status_changed") }} ${statusNames[status]}`, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('{{ get_text("error_status_change") }}', 'danger');
+            }
+        }).catch(error => {
+            console.error('Error:', error);
+            showToast('{{ get_text("error_status_change") }}', 'danger');
+        });
+    }
+
+    function updateFlightStatus(id, status) {
+        const statusNames = {
+            'pending': '{{ get_text("status_pending") }}',
+            'in_progress': '{{ get_text("status_in_progress") }}',
+            'purchased': '{{ get_text("flights_purchased") }}'
+        };
+
+        fetch(`/api/travel/request/${id}/flight_status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `status=${status}`
+        }).then(response => response.json()).then(data => {
+            if (data.success) {
+                showToast(`{{ get_text("flight_status_changed") }} ${statusNames[status]}`, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('{{ get_text("error_status_change") }}', 'danger');
+            }
+        }).catch(error => {
+            console.error('Error:', error);
+            showToast('{{ get_text("error_status_change") }}', 'danger');
+        });
+    }
+
+    // ============================================
+    // PER DIEM FUNCTIONS
+    // ============================================
+
+    async function loadPerDiemRequests() {
+        try {
+            const response = await fetch('/api/per_diem/requests');
+            perDiemRequests = await response.json();
+            updatePerDiemStats();
+            renderPerDiemTable();
+        } catch (e) {
+            console.error('Error loading per diem requests:', e);
+            document.getElementById('perDiemTableBody').innerHTML =
+                '<tr><td colspan="7" class="text-center text-danger">{{ get_text("error_loading_details") }}</td></tr>';
+        }
+    }
+
+    function updatePerDiemStats() {
+        const total = perDiemRequests.length;
+        const pending = perDiemRequests.filter(r => r.status === 'pending').length;
+        const completed = perDiemRequests.filter(r => r.status === 'completed').length;
+
+        document.getElementById('perDiemTotal').textContent = total;
+        document.getElementById('perDiemPending').textContent = pending;
+        document.getElementById('perDiemCompleted').textContent = completed;
+    }
+
+    function filterPerDiem(status) {
+        currentPerDiemFilter = status;
+
+        document.querySelectorAll('#perdiem .stat-card').forEach(card => card.classList.remove('active'));
+        if (status === 'all') {
+            document.getElementById('statPerDiemAll').classList.add('active');
+        } else if (status === 'pending') {
+            document.getElementById('statPerDiemPending').classList.add('active');
+        } else if (status === 'completed') {
+            document.getElementById('statPerDiemCompleted').classList.add('active');
+        }
+
+        renderPerDiemTable();
+    }
+
+    function renderPerDiemTable() {
+        const tbody = document.getElementById('perDiemTableBody');
+        let filtered = perDiemRequests;
+
+        if (currentPerDiemFilter !== 'all') {
+            filtered = perDiemRequests.filter(r => r.status === currentPerDiemFilter);
+        }
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">{{ get_text("no_data") }}</td></tr>';
+            return;
+        }
+
+        let html = '';
+        for (const req of filtered) {
+            const statusText = {
+                'pending': '⏳ {{ get_text("status_pending") }}',
+                'in_progress': '🔄 {{ get_text("status_in_progress") }}',
+                'completed': '✅ {{ get_text("status_ready") }}'
+            }[req.status] || req.status;
+
+            const statusClass = {
+                'pending': 'status-pending',
+                'in_progress': 'status-in_progress',
+                'completed': 'status-completed'
+            }[req.status] || '';
+
+            const paymentTypeText = req.payment_type === 'card' ? '💳 {{ get_text("per_diem_card") }}' : '🪙 {{ get_text("per_diem_crypto") }}';
+
+            html += `
+                <tr>
+                    <td>${req.id}</td>
+                    <td><strong>@${req.username}</strong><br><small class="text-muted">ID: ${req.user_id}</small></td>
+                    <td>${paymentTypeText}</td>
+                    <td class="booking-details" title="${escapeHtml(req.payment_details || '')}">
+                        ${escapeHtml((req.payment_details || '-').substring(0, 50))}${(req.payment_details || '').length > 50 ? '...' : ''}
+                    </td>
+                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <td>${req.created_at ? new Date(req.created_at).toLocaleString() : '-'}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewPerDiemDetails(${req.id})" title="{{ get_text('view_details') }}">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            ${req.status !== 'completed' ? `
+                            <button class="btn btn-sm btn-outline-success" onclick="updatePerDiemStatus(${req.id}, 'completed')" title="{{ get_text('set_ready') }}">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                            ` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+        tbody.innerHTML = html;
+    }
+
+    function viewPerDiemDetails(id) {
+        const request = perDiemRequests.find(r => r.id === id);
+        if (!request) return;
+
+        const paymentTypeText = request.payment_type === 'card' ? '💳 {{ get_text("per_diem_card") }}' : '🪙 {{ get_text("per_diem_crypto") }}';
+        const statusText = {
+            'pending': '⏳ {{ get_text("status_pending") }}',
+            'in_progress': '🔄 {{ get_text("status_in_progress") }}',
+            'completed': '✅ {{ get_text("status_ready") }}'
+        }[request.status] || request.status;
+
+        const html = `
+            <table class="table table-bordered">
+                <tr><th style="width: 40%">ID</th><td>${request.id}</td></tr>
+                <tr><th>Username</th><td>@${request.username}</td></tr>
+                <tr><th>User ID</th><td>${request.user_id}</td></tr>
+                <tr><th>{{ get_text('payment_type') }}</th><td>${paymentTypeText}</td></tr>
+                <tr><th>{{ get_text('payment_details') }}</th><td><pre style="white-space: pre-wrap; word-break: break-all;">${escapeHtml(request.payment_details || '-')}</pre></td></tr>
+                <tr><th>{{ get_text('consent_given') }}</th><td>${request.consent_given ? '✅ {{ get_text("yes") }}' : '❌ {{ get_text("no") }}'}</td></tr>
+                <tr><th>{{ get_text('status') }}</th><td><span class="status-badge status-${request.status}">${statusText}</span></td></tr>
+                <tr><th>{{ get_text('created_at') }}</th><td>${request.created_at ? new Date(request.created_at).toLocaleString() : '-'}</td></tr>
+                <tr><th>{{ get_text('updated_at') }}</th><td>${request.updated_at ? new Date(request.updated_at).toLocaleString() : '-'}</td></tr>
+            </table>
+        `;
+        document.getElementById('perDiemModalBody').innerHTML = html;
+        new bootstrap.Modal(document.getElementById('perDiemModal')).show();
+    }
+
+    async function updatePerDiemStatus(id, status) {
+        const statusNames = {
+            'pending': '{{ get_text("status_pending") }}',
+            'in_progress': '{{ get_text("status_in_progress") }}',
+            'completed': '{{ get_text("status_ready") }}'
+        };
+
+        if (!confirm(`{{ get_text("confirm_status_change") }} ${statusNames[status]}?`)) return;
+
+        try {
+            const formData = new FormData();
+            formData.append('status', status);
+
+            const response = await fetch(`/api/per_diem/${id}/status`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                showToast(`{{ get_text("status_changed") }} ${statusNames[status]}`, 'success');
+                loadPerDiemRequests();
+            } else {
+                showToast('{{ get_text("error_status_change") }}', 'danger');
+            }
+        } catch (e) {
+            console.error(e);
+            showToast('{{ get_text("error_status_change") }}', 'danger');
+        }
+    }
+
+    // ============================================
+    // UTILITY FUNCTIONS
+    // ============================================
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function showToast(message, type) {
+        const toastContainer = document.querySelector('.toast-container');
+        if (!toastContainer) return;
+
+        const typeMap = {
+            success: 'check-circle-fill text-success',
+            danger: 'exclamation-triangle-fill text-danger',
+            warning: 'exclamation-triangle-fill text-warning',
+            info: 'info-circle-fill text-info'
+        };
+
+        const toastHtml = `
+            <div class="toast show" role="alert" data-bs-autohide="true" data-bs-delay="3000">
+                <div class="toast-header">
+                    <i class="bi ${typeMap[type] || typeMap.info} me-2"></i>
+                    <strong class="me-auto">${type === 'success' ? '{{ get_text("operation_success") }}' : '{{ get_text("error_occurred") }}'}</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                </div>
+                <div class="toast-body">${message}</div>
+            </div>
+        `;
+        toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+        setTimeout(() => {
+            const toast = toastContainer.lastElementChild;
+            if (toast) toast.remove();
+        }, 3000);
     }
 </script>
 {% endblock %}
