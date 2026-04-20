@@ -896,7 +896,7 @@ def api_get_travel_request(request_id):
 @app.route('/api/travel/request/<int:request_id>/visa_status', methods=['POST'])
 @login_required
 def api_update_travel_visa_status(request_id):
-    """Обновить статус визовой заявки (из таблицы travel_flight_request)"""
+    """Обновить статус визовой заявки и отправить уведомление"""
     if session.get('role') != 'admin' and 'travel' not in session.get('groups', []):
         return jsonify({'error': 'Access denied'}), 403
 
@@ -904,13 +904,36 @@ def api_update_travel_visa_status(request_id):
     if status not in ['pending', 'in_progress', 'ready']:
         return jsonify({'error': 'Invalid status'}), 400
 
+    # Получаем текущий статус и данные пользователя
+    current_request = run_async(db.get_travel_flight_request_by_id(request_id))
+    old_status = current_request.get('visa_request_status') if current_request else None
+
     success = run_async(db.update_travel_visa_request_status(request_id, status))
-    return jsonify({'success': success})
+
+    if success and current_request and old_status != status:
+        # Получаем язык пользователя
+        user_data = run_async(db.get_user_data(current_request.get('user_id')))
+        lang = user_data.get('language', 'ru') if user_data else 'ru'
+
+        # Отправляем уведомление
+        from utility.notifications import notify_travel_visa_status_change
+        run_async(notify_travel_visa_status_change(
+            user_id=current_request.get('user_id'),
+            request_id=request_id,
+            old_status=old_status or 'pending',
+            new_status=status,
+            username=current_request.get('username'),
+            lang=lang
+        ))
+
+        return jsonify({'success': True})
+
+    return jsonify({'success': False}), 500
 
 @app.route('/api/travel/request/<int:request_id>/flight_status', methods=['POST'])
 @login_required
 def api_update_travel_flight_status(request_id):
-    """Обновить статус заявки на билет (из таблицы travel_flight_request)"""
+    """Обновить статус заявки на билет и отправить уведомление"""
     if session.get('role') != 'admin' and 'travel' not in session.get('groups', []):
         return jsonify({'error': 'Access denied'}), 403
 
@@ -918,8 +941,31 @@ def api_update_travel_flight_status(request_id):
     if status not in ['pending', 'in_progress', 'purchased']:
         return jsonify({'error': 'Invalid status'}), 400
 
+    # Получаем текущий статус и данные пользователя
+    current_request = run_async(db.get_travel_flight_request_by_id(request_id))
+    old_status = current_request.get('flight_request_status') if current_request else None
+
     success = run_async(db.update_travel_flight_request_status(request_id, status))
-    return jsonify({'success': success})
+
+    if success and current_request and old_status != status:
+        # Получаем язык пользователя
+        user_data = run_async(db.get_user_data(current_request.get('user_id')))
+        lang = user_data.get('language', 'ru') if user_data else 'ru'
+
+        # Отправляем уведомление
+        from utility.notifications import notify_travel_flight_status_change
+        run_async(notify_travel_flight_status_change(
+            user_id=current_request.get('user_id'),
+            request_id=request_id,
+            old_status=old_status or 'pending',
+            new_status=status,
+            username=current_request.get('username'),
+            lang=lang
+        ))
+
+        return jsonify({'success': True})
+
+    return jsonify({'success': False}), 500
 
 
 @app.route('/set_language/<lang>')
@@ -1289,7 +1335,7 @@ def user_chats():
 @app.route('/api/questions/forward', methods=['POST'])
 @login_required
 def api_forward_question():
-    """API для пересылки вопроса в другой отдел"""
+    """API для пересылки вопроса в другой отдел (исправленная версия)"""
     data = request.get_json()
 
     question_id = data.get('question_id')
@@ -1304,8 +1350,9 @@ def api_forward_question():
     manager_groups = session.get('groups', [])
     role = session.get('role')
 
+    # Админ может всё, менеджер только из своих отделов
     if role != 'admin' and source_department not in manager_groups:
-        return jsonify({'error': 'Access denied'}), 403
+        return jsonify({'error': f'Access denied to {source_department} department'}), 403
 
     # Получаем вопрос из исходной таблицы
     question = run_async(db.get_question_by_id(source_table, question_id))
@@ -1313,7 +1360,7 @@ def api_forward_question():
     if not question:
         return jsonify({'error': 'Question not found'}), 404
 
-    # Определяем целевую таблицу (уже с полным именем)
+    # Определяем целевую таблицу
     target_tables = {
         'pr': f'{db.db_schema_pr}.pr_questions',
         'event': f'{db.db_schema_event}.event_questions',
@@ -1329,13 +1376,14 @@ def api_forward_question():
         'username': question.get('username'),
         'user_id': question.get('user_id'),
         'category': f"forwarded_from_{source_department}",
-        'question': f"[Переслано из отдела {source_department.upper()} менеджером {session.get('username')}]\n\nОригинальный вопрос:\n{question.get('question')}",
+        'question': f"[🔄 Переслано из отдела {source_department.upper()} менеджером @{session.get('username')}]\n\n📝 Оригинальный вопрос:\n{question.get('question')}",
         'created_at': question.get('created_at')
     }
 
     success = run_async(db.save_forwarded_question(target_table, forwarded_question))
 
     if success:
+        # Логируем действие
         run_async(db.log_user_action(
             user_id=session.get('manager_id', 0),
             username=session.get('username'),
@@ -1347,9 +1395,39 @@ def api_forward_question():
                 "source_table": source_table
             }
         ))
-        return jsonify({'success': True})
+        return jsonify({'success': True, 'message': f'Question forwarded to {target_department.upper()}'})
 
     return jsonify({'error': 'Failed to forward question'}), 500
+
+
+@app.route('/api/questions/<int:question_id>/departments', methods=['GET'])
+@login_required
+def api_get_available_departments_for_forward(question_id):
+    """API для получения списка отделов, доступных для пересылки вопроса"""
+    manager_groups = session.get('groups', [])
+    role = session.get('role')
+
+    # Все возможные отделы
+    all_departments = [
+        {'id': 'pr', 'name': '📢 PR отдел'},
+        {'id': 'event', 'name': '🎪 Event отдел'},
+        {'id': 'travel', 'name': '✈️ Travel отдел'}
+    ]
+
+    # Админ может пересылать в любой отдел (кроме исходного)
+    if role == 'admin':
+        # Нужно знать исходный отдел вопроса
+        source_department = request.args.get('source', '')
+        available = [d for d in all_departments if d['id'] != source_department]
+        return jsonify({'departments': available})
+
+    # Менеджер может пересылать только в те отделы, к которым у него есть доступ
+    # (и которые не являются исходным отделом)
+    source_department = request.args.get('source', '')
+    available = [d for d in all_departments
+                 if d['id'] != source_department and d['id'] in manager_groups]
+
+    return jsonify({'departments': available})
 
 
 @app.route('/api/user_messages/<int:user_id>')
@@ -1480,10 +1558,12 @@ def api_get_file(file_id):
 
 
 # Добавьте эти маршруты в app.py
+# app.py - ЗАМЕНИТЕ существующий маршрут /api/questions
+
 @app.route('/api/questions')
 @login_required
 def api_get_my_questions():
-    """API для получения вопросов, доступных текущему менеджеру (свои + пересланные)"""
+    """API для получения вопросов, доступных текущему менеджеру"""
     manager_groups = session.get('groups', [])
     role = session.get('role')
 
@@ -1493,7 +1573,7 @@ def api_get_my_questions():
 
     all_questions = []
 
-    # Определяем соответствие групп и таблиц (полные имена таблиц)
+    # Определяем соответствие групп и таблиц
     tables_map = {
         'pr': f'{db.db_schema_pr}.pr_questions',
         'event': f'{db.db_schema_event}.event_questions',

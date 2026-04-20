@@ -257,7 +257,7 @@
                                 </tr>
                             </thead>
                             <tbody id="perDiemTableBody">
-                                <tr><td colspan="7" class="text-center">{{ get_text('loading') }}</td></tr>
+                                <tr><td colspan="7" class="text-center">{{ get_text('loading') }}<\/td></td>
                             </tbody>
                         </table>
                     </div>
@@ -298,6 +298,12 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
 
 <script>
     let currentFilter = 'all';
@@ -307,18 +313,40 @@
     let perDiemRequests = [];
     let requestsTable;
 
-    $(document).ready(function() {
+    // Ждем загрузки DOM и jQuery
+    document.addEventListener('DOMContentLoaded', function() {
+        // Проверяем, что jQuery загружен
+        if (typeof jQuery !== 'undefined') {
+            initDataTable();
+            loadPerDiemRequests();
+            initFilters();
+        } else {
+            console.error('jQuery not loaded');
+            // Повторная попытка через 100ms
+            setTimeout(function() {
+                if (typeof jQuery !== 'undefined') {
+                    initDataTable();
+                    loadPerDiemRequests();
+                    initFilters();
+                }
+            }, 100);
+        }
+    });
+
+    function initDataTable() {
         requestsTable = $('#requestsTable').DataTable({
             language: {
                 url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/{{ "ru" if session.get("lang", "ru") == "ru" else "en" }}.json'
             },
             pageLength: 25,
-            order: [[0, 'desc']]
+            order: [[0, 'desc']],
+            columnDefs: [
+                { orderable: false, targets: [9] }
+            ]
         });
+    }
 
-        loadPerDiemRequests();
-
-        // Обработчики фильтров
+    function initFilters() {
         $('.filter-btn').on('click', function() {
             $('.filter-btn').removeClass('active');
             $(this).addClass('active');
@@ -334,7 +362,7 @@
                 requestsTable.column(7).search('purchased').draw();
             }
         });
-    });
+    }
 
     // ============================================
     // FLIGHT REQUESTS FUNCTIONS
@@ -348,7 +376,9 @@
         document.querySelectorAll('#flights .stat-card').forEach(card => card.classList.remove('active'));
         document.getElementById('statAll').classList.add('active');
 
-        requestsTable.search('').columns().search('').draw();
+        if (requestsTable) {
+            requestsTable.search('').columns().search('').draw();
+        }
     }
 
     function filterVisaStatus(status) {
@@ -358,7 +388,9 @@
         document.querySelectorAll('#flights .stat-card').forEach(card => card.classList.remove('active'));
         document.getElementById('statVisaPending').classList.add('active');
 
-        requestsTable.column(6).search(status).draw();
+        if (requestsTable) {
+            requestsTable.column(6).search(status).draw();
+        }
     }
 
     function filterFlightStatus(status) {
@@ -372,165 +404,9 @@
             document.getElementById('statFlightPurchased').classList.add('active');
         }
 
-        requestsTable.column(7).search(status).draw();
-    }
-
-    // travel_panel.html - ЗАМЕНИТЕ функцию viewRequestDetails
-
-    function viewRequestDetails(id) {
-        fetch(`/api/travel/request/${id}`)
-            .then(response => response.json())
-            .then(data => {
-                const visaStatusText = {
-                    'have': '✅ {{ get_text("visa_have") }}',
-                    'not_have': '❌ {{ get_text("visa_not_have") }}',
-                    'special': '🔄 {{ get_text("visa_special") }}'
-                };
-
-                const html = `
-                    <h6 class="mb-3"><i class="bi bi-person"></i> {{ get_text('personal_info') }}</h6>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('full_name') }}:</div>
-                        <div class="detail-value">${escapeHtml(data.first_name || '')} ${escapeHtml(data.last_name || '')}</div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('phone') }}:</div>
-                        <div class="detail-value">${escapeHtml(data.phone || '-')}</div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('passport_number') }}:</div>
-                        <div class="detail-value">${escapeHtml(data.passport_number || '-')}</div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('birth_date') }}:</div>
-                        <div class="detail-value">${escapeHtml(data.birth_date || '-')}</div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('passport_country') }}:</div>
-                        <div class="detail-value">${escapeHtml(data.passport_country || '-')}</div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('issue_date') }}:</div>
-                        <div class="detail-value">${escapeHtml(data.issue_date || '-')}</div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('expiry_date') }}:</div>
-                        <div class="detail-value">${escapeHtml(data.expiry_date || '-')}</div>
-                    </div>
-
-                    <h6 class="mt-3 mb-3"><i class="bi bi-geo-alt"></i> {{ get_text('route_info') }}</h6>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('departure_from') }}:</div>
-                        <div class="detail-value">${escapeHtml(data.departure_from || '-')}</div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('return_to') }}:</div>
-                        <div class="detail-value">${escapeHtml(data.return_to || '-')}</div>
-                    </div>
-
-                    <h6 class="mt-3 mb-3"><i class="bi bi-passport"></i> {{ get_text('visa_info') }}</h6>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('visa_status') }}:</div>
-                        <div class="detail-value">${visaStatusText[data.visa_status] || '-'}</div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('visa_request_status') }}:</div>
-                        <div class="detail-value">
-                            <select class="form-select form-select-sm" style="width: auto; display: inline-block;" id="visaStatusSelect" onchange="updateVisaStatus(${data.id}, this.value)">
-                                <option value="pending" ${data.visa_request_status === 'pending' ? 'selected' : ''}>⏳ {{ get_text('status_pending') }}</option>
-                                <option value="in_progress" ${data.visa_request_status === 'in_progress' ? 'selected' : ''}>🔄 {{ get_text('status_in_progress') }}</option>
-                                <option value="ready" ${data.visa_request_status === 'ready' ? 'selected' : ''}>✅ {{ get_text('status_ready') }}</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <h6 class="mt-3 mb-3"><i class="bi bi-airplane"></i> {{ get_text('flight_info') }}</h6>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('flight_request_status') }}:</div>
-                        <div class="detail-value">
-                            <select class="form-select form-select-sm" style="width: auto; display: inline-block;" id="flightStatusSelect" onchange="updateFlightStatus(${data.id}, this.value)">
-                                <option value="pending" ${data.flight_request_status === 'pending' ? 'selected' : ''}>⏳ {{ get_text('status_pending') }}</option>
-                                <option value="in_progress" ${data.flight_request_status === 'in_progress' ? 'selected' : ''}>🔄 {{ get_text('status_in_progress') }}</option>
-                                <option value="purchased" ${data.flight_request_status === 'purchased' ? 'selected' : ''}>🎫 {{ get_text('flights_purchased') }}</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('needs_baggage') }}:</div>
-                        <div class="detail-value">${data.needs_baggage ? '✅ {{ get_text("yes") }}' : '❌ {{ get_text("no") }}'}</div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('hotel_needed') }}:</div>
-                        <div class="detail-value">${data.hotel_needed ? '✅ {{ get_text("yes") }}' : '❌ {{ get_text("no") }}'}</div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('preferences') }}:</div>
-                        <div class="detail-value">${escapeHtml(data.preferences || '-')}</div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('created_at') }}:</div>
-                        <div class="detail-value">${new Date(data.created_at).toLocaleString()}</div>
-                    </div>
-                    <div class="detail-row">
-                        <div class="detail-label">{{ get_text('updated_at') }}:</div>
-                        <div class="detail-value">${data.updated_at ? new Date(data.updated_at).toLocaleString() : '-'}</div>
-                    </div>
-                `;
-                document.getElementById('requestModalBody').innerHTML = html;
-                new bootstrap.Modal(document.getElementById('requestModal')).show();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showToast('{{ get_text("error_loading_details") }}', 'danger');
-            });
-    }
-
-    function updateVisaStatus(id, status) {
-        const statusNames = {
-            'pending': '{{ get_text("status_pending") }}',
-            'in_progress': '{{ get_text("status_in_progress") }}',
-            'ready': '{{ get_text("status_ready") }}'
-        };
-
-        fetch(`/api/travel/request/${id}/visa_status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `status=${status}`
-        }).then(response => response.json()).then(data => {
-            if (data.success) {
-                showToast(`{{ get_text("visa_status_changed") }} ${statusNames[status]}`, 'success');
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showToast('{{ get_text("error_status_change") }}', 'danger');
-            }
-        }).catch(error => {
-            console.error('Error:', error);
-            showToast('{{ get_text("error_status_change") }}', 'danger');
-        });
-    }
-
-    function updateFlightStatus(id, status) {
-        const statusNames = {
-            'pending': '{{ get_text("status_pending") }}',
-            'in_progress': '{{ get_text("status_in_progress") }}',
-            'purchased': '{{ get_text("flights_purchased") }}'
-        };
-
-        fetch(`/api/travel/request/${id}/flight_status`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `status=${status}`
-        }).then(response => response.json()).then(data => {
-            if (data.success) {
-                showToast(`{{ get_text("flight_status_changed") }} ${statusNames[status]}`, 'success');
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showToast('{{ get_text("error_status_change") }}', 'danger');
-            }
-        }).catch(error => {
-            console.error('Error:', error);
-            showToast('{{ get_text("error_status_change") }}', 'danger');
-        });
+        if (requestsTable) {
+            requestsTable.column(7).search(status).draw();
+        }
     }
 
     // ============================================
@@ -545,8 +421,10 @@
             renderPerDiemTable();
         } catch (e) {
             console.error('Error loading per diem requests:', e);
-            document.getElementById('perDiemTableBody').innerHTML =
-                '<tr><td colspan="7" class="text-center text-danger">{{ get_text("error_loading_details") }}</td></tr>';
+            const tbody = document.getElementById('perDiemTableBody');
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">{{ get_text("error_loading_details") }}<\/td></tr>';
+            }
         }
     }
 
@@ -555,9 +433,13 @@
         const pending = perDiemRequests.filter(r => r.status === 'pending').length;
         const completed = perDiemRequests.filter(r => r.status === 'completed').length;
 
-        document.getElementById('perDiemTotal').textContent = total;
-        document.getElementById('perDiemPending').textContent = pending;
-        document.getElementById('perDiemCompleted').textContent = completed;
+        const totalEl = document.getElementById('perDiemTotal');
+        const pendingEl = document.getElementById('perDiemPending');
+        const completedEl = document.getElementById('perDiemCompleted');
+
+        if (totalEl) totalEl.textContent = total;
+        if (pendingEl) pendingEl.textContent = pending;
+        if (completedEl) completedEl.textContent = completed;
     }
 
     function filterPerDiem(status) {
@@ -565,11 +447,14 @@
 
         document.querySelectorAll('#perdiem .stat-card').forEach(card => card.classList.remove('active'));
         if (status === 'all') {
-            document.getElementById('statPerDiemAll').classList.add('active');
+            const el = document.getElementById('statPerDiemAll');
+            if (el) el.classList.add('active');
         } else if (status === 'pending') {
-            document.getElementById('statPerDiemPending').classList.add('active');
+            const el = document.getElementById('statPerDiemPending');
+            if (el) el.classList.add('active');
         } else if (status === 'completed') {
-            document.getElementById('statPerDiemCompleted').classList.add('active');
+            const el = document.getElementById('statPerDiemCompleted');
+            if (el) el.classList.add('active');
         }
 
         renderPerDiemTable();
@@ -577,6 +462,8 @@
 
     function renderPerDiemTable() {
         const tbody = document.getElementById('perDiemTableBody');
+        if (!tbody) return;
+
         let filtered = perDiemRequests;
 
         if (currentPerDiemFilter !== 'all') {
@@ -584,7 +471,7 @@
         }
 
         if (filtered.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">{{ get_text("no_data") }}</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">{{ get_text("no_data") }}<\/td></tr>';
             return;
         }
 
@@ -606,26 +493,26 @@
 
             html += `
                 <tr>
-                    <td>${req.id}</td>
-                    <td><strong>@${req.username}</strong><br><small class="text-muted">ID: ${req.user_id}</small></td>
+                    <td>${escapeHtml(String(req.id))}</td>
+                    <td><strong>@${escapeHtml(req.username)}<\/strong><br><small class="text-muted">ID: ${escapeHtml(String(req.user_id))}<\/small></td>
                     <td>${paymentTypeText}</td>
                     <td class="booking-details" title="${escapeHtml(req.payment_details || '')}">
                         ${escapeHtml((req.payment_details || '-').substring(0, 50))}${(req.payment_details || '').length > 50 ? '...' : ''}
-                    </td>
-                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <\/td>
+                    <td><span class="status-badge ${statusClass}">${statusText}<\/span></td>
                     <td>${req.created_at ? new Date(req.created_at).toLocaleString() : '-'}</td>
                     <td>
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-sm btn-outline-primary" onclick="viewPerDiemDetails(${req.id})" title="{{ get_text('view_details') }}">
-                                <i class="bi bi-eye"></i>
-                            </button>
+                                <i class="bi bi-eye"><\/i>
+                            <\/button>
                             ${req.status !== 'completed' ? `
                             <button class="btn btn-sm btn-outline-success" onclick="updatePerDiemStatus(${req.id}, 'completed')" title="{{ get_text('set_ready') }}">
-                                <i class="bi bi-check-lg"></i>
-                            </button>
+                                <i class="bi bi-check-lg"><\/i>
+                            <\/button>
                             ` : ''}
-                        </div>
-                    </td>
+                        <\/div>
+                    <\/td>
                 </tr>
             `;
         }
@@ -645,18 +532,19 @@
 
         const html = `
             <table class="table table-bordered">
-                <tr><th style="width: 40%">ID</th><td>${request.id}</td></tr>
-                <tr><th>Username</th><td>@${request.username}</td></tr>
-                <tr><th>User ID</th><td>${request.user_id}</td></tr>
-                <tr><th>{{ get_text('payment_type') }}</th><td>${paymentTypeText}</td></tr>
-                <tr><th>{{ get_text('payment_details') }}</th><td><pre style="white-space: pre-wrap; word-break: break-all;">${escapeHtml(request.payment_details || '-')}</pre></td></tr>
-                <tr><th>{{ get_text('consent_given') }}</th><td>${request.consent_given ? '✅ {{ get_text("yes") }}' : '❌ {{ get_text("no") }}'}</td></tr>
-                <tr><th>{{ get_text('status') }}</th><td><span class="status-badge status-${request.status}">${statusText}</span></td></tr>
-                <tr><th>{{ get_text('created_at') }}</th><td>${request.created_at ? new Date(request.created_at).toLocaleString() : '-'}</td></tr>
-                <tr><th>{{ get_text('updated_at') }}</th><td>${request.updated_at ? new Date(request.updated_at).toLocaleString() : '-'}</td></tr>
+                <tr><th style="width: 40%">ID<\/th><td>${escapeHtml(String(request.id))}<\/td></tr>
+                <tr><th>Username<\/th><td>@${escapeHtml(request.username)}<\/td></tr>
+                <tr><th>User ID<\/th><td>${escapeHtml(String(request.user_id))}<\/td></tr>
+                <tr><th>{{ get_text('payment_type') }}<\/th><td>${paymentTypeText}<\/td></tr>
+                <tr><th>{{ get_text('payment_details') }}<\/th><td><pre style="white-space: pre-wrap; word-break: break-all;">${escapeHtml(request.payment_details || '-')}<\/pre><\/td></tr>
+                <tr><th>{{ get_text('consent_given') }}<\/th><td>${request.consent_given ? '✅ {{ get_text("yes") }}' : '❌ {{ get_text("no") }}'}<\/td></tr>
+                <tr><th>{{ get_text('status') }}<\/th><td><span class="status-badge status-${request.status}">${statusText}<\/span><\/td></tr>
+                <tr><th>{{ get_text('created_at') }}<\/th><td>${request.created_at ? new Date(request.created_at).toLocaleString() : '-'}<\/td></tr>
+                <tr><th>{{ get_text('updated_at') }}<\/th><td>${request.updated_at ? new Date(request.updated_at).toLocaleString() : '-'}<\/td></tr>
             </table>
         `;
-        document.getElementById('perDiemModalBody').innerHTML = html;
+        const modalBody = document.getElementById('perDiemModalBody');
+        if (modalBody) modalBody.innerHTML = html;
         new bootstrap.Modal(document.getElementById('perDiemModal')).show();
     }
 
@@ -716,12 +604,12 @@
         const toastHtml = `
             <div class="toast show" role="alert" data-bs-autohide="true" data-bs-delay="3000">
                 <div class="toast-header">
-                    <i class="bi ${typeMap[type] || typeMap.info} me-2"></i>
-                    <strong class="me-auto">${type === 'success' ? '{{ get_text("operation_success") }}' : '{{ get_text("error_occurred") }}'}</strong>
-                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
-                </div>
-                <div class="toast-body">${message}</div>
-            </div>
+                    <i class="bi ${typeMap[type] || typeMap.info} me-2"><\/i>
+                    <strong class="me-auto">${type === 'success' ? '{{ get_text("operation_success") }}' : '{{ get_text("error_occurred") }}'}<\/strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast"><\/button>
+                <\/div>
+                <div class="toast-body">${escapeHtml(message)}<\/div>
+            <\/div>
         `;
         toastContainer.insertAdjacentHTML('beforeend', toastHtml);
         setTimeout(() => {

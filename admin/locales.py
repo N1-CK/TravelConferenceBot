@@ -399,6 +399,13 @@ TEXTS = {
         'preferences': 'Предпочтения',
         'visa_request_status': 'Статус визовой заявки',
         'flight_request_status': 'Статус заявки на билет',
+
+        'travel_requests': 'Заявки на билеты',
+        'visa_have': 'Есть виза',
+        'visa_not_have': 'Нет визы',
+        'visa_special': 'Особый случай',
+        'no_requests': 'Нет заявок',
+
     },
     'en': {
         # Navigation
@@ -791,6 +798,12 @@ TEXTS = {
         'preferences': 'Preferences',
         'visa_request_status': 'Visa Request Status',
         'flight_request_status': 'Flight Request Status',
+
+        'travel_requests': 'Flight Requests',
+        'visa_have': 'Have visa',
+        'visa_not_have': 'No visa',
+        'visa_special': 'Special case',
+        'no_requests': 'No requests',
     }
 }
 

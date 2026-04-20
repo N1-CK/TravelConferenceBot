@@ -35,8 +35,6 @@
     .dept-btn.pr.active { background: #0d6efd; }
     .dept-btn.event.active { background: #198754; }
     .dept-btn.travel.active { background: #fd7e14; }
-    .reply-form { margin-top: 10px; display: none; }
-    .reply-form textarea { width: 100%; border-radius: 10px; border: 1px solid #dee2e6; padding: 8px; }
 </style>
 {% endblock %}
 
@@ -110,9 +108,15 @@
         <div class="card-body">
             <div class="department-filter" id="deptFilter">
                 <button class="dept-btn active" data-dept="all" onclick="filterQuestions('all')">📋 Все</button>
+                {% if 'pr' in session.groups or session.role == 'admin' %}
                 <button class="dept-btn pr" data-dept="pr" onclick="filterQuestions('pr')">📢 PR</button>
+                {% endif %}
+                {% if 'event' in session.groups or session.role == 'admin' %}
                 <button class="dept-btn event" data-dept="event" onclick="filterQuestions('event')">🎪 Event</button>
+                {% endif %}
+                {% if 'travel' in session.groups or session.role == 'admin' %}
                 <button class="dept-btn travel" data-dept="travel" onclick="filterQuestions('travel')">✈️ Travel</button>
+                {% endif %}
             </div>
             <div id="questionsList">
                 <div class="text-center text-muted py-4">Загрузка вопросов...</div>
@@ -136,6 +140,7 @@
                 <textarea class="form-control" id="replyAnswer" rows="4" placeholder="Введите ответ..."></textarea>
                 <input type="hidden" id="replyUserId">
                 <input type="hidden" id="replyDept">
+                <input type="hidden" id="replyQuestionId">
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
@@ -153,135 +158,52 @@
     let currentUserGroups = {{ session.get('groups', [])|tojson }};
     let currentUserRole = "{{ session.get('role', 'user') }}";
 
-    // Доступные отделы для пересылки
-    const allDepartments = [
-        { id: 'pr', name: '📢 PR отдел' },
-        { id: 'event', name: '🎪 Event отдел' },
-        { id: 'travel', name: '✈️ Travel отдел' }
-    ];
+    // Таблицы для каждого отдела
+    const DEPARTMENT_TABLES = {
+        'pr': 'travelconference_pr.pr_questions',
+        'event': 'travelconference_event.event_questions',
+        'travel': 'travelconference_travel.travel_questions'
+    };
+
+    // Хардкодные отделы для пересылки
+    const ALL_DEPARTMENTS = {
+        'pr': { id: 'pr', name: 'PR отдел', icon: 'megaphone' },
+        'event': { id: 'event', name: 'Event отдел', icon: 'calendar' },
+        'travel': { id: 'travel', name: 'Travel отдел', icon: 'airplane' }
+    };
 
     function switchTab(tab) {
         const chatsTab = document.getElementById('chatsTab');
         const questionsTab = document.getElementById('questionsTab');
+        const chatsBtn = document.querySelector('[data-tab="chats"]');
+        const questionsBtn = document.querySelector('[data-tab="questions"]');
 
         if (tab === 'chats') {
-            chatsTab.style.display = 'flex';  // Явно устанавливаем display: flex
+            chatsTab.style.display = 'block';
             questionsTab.style.display = 'none';
-            // Небольшой "толчок" для перерисовки, чтобы браузер пересчитал размеры
-            setTimeout(() => {
-                if (window.dispatchEvent) {
-                    window.dispatchEvent(new Event('resize'));
-                }
-            }, 100);
-        } else if (tab === 'questions') {
+            chatsBtn.classList.add('active');
+            questionsBtn.classList.remove('active');
+        } else {
             chatsTab.style.display = 'none';
             questionsTab.style.display = 'block';
-            loadAllQuestions(); // Загружаем вопросы, когда показываем вкладку
-        }
-
-        // Обновляем активный класс для кнопок табов
-        document.querySelectorAll('.nav-link').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.getAttribute('data-tab') === tab) {
-                btn.classList.add('active');
-            }
-        });
-    }
-
-    async function loadAllQuestions() {
-        const container = document.getElementById('questionsList');
-        container.innerHTML = '<div class="text-center text-muted py-4">{{ get_text("loading") }}</div>';
-
-        try {
-            const response = await fetch('/api/questions');
-            if (!response.ok) throw new Error('Failed to load questions');
-
-            const questions = await response.json();
-            currentQuestions = questions;
-
-            renderQuestions(currentQuestions);
-        } catch (e) {
-            console.error(e);
-            container.innerHTML = '<div class="text-center text-muted py-4">{{ get_text("error_loading_details") }}</div>';
+            chatsBtn.classList.remove('active');
+            questionsBtn.classList.add('active');
+            loadAllQuestions();
         }
     }
 
-    function getAvailableDepartmentsForForward(sourceDept) {
-        // Админ может пересылать в любой отдел
-        if (currentUserRole === 'admin') {
-            return allDepartments.filter(d => d.id !== sourceDept);
-        }
-        // Менеджер может пересылать только в те отделы, к которым у него есть доступ
-        return allDepartments.filter(d => d.id !== sourceDept && currentUserGroups.includes(d.id));
-    }
-
-    function renderQuestions(questions) {
-        const container = document.getElementById('questionsList');
-        if (!questions.length) {
-            container.innerHTML = '<div class="text-center text-muted py-4">{{ get_text("no_data") }}</div>';
-            return;
-        }
-
-        let html = '';
-        for (const q of questions) {
-            const deptNames = { pr: 'PR', event: 'EVENT', travel: 'TRAVEL' };
-            const deptColors = { pr: '#0d6efd', event: '#198754', travel: '#fd7e14' };
-
-            // Определяем, из какого отдела вопрос (оригинальный или пересланный)
-            let isForwarded = q.category && q.category.startsWith('forwarded_from_');
-            let originalDept = '';
-            if (isForwarded) {
-                originalDept = q.category.replace('forwarded_from_', '');
-            }
-
-            const forwardDepts = getAvailableDepartmentsForForward(q.department);
-            const forwardButtons = forwardDepts.map(dept =>
-                `<button class="btn btn-sm btn-outline-secondary ms-1"
-                    onclick="forwardQuestion(${q.id}, '${q.department}', '${dept.id}')"
-                    title="Переслать в ${dept.name}">
-                    <i class="bi bi-share"></i> ${dept.name}
-                </button>`
-            ).join('');
-
-            html += `
-                <div class="question-item">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <span class="question-department ${q.department}" style="background: ${deptColors[q.department]};">
-                                ${deptNames[q.department]}
-                            </span>
-                            ${isForwarded ? `<span class="badge bg-secondary ms-1">Переслано из ${originalDept.toUpperCase()}</span>` : ''}
-                            <strong class="ms-2">@${escapeHtml(q.username)}</strong>
-                            <small class="text-muted ms-2">${new Date(q.created_at).toLocaleString()}</small>
-                        </div>
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-primary"
-                                onclick="openReplyModal(${q.user_id}, '${q.department}', '${escapeHtml(q.question)}')">
-                                <i class="bi bi-reply"></i> {{ get_text("answer") }}
-                            </button>
-                            ${forwardButtons}
-                        </div>
-                    </div>
-                    <div class="question-text mt-2">${escapeHtml(q.question)}</div>
-                </div>
-            `;
-        }
-        container.innerHTML = html;
-    }
+    // ============================================
+    // ПЕРЕСЫЛКА ВОПРОСА (простое обновление статуса)
+    // ============================================
 
     async function forwardQuestion(questionId, sourceDept, targetDept) {
-        if (!confirm(`Переслать вопрос в отдел ${targetDept.toUpperCase()}?`)) {
+        console.log('Forwarding question:', questionId, 'from', sourceDept, 'to', targetDept);
+
+        const deptNames = { pr: 'PR', event: 'EVENT', travel: 'TRAVEL' };
+
+        if (!confirm(`Переслать вопрос в отдел ${deptNames[targetDept]}?`)) {
             return;
         }
-
-        // Определяем таблицу-источник
-        const sourceTables = {
-            'pr': 'travelconference_pr.pr_questions',
-            'event': 'travelconference_event.event_questions',
-            'travel': 'travelconference_travel.travel_questions'
-        };
-
-        const sourceTable = sourceTables[sourceDept];
 
         try {
             const response = await fetch('/api/questions/forward', {
@@ -291,27 +213,153 @@
                     question_id: questionId,
                     source_department: sourceDept,
                     target_department: targetDept,
-                    source_table: sourceTable
+                    source_table: DEPARTMENT_TABLES[sourceDept]
                 })
             });
 
             const data = await response.json();
 
             if (data.success) {
-                showToast(`Вопрос переслан в отдел ${targetDept.toUpperCase()}`, 'success');
+                showToast(data.message || `Вопрос переслан в отдел ${deptNames[targetDept]}`, 'success');
                 loadAllQuestions(); // Обновляем список
             } else {
-                showToast('Ошибка при пересылке вопроса', 'danger');
+                showToast(data.error || 'Ошибка при пересылке вопроса', 'danger');
             }
         } catch (e) {
-            console.error(e);
+            console.error('Forward error:', e);
             showToast('Ошибка при пересылке вопроса', 'danger');
         }
     }
 
-    function openReplyModal(userId, department, questionText) {
+    // Получить список отделов для пересылки (хардкод - все кроме текущего)
+    function getForwardDepartments(currentDept) {
+        const all = [
+            { id: 'pr', name: 'PR отдел', icon: 'megaphone' },
+            { id: 'event', name: 'Event отдел', icon: 'calendar' },
+            { id: 'travel', name: 'Travel отдел', icon: 'airplane' }
+        ];
+        return all.filter(d => d.id !== currentDept);
+    }
+
+    // ============================================
+    // ОТОБРАЖЕНИЕ ВОПРОСОВ
+    // ============================================
+
+    function renderQuestions(questions) {
+        const container = document.getElementById('questionsList');
+        if (!questions.length) {
+            container.innerHTML = '<div class="text-center text-muted py-4">Нет вопросов</div>';
+            return;
+        }
+
+        let html = '';
+        for (const q of questions) {
+            const deptNames = { pr: 'PR', event: 'EVENT', travel: 'TRAVEL' };
+            const deptColors = { pr: '#0d6efd', event: '#198754', travel: '#fd7e14' };
+
+            let isForwarded = q.category && q.category.startsWith('forwarded_from_');
+            let originalDept = '';
+            if (isForwarded) {
+                originalDept = q.category.replace('forwarded_from_', '');
+            }
+
+            // Всегда показываем кнопку пересылки с двумя другими отделами
+            const forwardDepts = getForwardDepartments(q.department);
+            const hasForwardOptions = forwardDepts.length > 0;
+
+            html += `
+                <div class="question-item" data-question-id="${q.id}" data-dept="${q.department}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div style="flex: 1;">
+                            <div class="mb-2">
+                                <span class="question-department ${q.department}" style="background: ${deptColors[q.department]};">
+                                    ${deptNames[q.department]}
+                                </span>
+                                ${isForwarded ? `<span class="badge bg-secondary ms-1"><i class="bi bi-arrow-return-right"></i> из ${originalDept.toUpperCase()}</span>` : ''}
+                                <strong class="ms-2">@${escapeHtml(q.username)}</strong>
+                                <small class="text-muted ms-2">${new Date(q.created_at).toLocaleString()}</small>
+                            </div>
+                            <div class="question-text">${escapeHtml(q.question)}</div>
+                        </div>
+                        <div class="btn-group ms-3" style="flex-shrink: 0;">
+                            <button class="btn btn-sm btn-outline-primary"
+                                onclick="openReplyModal(${q.user_id}, '${q.department}', '${escapeHtml(q.question)}', ${q.id})"
+                                title="Ответить">
+                                <i class="bi bi-reply"></i> Ответить
+                            </button>
+                            ${hasForwardOptions ? `
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                                    data-bs-toggle="dropdown" aria-expanded="false"
+                                    title="Переслать в другой отдел">
+                                    <i class="bi bi-share"></i> Переслать
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    ${forwardDepts.map(dept =>
+                                        `<li><a class="dropdown-item" href="#" onclick="forwardQuestion(${q.id}, '${q.department}', '${dept.id}'); return false;">
+                                            <i class="bi bi-${dept.icon} me-2"></i>
+                                            В ${dept.name}
+                                        </a></li>`
+                                    ).join('')}
+                                </ul>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+
+        // Инициализируем Bootstrap dropdown
+        if (typeof bootstrap !== 'undefined') {
+            document.querySelectorAll('[data-bs-toggle="dropdown"]').forEach(el => {
+                new bootstrap.Dropdown(el);
+            });
+        }
+    }
+
+    async function loadAllQuestions() {
+        const container = document.getElementById('questionsList');
+        container.innerHTML = '<div class="text-center text-muted py-4">Загрузка...</div>';
+
+        try {
+            const response = await fetch('/api/questions');
+            if (!response.ok) throw new Error('Failed to load questions');
+
+            const questions = await response.json();
+            currentQuestions = questions;
+            renderQuestions(currentQuestions);
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = '<div class="text-center text-muted py-4">Ошибка загрузки вопросов</div>';
+        }
+    }
+
+    function filterQuestions(dept) {
+        document.querySelectorAll('.dept-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.dept === dept) {
+                btn.classList.add('active');
+            }
+        });
+
+        if (dept === 'all') {
+            renderQuestions(currentQuestions);
+        } else {
+            const filtered = currentQuestions.filter(q => q.department === dept);
+            renderQuestions(filtered);
+        }
+    }
+
+    // ============================================
+    // ОТВЕТ НА ВОПРОС
+    // ============================================
+
+    function openReplyModal(userId, department, questionText, questionId) {
         document.getElementById('replyUserId').value = userId;
         document.getElementById('replyDept').value = department;
+        document.getElementById('replyQuestionId').value = questionId;
         document.getElementById('questionText').innerHTML = escapeHtml(questionText);
         document.getElementById('replyAnswer').value = '';
         new bootstrap.Modal(document.getElementById('replyModal')).show();
@@ -323,7 +371,7 @@
         const answer = document.getElementById('replyAnswer').value.trim();
 
         if (!answer) {
-            showToast('{{ get_text("field_required") }}', 'warning');
+            showToast('Введите ответ', 'warning');
             return;
         }
 
@@ -337,16 +385,20 @@
             const data = await resp.json();
 
             if (data.success) {
-                showToast('{{ get_text("operation_success") }}', 'success');
+                showToast('Ответ отправлен', 'success');
                 bootstrap.Modal.getInstance(document.getElementById('replyModal')).hide();
                 loadAllQuestions();
             } else {
-                showToast('{{ get_text("error_occurred") }}: ' + (data.error || 'Unknown error'), 'danger');
+                showToast('Ошибка: ' + (data.error || 'Unknown error'), 'danger');
             }
         } catch (e) {
-            showToast('{{ get_text("error_occurred") }}', 'danger');
+            showToast('Ошибка отправки', 'danger');
         }
     }
+
+    // ============================================
+    // ЧАТЫ
+    // ============================================
 
     async function loadChat(userId) {
         currentUserId = userId;
@@ -361,11 +413,18 @@
         const messagesDiv = document.getElementById('chatMessages');
         messagesDiv.innerHTML = '';
 
-        for (const msg of data.messages.reverse()) {
+        for (const msg of (data.messages || []).reverse()) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${msg.direction === 'incoming' ? 'incoming' : 'outgoing'}`;
             let content = '';
-            if (msg.message_text) content += `<div class="message-bubble">${escapeHtml(msg.message_text)}</div>`;
+
+            if (msg.source_type && msg.source_type.includes('_question')) {
+                const dept = msg.source_type.replace('_question', '').toUpperCase();
+                content += `<div class="message-bubble"><small class="text-muted">[Вопрос из отдела ${dept}]</small><br>${escapeHtml(msg.message_text)}</div>`;
+            } else if (msg.message_text) {
+                content += `<div class="message-bubble">${escapeHtml(msg.message_text)}</div>`;
+            }
+
             const time = new Date(msg.created_at).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
             content += `<div class="message-time">${time}</div>`;
             messageDiv.innerHTML = content;
@@ -373,7 +432,7 @@
         }
 
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        document.getElementById('currentUserName').textContent = data.username;
+        document.getElementById('currentUserName').textContent = data.username || `User ${userId}`;
         document.getElementById('currentUserInfo').textContent = `ID: ${userId}`;
         document.getElementById('chatInput').style.display = 'block';
 
@@ -399,9 +458,13 @@
             document.getElementById('replyMessage').value = '';
             loadChat(currentUserId);
         } else {
-            showToast('{{ get_text("error_occurred") }}', 'danger');
+            showToast('Ошибка отправки', 'danger');
         }
     }
+
+    // ============================================
+    // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+    // ============================================
 
     function escapeHtml(text) {
         if (!text) return '';
@@ -421,10 +484,10 @@
             info: 'info-circle-fill text-info'
         };
         const typeText = {
-            success: '{{ get_text("operation_success") }}',
-            danger: '{{ get_text("error_occurred") }}',
-            warning: '{{ get_text("warning") }}',
-            info: '{{ get_text("info") }}'
+            success: 'Успешно',
+            danger: 'Ошибка',
+            warning: 'Внимание',
+            info: 'Информация'
         };
 
         const toastHtml = `
@@ -434,7 +497,7 @@
                     <strong class="me-auto">${typeText[type] || typeText.info}</strong>
                     <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
                 </div>
-                <div class="toast-body">${message}</div>
+                <div class="toast-body">${escapeHtml(message)}</div>
             </div>
         `;
 

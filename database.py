@@ -709,7 +709,7 @@ class Database:
         """Сохранение заявки на суточные"""
         try:
             async with self.pool.acquire() as conn:
-                # Создаем таблицу если её нет
+                # Создаем таблицу с правильной структурой если её нет
                 await conn.execute(f"""
                     CREATE TABLE IF NOT EXISTS {self.db_schema_travel}.travel_per_diem_requests (
                         id SERIAL PRIMARY KEY,
@@ -717,13 +717,41 @@ class Database:
                         user_id BIGINT NOT NULL,
                         payment_type TEXT,
                         payment_details TEXT,
-                        consent_given BOOLEAN DEFAULT FALSE,
                         status TEXT DEFAULT 'pending',
+                        consent_given BOOLEAN DEFAULT FALSE,
                         created_at TIMESTAMP DEFAULT NOW(),
                         updated_at TIMESTAMP DEFAULT NOW()
                     )
                 """)
 
+                # Добавляем колонку payment_type если её нет
+                try:
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_per_diem_requests 
+                        ADD COLUMN IF NOT EXISTS payment_type TEXT
+                    """)
+                except:
+                    pass
+
+                # Добавляем колонку status если её нет
+                try:
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_per_diem_requests 
+                        ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'
+                    """)
+                except:
+                    pass
+
+                # Добавляем колонку updated_at если её нет
+                try:
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_per_diem_requests 
+                        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()
+                    """)
+                except:
+                    pass
+
+                # Вставляем данные
                 await conn.execute(f"""
                     INSERT INTO {self.db_schema_travel}.travel_per_diem_requests 
                     (username, user_id, payment_type, payment_details, consent_given, status)
@@ -740,12 +768,92 @@ class Database:
             logger.error(f"Error saving per diem request: {e}")
             return False
 
+    # database.py - добавьте этот метод в класс Database
+
+    async def get_questions_by_department(self, department: str, limit: int = 100) -> list:
+        """Получить вопросы для конкретного отдела"""
+        try:
+            async with self.pool.acquire() as conn:
+                tables = {
+                    'pr': f'{self.db_schema_pr}.pr_questions',
+                    'event': f'{self.db_schema_event}.event_questions',
+                    'travel': f'{self.db_schema_travel}.travel_questions'
+                }
+
+                table = tables.get(department)
+                if not table:
+                    return []
+
+                rows = await conn.fetch(f"""
+                    SELECT * FROM {table}
+                    ORDER BY created_at DESC
+                    LIMIT $1
+                """, limit)
+
+                result = []
+                for row in rows:
+                    item = dict(row)
+                    item['department'] = department
+                    result.append(item)
+
+                return result
+        except Exception as e:
+            logger.error(f"Error getting questions for {department}: {e}")
+            return []
+
     async def get_all_per_diem_requests(self) -> list:
         """Получить все заявки на суточные"""
         try:
             async with self.pool.acquire() as conn:
+                # Сначала убедимся, что таблица имеет правильную структуру
+                try:
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_per_diem_requests 
+                        ADD COLUMN IF NOT EXISTS payment_type TEXT
+                    """)
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_per_diem_requests 
+                        ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'
+                    """)
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_per_diem_requests 
+                        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()
+                    """)
+                except Exception as e:
+                    logger.warning(f"Error adding columns to per_diem table: {e}")
+
+                # Обновляем старые записи, у которых нет payment_type
+                try:
+                    await conn.execute(f"""
+                        UPDATE {self.db_schema_travel}.travel_per_diem_requests 
+                        SET payment_type = 'card' 
+                        WHERE payment_type IS NULL AND payment_details IS NOT NULL
+                    """)
+                except:
+                    pass
+
+                # Обновляем статус для старых записей
+                try:
+                    await conn.execute(f"""
+                        UPDATE {self.db_schema_travel}.travel_per_diem_requests 
+                        SET status = 'pending' 
+                        WHERE status IS NULL
+                    """)
+                except:
+                    pass
+
                 rows = await conn.fetch(f"""
-                    SELECT * FROM {self.db_schema_travel}.travel_per_diem_requests 
+                    SELECT 
+                        id, 
+                        username, 
+                        user_id, 
+                        COALESCE(payment_type, 'card') as payment_type,
+                        payment_details, 
+                        COALESCE(status, 'pending') as status,
+                        consent_given,
+                        created_at,
+                        updated_at
+                    FROM {self.db_schema_travel}.travel_per_diem_requests 
                     ORDER BY created_at DESC
                 """)
                 return [dict(row) for row in rows]
@@ -1325,39 +1433,6 @@ class Database:
             logger.error(f"Error getting airline URL from travel_bot: {e}")
             return ""
 
-    async def save_per_diem_request(self, data: dict) -> bool:
-        """Сохранение заявки на суточные"""
-        try:
-            async with self.pool.acquire() as conn:
-                # Сначала создайте таблицу если её нет
-                await conn.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self.db_schema_travel}.travel_per_diem_requests (
-                        id SERIAL PRIMARY KEY,
-                        username TEXT,
-                        user_id BIGINT,
-                        payment_details TEXT,
-                        currency TEXT,
-                        comments TEXT,
-                        consent_given BOOLEAN DEFAULT FALSE,
-                        created_at TIMESTAMP DEFAULT NOW()
-                    )
-                """)
-
-                await conn.execute(f"""
-                    INSERT INTO {self.db_schema_travel}.travel_per_diem_requests 
-                    (username, user_id, payment_details, currency, comments, consent_given)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                """,
-                                   data['username'], data['user_id'],
-                                   data.get('payment_details'),
-                                   data.get('currency'),
-                                   data.get('comments', '-'),
-                                   data.get('consent_given', False)
-                                   )
-                return True
-        except Exception as e:
-            logger.error(f"Error saving daily allowance request: {e}")
-            return False
 
     async def get_user_company(self, user_id: int) -> str:
         """Получить компанию пользователя"""

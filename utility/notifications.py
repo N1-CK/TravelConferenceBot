@@ -300,3 +300,175 @@ async def notify_business_card_status_change(user_id: int, request_id: int, old_
     except Exception as e:
         logger.error(f"❌ Ошибка отправки уведомления о статусе визиток: {e}")
         return False
+
+
+# ============================================
+# TRAVEL NOTIFICATIONS (Добавить в notifications.py)
+# ============================================
+
+async def notify_travel_visa_status_change(user_id: int, request_id: int, old_status: str, new_status: str,
+                                           username: str = None, lang: str = None):
+    """Отправка уведомления об изменении статуса визовой поддержки"""
+    try:
+        if lang is None:
+            user_data = await db.get_user_data(user_id)
+            lang = user_data.get('language', 'ru') if user_data else 'ru'
+
+        status_messages = {
+            'pending': {'ru': "В ожидании ⏳", 'en': "Pending ⏳"},
+            'in_progress': {'ru': "В процессе обработки 🔄", 'en': "In progress 🔄"},
+            'ready': {'ru': "Готово ✅", 'en': "Ready ✅"}
+        }
+        status_display = status_messages.get(new_status, {}).get(lang, new_status)
+
+        if lang == 'ru':
+            message_text = (
+                f"🛂 *Изменение статуса визовой поддержки*\n\n"
+                f"Заявка #{request_id}\n"
+                f"Новый статус: *{status_display}*\n\n"
+            )
+            if new_status == 'ready':
+                message_text += (
+                    f"Ваши визовые документы готовы!\n"
+                    f"Свяжитесь с travel-отделом для получения подробной информации.\n\n"
+                )
+            elif new_status == 'in_progress':
+                message_text += (
+                    f"Ваша заявка принята в работу.\n"
+                    f"Мы свяжемся с вами при необходимости."
+                )
+            else:
+                message_text += (
+                    f"Ваша заявка зарегистрирована и ожидает обработки."
+                )
+        else:
+            message_text = (
+                f"🛂 *Visa support status update*\n\n"
+                f"Request #{request_id}\n"
+                f"New status: *{status_display}*\n\n"
+            )
+            if new_status == 'ready':
+                message_text += (
+                    f"Your visa documents are ready!\n"
+                    f"Contact the travel department for details.\n\n"
+                )
+            elif new_status == 'in_progress':
+                message_text += (
+                    f"Your request has been accepted for processing.\n"
+                    f"We will contact you if necessary."
+                )
+            else:
+                message_text += (
+                    f"Your request has been registered and is pending processing."
+                )
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="🏠 Главное меню" if lang == 'ru' else "🏠 Main Menu",
+                callback_data="menu_main"
+            )]
+        ])
+
+        await bot.send_message(
+            chat_id=user_id,
+            text=message_text,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+
+        await db.log_user_action(
+            user_id=user_id,
+            username=username or str(user_id),
+            action="travel_visa_status_notification_sent",
+            details={"request_id": request_id, "new_status": new_status, "language": lang}
+        )
+        logger.info(f"✅ Уведомление о статусе визы #{request_id} отправлено пользователю {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Ошибка отправки уведомления о статусе визы: {e}")
+        return False
+
+
+async def notify_travel_flight_status_change(user_id: int, request_id: int, old_status: str, new_status: str,
+                                             username: str = None, lang: str = None):
+    """Отправка уведомления об изменении статуса заявки на билет"""
+    try:
+        if lang is None:
+            user_data = await db.get_user_data(user_id)
+            lang = user_data.get('language', 'ru') if user_data else 'ru'
+
+        status_messages = {
+            'pending': {'ru': "В ожидании ⏳", 'en': "Pending ⏳"},
+            'in_progress': {'ru': "В процессе обработки 🔄", 'en': "In progress 🔄"},
+            'purchased': {'ru': "Билеты куплены 🎫", 'en': "Tickets purchased 🎫"}
+        }
+        status_display = status_messages.get(new_status, {}).get(lang, new_status)
+
+        if lang == 'ru':
+            message_text = (
+                f"✈️ *Изменение статуса заявки на авиабилеты*\n\n"
+                f"Заявка #{request_id}\n"
+                f"Новый статус: *{status_display}*\n\n"
+            )
+            if new_status == 'purchased':
+                message_text += (
+                    f"Ваши авиабилеты успешно приобретены!\n"
+                    f"Билеты будут отправлены вам в ближайшее время.\n\n"
+                    f"Проверьте email и Telegram для получения деталей."
+                )
+            elif new_status == 'in_progress':
+                message_text += (
+                    f"Ваша заявка принята в работу.\n"
+                    f"Мы подбираем оптимальные рейсы и свяжемся с вами."
+                )
+            else:
+                message_text += (
+                    f"Ваша заявка зарегистрирована и ожидает обработки."
+                )
+        else:
+            message_text = (
+                f"✈️ *Flight request status update*\n\n"
+                f"Request #{request_id}\n"
+                f"New status: *{status_display}*\n\n"
+            )
+            if new_status == 'purchased':
+                message_text += (
+                    f"Your flight tickets have been purchased!\n"
+                    f"Tickets will be sent to you shortly.\n\n"
+                    f"Check your email and Telegram for details."
+                )
+            elif new_status == 'in_progress':
+                message_text += (
+                    f"Your request has been accepted for processing.\n"
+                    f"We are selecting the best flights and will contact you."
+                )
+            else:
+                message_text += (
+                    f"Your request has been registered and is pending processing."
+                )
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="🏠 Главное меню" if lang == 'ru' else "🏠 Main Menu",
+                callback_data="menu_main"
+            )]
+        ])
+
+        await bot.send_message(
+            chat_id=user_id,
+            text=message_text,
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+
+        await db.log_user_action(
+            user_id=user_id,
+            username=username or str(user_id),
+            action="travel_flight_status_notification_sent",
+            details={"request_id": request_id, "new_status": new_status, "language": lang}
+        )
+        logger.info(f"✅ Уведомление о статусе билетов #{request_id} отправлено пользователю {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Ошибка отправки уведомления о статусе билетов: {e}")
+        return False
