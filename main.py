@@ -14,8 +14,8 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(),  # Вывод в консоль
-        logging.FileHandler('bot.log')  # Запись в файл
+        logging.StreamHandler(),
+        logging.FileHandler('bot.log')
     ]
 )
 logger = logging.getLogger(__name__)
@@ -34,6 +34,9 @@ async def on_startup():
             logger.error("❌ Не удалось подключиться к БД")
             return False
 
+        # Создаем таблицы для менеджеров (если нет)
+        await db.create_managers_tables()
+
         logger.info("✅ Бот запущен. База данных инициализирована.")
         return True
     except Exception as e:
@@ -51,24 +54,10 @@ async def on_shutdown():
 
 
 async def main():
-    # Initialize DB connection
+    # Создаем пул соединений с БД
     if not await db.create_pool():
         logger.error("❌ Failed to connect to database")
         return
-
-    # Start affiliate sync
-    # try:
-        # from .utility.sync import start_sync_scheduler
-    #     await start_sync_scheduler()
-    #     logger.info("✅ Affiliate sync scheduler started")
-    # except Exception as e:
-    #     logger.error(f"❌ Failed to start sync scheduler: {e}")
-
-    try:
-        await db.sync_whitelist_from_google_sheets()
-        logger.info("✅ Whitelist synced from Google Sheets")
-    except Exception as e:
-        logger.warning(f"⚠️ Could not sync whitelist: {e}")
 
     try:
         from handlers import (
@@ -98,7 +87,8 @@ async def main():
         logger.error(f"❌ Router import error: {e}")
         return
 
-    # Register shutdown handler
+    # Register startup/shutdown handlers
+    dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
     logger.info("✅ Bot started and ready")

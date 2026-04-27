@@ -1,3 +1,4 @@
+from aiogram.client.session import aiohttp
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from functools import wraps
 import asyncio
@@ -278,8 +279,9 @@ class TelegramBot:
                     print(f"Error sending message: {e}")
                     return False
 
+
     async def broadcast_to_users(self, users, message, files=None):
-        """Массовая рассылка пользователям с файлами"""
+        """Массовая рассылка пользователям с файлами и HTML форматированием"""
         results = {'success': 0, 'failed': 0}
         file_count = len(files) if files else 0
 
@@ -290,22 +292,60 @@ class TelegramBot:
                 continue
 
             success = False
-            if files and len(files) > 0:
-                # Отправляем первый файл с подписью
-                success = await self.send_message(user_id, message, files[0])
-                # Отправляем остальные файлы без подписи
-                for file in files[1:]:
-                    await self.send_message(user_id, None, file)
-            else:
-                success = await self.send_message(user_id, message)
+            try:
+                # Конвертируем Markdown в HTML для корректного отображения
+                html_message = message
+                if html_message:
+                    html_message = html_message.replace('**', '<b>').replace('**', '</b>')
+                    html_message = html_message.replace('*', '<i>').replace('*', '</i>')
+                    # Ссылки уже в HTML формате, оставляем как есть
+                    # Эмодзи остаются как есть
+
+                async with aiohttp.ClientSession() as session:
+                    if files and len(files) > 0:
+                        # Отправляем первый файл с подписью
+                        for idx, file_path in enumerate(files):
+                            if os.path.exists(file_path):
+                                url = f"{self.api_url}/sendDocument"
+                                form_data = aiohttp.FormData()
+                                form_data.add_field('chat_id', str(user_id))
+                                form_data.add_field('document', open(file_path, 'rb'),
+                                                    filename=os.path.basename(file_path))
+                                if idx == 0 and html_message:
+                                    form_data.add_field('caption', html_message, content_type='text/html')
+                                else:
+                                    form_data.add_field('caption', ' ', content_type='text/html')
+
+                                async with session.post(url, data=form_data) as resp:
+                                    result = await resp.json()
+                                    if result.get('ok'):
+                                        success = True
+                                await asyncio.sleep(0.05)
+                        # Если файлы были отправлены, считаем успехом
+                        if files and len(files) > 0:
+                            success = True
+                    else:
+                        # Отправка только текста в HTML формате
+                        url = f"{self.api_url}/sendMessage"
+                        payload = {
+                            'chat_id': user_id,
+                            'text': html_message,
+                            'parse_mode': 'HTML'
+                        }
+                        async with session.post(url, json=payload) as resp:
+                            result = await resp.json()
+                            success = result.get('ok', False)
+
+            except Exception as e:
+                logger.error(f"Error sending to {user_id}: {e}")
+                success = False
 
             if success:
                 results['success'] += 1
             else:
                 results['failed'] += 1
 
-            # Небольшая задержка чтобы не превысить лимиты Telegram
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.05)  # Защита от лимитов Telegram
 
         results['file_count'] = file_count
         return results
@@ -860,8 +900,6 @@ def api_update_per_diem_status(request_id):
     return jsonify({'success': success})
 
 
-# app.py - Добавьте этот маршрут
-
 @app.route('/api/travel/requests')
 @login_required
 def api_get_travel_requests():
@@ -1095,6 +1133,20 @@ def update_business_card_status(request_id):
 def api_get_all_users():
     """API для получения всех пользователей"""
     users = run_async(db.get_all_users_basic())
+    return jsonify(users)
+
+
+@app.route('/api/users/by_conferences', methods=['POST'])
+@login_required
+def api_get_users_by_conferences():
+    """API для получения пользователей по списку конференций (с деталями)"""
+    data = request.get_json()
+    conferences = data.get('conferences', [])
+
+    if not conferences:
+        return jsonify([])
+
+    users = run_async(db.get_users_by_conference_list(conferences))
     return jsonify(users)
 
 

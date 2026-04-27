@@ -1,4 +1,4 @@
-<!-- broadcast.html - обновленная версия с полной локализацией -->
+<!-- broadcast.html - исправленная версия -->
 {% extends "base.html" %}
 
 {% block title %}{{ get_text('title_broadcast') }}{% endblock %}
@@ -8,17 +8,6 @@
     :root {
         --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         --card-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.02);
-    }
-
-    .sidebar {
-        position: sticky;
-        top: 0;
-        height: 100vh;
-        overflow-y: auto;
-    }
-
-    .main-content {
-        min-height: 100vh;
     }
 
     .selection-group {
@@ -32,68 +21,8 @@
     }
 
     @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(-10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    #companyMultiSelect,
-    #specificUsersSelect,
-    #conferenceMultiSelect {
-        display: none;
-    }
-
-    #companyMultiSelect.show,
-    #specificUsersSelect.show,
-    #conferenceMultiSelect.show {
-        display: block;
-    }
-
-    .broadcast-header {
-        background: var(--primary-gradient);
-        border-radius: 28px;
-        padding: 2rem 2rem;
-        margin-bottom: 2rem;
-        color: white;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .broadcast-header::before {
-        content: "✉️";
-        position: absolute;
-        right: -20px;
-        bottom: -20px;
-        font-size: 120px;
-        opacity: 0.1;
-        pointer-events: none;
-        transform: rotate(-15deg);
-    }
-
-    .broadcast-header h2 {
-        margin: 0;
-        font-weight: 700;
-        letter-spacing: -0.5px;
-    }
-
-    .broadcast-header p {
-        margin: 0.5rem 0 0;
-        opacity: 0.9;
-    }
-
-    .broadcast-card {
-        background: rgba(255, 255, 255, 0.96);
-        backdrop-filter: blur(0px);
-        border-radius: 32px;
-        box-shadow: var(--card-shadow);
-        padding: 2rem;
-        transition: all 0.3s ease;
-        border: 1px solid rgba(255, 255, 255, 0.5);
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 
     .target-type-group {
@@ -127,20 +56,9 @@
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
     }
 
-    .target-emoji {
-        font-size: 1.8rem;
-    }
-
-    .target-title {
-        font-weight: 700;
-        color: #1e293b;
-        margin-bottom: 2px;
-    }
-
-    .target-desc {
-        font-size: 0.75rem;
-        color: #64748b;
-    }
+    .target-emoji { font-size: 1.8rem; }
+    .target-title { font-weight: 700; color: #1e293b; margin-bottom: 2px; }
+    .target-desc { font-size: 0.75rem; color: #64748b; }
 
     .selection-header {
         display: flex;
@@ -151,19 +69,7 @@
         gap: 10px;
     }
 
-    .selection-header label {
-        font-weight: 700;
-        color: #0f172a;
-        font-size: 1.1rem;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .action-buttons {
-        display: flex;
-        gap: 8px;
-    }
+    .action-buttons { display: flex; gap: 8px; }
 
     .btn-soft {
         background: white;
@@ -174,11 +80,7 @@
         font-weight: 500;
         transition: all 0.2s;
     }
-
-    .btn-soft:hover {
-        background: #f1f5f9;
-        transform: translateY(-1px);
-    }
+    .btn-soft:hover { background: #f1f5f9; }
 
     .checkbox-grid {
         display: grid;
@@ -200,101 +102,117 @@
         align-items: center;
         gap: 10px;
     }
+    .checkbox-item:hover { background: #fefce8; border-color: #facc15; transform: translateX(4px); }
+    .checkbox-item input { width: 18px; height: 18px; accent-color: #667eea; margin: 0; cursor: pointer; }
+    .checkbox-item span { font-size: 0.9rem; font-weight: 500; color: #1e293b; }
 
-    .checkbox-item:hover {
-        background: #fefce8;
-        border-color: #facc15;
-        transform: translateX(4px);
+    /* Recipient Preview List */
+    .recipient-preview {
+        margin-top: 1rem;
+        border-top: 1px solid #e2e8f0;
+        padding-top: 1rem;
     }
-
-    .checkbox-item input {
-        width: 18px;
-        height: 18px;
-        accent-color: #667eea;
-        margin: 0;
-        cursor: pointer;
-    }
-
-    .checkbox-item span {
-        font-size: 0.9rem;
-        font-weight: 500;
-        color: #1e293b;
-    }
-
-    .user-list-modern {
-        border-radius: 20px;
+    .recipient-list {
+        max-height: 200px;
         overflow-y: auto;
-        max-height: 400px;
-        border: 1px solid #e2e8f0;
+        border-radius: 16px;
         background: white;
+        border: 1px solid #e2e8f0;
     }
-
-    .user-item-modern {
-        padding: 10px 12px;
+    .recipient-item {
+        padding: 8px 12px;
         border-bottom: 1px solid #f1f5f9;
-        transition: background 0.2s;
         display: flex;
         align-items: center;
         gap: 10px;
+        font-size: 0.85rem;
     }
-
-    .user-item-modern:hover {
-        background: #f8fafc;
-    }
-
-    .user-avatar-small {
-        width: 36px;
-        height: 36px;
-        min-width: 36px;
+    .recipient-item:last-child { border-bottom: none; }
+    .recipient-avatar {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
         background: var(--primary-gradient);
-        border-radius: 12px;
+        border-radius: 10px;
         display: flex;
         align-items: center;
         justify-content: center;
         color: white;
         font-weight: bold;
-        font-size: 1rem;
-    }
-
-    .user-info {
-        flex: 1;
-        min-width: 0;
-        overflow: hidden;
-    }
-
-    .user-info strong {
-        font-size: 0.9rem;
-        display: block;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .user-info small {
         font-size: 0.7rem;
-        color: #64748b;
-        display: block;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+    }
+    .recipient-info { flex: 1; min-width: 0; }
+    .recipient-username { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .recipient-company { font-size: 0.65rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .stats-badge {
+        background: #e0e7ff;
+        border-radius: 40px;
+        padding: 8px 16px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #4338ca;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
     }
 
-    .user-info .text-muted {
-        font-size: 0.65rem;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+    /* Toolbar for text formatting */
+    .format-toolbar {
+        background: #f1f5f9;
+        border-radius: 20px;
+        padding: 8px 12px;
+        margin-bottom: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        border: 1px solid #e2e8f0;
     }
+    .format-btn {
+        background: white;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        padding: 6px 12px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 500;
+        color: #334155;
+    }
+    .format-btn:hover { background: #e2e8f0; transform: translateY(-1px); }
+    .format-btn i { margin-right: 4px; }
+    .emoji-picker-btn { background: #fef3c7; border-color: #f59e0b; color: #92400e; }
+    .emoji-picker-btn:hover { background: #fde68a; }
 
-    .message-area {
-        margin-top: 2rem;
+    .emoji-dropdown {
+        position: absolute;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        padding: 12px;
+        z-index: 1000;
+        max-width: 320px;
+        border: 1px solid #e2e8f0;
+        display: none;
     }
-
-    .message-area label {
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-        display: block;
+    .emoji-dropdown.show { display: block; }
+    .emoji-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 8px;
+        max-height: 200px;
+        overflow-y: auto;
     }
+    .emoji-item {
+        font-size: 1.5rem;
+        cursor: pointer;
+        text-align: center;
+        padding: 6px;
+        border-radius: 12px;
+        transition: all 0.1s;
+    }
+    .emoji-item:hover { background: #f1f5f9; transform: scale(1.1); }
 
     .modern-textarea {
         border-radius: 24px;
@@ -303,8 +221,8 @@
         font-size: 1rem;
         transition: all 0.2s;
         resize: vertical;
+        font-family: inherit;
     }
-
     .modern-textarea:focus {
         border-color: #667eea;
         box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
@@ -319,13 +237,6 @@
         margin-top: 1.5rem;
         border-left: 6px solid #667eea;
     }
-
-    .preview-modern h6 {
-        color: #a5b4fc;
-        font-weight: 600;
-        margin-bottom: 1rem;
-    }
-
     .preview-content {
         background: rgba(255, 255, 255, 0.05);
         border-radius: 16px;
@@ -334,29 +245,6 @@
         line-height: 1.5;
         word-wrap: break-word;
         white-space: pre-wrap;
-    }
-
-    .stats-badge {
-        background: #e0e7ff;
-        border-radius: 40px;
-        padding: 6px 14px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        color: #4338ca;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-    }
-
-    .alert-modern {
-        background: #fffbeb;
-        border-left: 4px solid #f59e0b;
-        border-radius: 20px;
-        padding: 1rem 1.2rem;
-        margin-top: 1.5rem;
-        display: flex;
-        align-items: center;
-        gap: 12px;
     }
 
     .btn-modern-primary {
@@ -369,27 +257,7 @@
         transition: all 0.2s;
         box-shadow: 0 4px 10px rgba(102, 126, 234, 0.4);
     }
-
-    .btn-modern-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5);
-    }
-
-    .btn-modern-secondary {
-        background: white;
-        border: 1px solid #cbd5e1;
-        border-radius: 40px;
-        padding: 12px 28px;
-        font-weight: 500;
-        color: #475569;
-        text-decoration: none;
-        display: inline-block;
-    }
-
-    .btn-modern-secondary:hover {
-        background: #f8fafc;
-        transform: translateY(-1px);
-    }
+    .btn-modern-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5); }
 
     .footer-actions {
         display: flex;
@@ -408,42 +276,32 @@
         margin-bottom: 1rem;
         width: 100%;
     }
-
-    .search-input:focus {
-        border-color: #667eea;
-        outline: none;
-    }
+    .counter.warning { color: #dc3545; }
 
     @keyframes fadeSlideUp {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
     }
+    .fade-slide-up { animation: fadeSlideUp 0.4s ease-out forwards; }
 
-    .fade-slide-up {
-        animation: fadeSlideUp 0.4s ease-out forwards;
-    }
+    .position-relative { position: relative; }
 
-    .counter.warning {
-        color: #dc3545;
-    }
+    /* Hidden header */
+    .hidden-header { display: none; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="fade-slide-up">
-    <!-- Hero Header -->
-    <div class="broadcast-header">
+    <!-- Скрытый блок - закомментирован -->
+    {#
+    <div class="broadcast-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 28px; padding: 2rem; margin-bottom: 2rem; color: white;">
         <h2><i class="bi bi-megaphone-fill me-2"></i> {{ get_text('title_broadcast') }}</h2>
         <p>{{ get_text('hint_message_limit') }} • {{ get_text('hint_select_users') }}</p>
     </div>
+    #}
 
-    <div class="broadcast-card">
+    <div class="broadcast-card" style="background: white; border-radius: 32px; box-shadow: var(--card-shadow); padding: 2rem;">
         <form method="POST" action="/broadcast" id="broadcastForm" enctype="multipart/form-data">
 
             <!-- Smart Target Selection -->
@@ -452,49 +310,25 @@
                 <div class="target-type-group">
                     <label style="width:100%; cursor:pointer;">
                         <input type="radio" name="target_type" value="all" class="d-none" checked>
-                        <div class="target-card">
-                            <div class="target-emoji">🌍</div>
-                            <div>
-                                <div class="target-title">{{ get_text('broadcast_all') }}</div>
-                                <div class="target-desc">{{ get_text('broadcast_all_desc') }}</div>
-                            </div>
-                        </div>
+                        <div class="target-card"><div class="target-emoji">🌍</div><div><div class="target-title">{{ get_text('broadcast_all') }}</div><div class="target-desc">{{ get_text('broadcast_all_desc') }}</div></div></div>
                     </label>
                     <label style="width:100%; cursor:pointer;">
                         <input type="radio" name="target_type" value="company" class="d-none">
-                        <div class="target-card">
-                            <div class="target-emoji">🏢</div>
-                            <div>
-                                <div class="target-title">{{ get_text('broadcast_by_company') }}</div>
-                                <div class="target-desc">{{ get_text('broadcast_company_desc') }}</div>
-                            </div>
-                        </div>
+                        <div class="target-card"><div class="target-emoji">🏢</div><div><div class="target-title">{{ get_text('broadcast_by_company') }}</div><div class="target-desc">{{ get_text('broadcast_company_desc') }}</div></div></div>
                     </label>
                     <label style="width:100%; cursor:pointer;">
                         <input type="radio" name="target_type" value="specific" class="d-none">
-                        <div class="target-card">
-                            <div class="target-emoji">👥</div>
-                            <div>
-                                <div class="target-title">{{ get_text('broadcast_selected') }}</div>
-                                <div class="target-desc">{{ get_text('broadcast_selected_desc') }}</div>
-                            </div>
-                        </div>
+                        <div class="target-card"><div class="target-emoji">👥</div><div><div class="target-title">{{ get_text('broadcast_selected') }}</div><div class="target-desc">{{ get_text('broadcast_selected_desc') }}</div></div></div>
                     </label>
                     <label style="width:100%; cursor:pointer;">
                         <input type="radio" name="target_type" value="conference" class="d-none">
-                        <div class="target-card">
-                            <div class="target-emoji">🎫</div>
-                            <div>
-                                <div class="target-title">{{ get_text('conferences_for_broadcast') }}</div>
-                                <div class="target-desc">{{ get_text('broadcast_conference_desc') }}</div>
-                            </div>
-                        </div>
+                        <div class="target-card"><div class="target-emoji">🎫</div><div><div class="target-title">{{ get_text('conferences_for_broadcast') }}</div><div class="target-desc">{{ get_text('broadcast_conference_desc') }}</div></div></div>
                     </label>
                 </div>
             </div>
 
             <!-- Companies Block -->
-            <div id="companyMultiSelect">
+            <div id="companyMultiSelect" style="display: none;">
                 <div class="selection-group">
                     <div class="selection-header">
                         <label><i class="bi bi-building"></i> {{ get_text('companies') }}</label>
@@ -505,20 +339,21 @@
                     </div>
                     <div class="checkbox-grid" id="companyCheckboxes">
                         {% for company in companies %}
-                        <label class="checkbox-item">
-                            <input type="checkbox" name="companies" value="{{ company }}" onchange="updateCompanyCount()">
-                            <span>{{ company }}</span>
-                        </label>
+                        <label class="checkbox-item"><input type="checkbox" name="companies" value="{{ company }}" onchange="updateCompanyRecipients()"><span>{{ company }}</span></label>
                         {% endfor %}
                     </div>
-                    <div class="mt-3" id="companyStats" style="display: none;">
-                        <div class="stats-badge"><i class="bi bi-people-fill"></i> <span id="companyRecipientCount">0</span> {{ get_text('recipients') }}</div>
+                    <div id="companyRecipientPreview" class="recipient-preview" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stats-badge"><i class="bi bi-people-fill"></i> <span id="companyCount">0</span> {{ get_text('recipients') }}</span>
+                            <button type="button" class="btn-soft btn-sm" onclick="toggleCompanyPreview()"><i class="bi bi-eye-slash"></i> Скрыть</button>
+                        </div>
+                        <div id="companyRecipientList" class="recipient-list"></div>
                     </div>
                 </div>
             </div>
 
             <!-- Specific Users Block -->
-            <div id="specificUsersSelect">
+            <div id="specificUsersSelect" style="display: none;">
                 <div class="selection-group">
                     <div class="selection-header">
                         <label><i class="bi bi-person-badge"></i> {{ get_text('participants') }}</label>
@@ -528,15 +363,15 @@
                         </div>
                     </div>
                     <input type="text" id="userSearch" class="search-input" placeholder="🔍 {{ get_text('search_users') }}">
-                    <div class="user-list-modern" id="userList">
+                    <div class="user-list-modern" id="userList" style="max-height: 300px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 16px; background: white;">
                         {% for user in users %}
-                        <div class="user-item-modern" data-username="{{ user.username }}" data-name="{{ user.full_name|default('') }}">
+                        <div class="user-item-modern" style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 10px;" data-username="{{ user.username }}" data-name="{{ user.full_name|default('') }}">
                             <input type="checkbox" class="user-checkbox" name="selected_users" value="{{ user.user_id }}" onchange="updateUserCount()" id="user_{{ user.user_id }}">
-                            <div class="user-avatar-small">{{ user.username[0]|upper if user.username else 'U' }}</div>
-                            <div class="user-info">
+                            <div class="user-avatar-small" style="width: 36px; height: 36px; min-width: 36px; background: var(--primary-gradient); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">{{ user.username[0]|upper if user.username else 'U' }}</div>
+                            <div class="user-info" style="flex:1; min-width:0;">
                                 <strong>@{{ user.username }}</strong>
                                 {% if user.full_name %}<small>{{ user.full_name }}</small>{% endif %}
-                                {% if user.company %}<div class="text-muted">{{ user.company }}</div>{% endif %}
+                                {% if user.company %}<div class="text-muted" style="font-size:0.65rem;">{{ user.company }}</div>{% endif %}
                             </div>
                         </div>
                         {% endfor %}
@@ -547,30 +382,75 @@
                 </div>
             </div>
 
-            <!-- Conferences Block -->
-            <div id="conferenceMultiSelect">
+            <!-- Conferences Block (переименовано) -->
+            <div id="conferenceMultiSelect" style="display: none;">
                 <div class="selection-group">
                     <div class="selection-header">
                         <label><i class="bi bi-calendar-event"></i> {{ get_text('conferences_for_broadcast') }}</label>
+                        <div class="action-buttons">
+                            <button type="button" class="btn-soft" onclick="selectAllConferences()"><i class="bi bi-check-all"></i> {{ get_text('select_all') }}</button>
+                            <button type="button" class="btn-soft" onclick="deselectAllConferences()"><i class="bi bi-x-circle"></i> {{ get_text('clear_all') }}</button>
+                        </div>
                     </div>
                     <div class="checkbox-grid" id="conferenceCheckboxes">
                         {% for conference in conferences %}
                         <label class="checkbox-item">
-                            <input type="checkbox" name="conferences" value="{{ conference.name }}" onchange="updateConferenceCount()">
+                            <input type="checkbox" name="conferences" value="{{ conference.name }}" onchange="updateConferenceRecipients()">
                             <span>{{ conference.name }} <span class="text-muted">({{ conference.user_count }})</span></span>
                         </label>
                         {% endfor %}
                     </div>
-                    <div class="mt-3" id="conferenceStats" style="display: none;">
-                        <div class="stats-badge"><i class="bi bi-people-fill"></i> <span id="conferenceRecipientCount">0</span> {{ get_text('participants_count') }}</div>
+                    <div id="conferenceRecipientPreview" class="recipient-preview" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stats-badge"><i class="bi bi-people-fill"></i> <span id="conferenceCount">0</span> {{ get_text('participants_count') }}</span>
+                            <button type="button" class="btn-soft btn-sm" onclick="toggleConferencePreview()"><i class="bi bi-eye-slash"></i> Скрыть</button>
+                        </div>
+                        <div id="conferenceRecipientList" class="recipient-list"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Message Input -->
-            <div class="message-area">
-                <label><i class="bi bi-chat-dots-fill"></i> {{ get_text('message') }}</label>
-                <textarea class="form-control modern-textarea" name="message" rows="6" placeholder="{{ get_text('type_message') }}" id="messageInput"></textarea>
+            <!-- Message Input with Formatting Toolbar -->
+            <div class="message-area mt-4">
+                <label class="form-label fw-bold"><i class="bi bi-chat-dots-fill"></i> {{ get_text('message') }}</label>
+
+                <!-- Formatting Toolbar -->
+                <div class="format-toolbar position-relative">
+                    <button type="button" class="format-btn" onclick="wrapText('<b>', '</b>')" title="Жирный (Ctrl+B)"><i class="bi bi-type-bold"></i> <b>Жирный</b></button>
+                    <button type="button" class="format-btn" onclick="wrapText('<i>', '</i>')" title="Курсив (Ctrl+I)"><i class="bi bi-type-italic"></i> <i>Курсив</i></button>
+                    <button type="button" class="format-btn" onclick="wrapText('```\n', '\n```')" title="Моноширинный код"><i class="bi bi-code-slash"></i> Код</button>
+                    <button type="button" class="format-btn" onclick="insertLink()" title="Вставить ссылку"><i class="bi bi-link-45deg"></i> Ссылка</button>
+                    <button type="button" class="format-btn emoji-picker-btn" onclick="toggleEmojiPicker()" title="Смайлики"><i class="bi bi-emoji-smile"></i> Смайлик</button>
+                    <div id="emojiPicker" class="emoji-dropdown">
+                        <div class="emoji-grid">
+                            <div class="emoji-item" onclick="insertEmoji('👍')">👍</div>
+                            <div class="emoji-item" onclick="insertEmoji('❤️')">❤️</div>
+                            <div class="emoji-item" onclick="insertEmoji('🎉')">🎉</div>
+                            <div class="emoji-item" onclick="insertEmoji('✅')">✅</div>
+                            <div class="emoji-item" onclick="insertEmoji('❌')">❌</div>
+                            <div class="emoji-item" onclick="insertEmoji('⚠️')">⚠️</div>
+                            <div class="emoji-item" onclick="insertEmoji('🔥')">🔥</div>
+                            <div class="emoji-item" onclick="insertEmoji('⭐')">⭐</div>
+                            <div class="emoji-item" onclick="insertEmoji('🎯')">🎯</div>
+                            <div class="emoji-item" onclick="insertEmoji('📢')">📢</div>
+                            <div class="emoji-item" onclick="insertEmoji('📅')">📅</div>
+                            <div class="emoji-item" onclick="insertEmoji('⏰')">⏰</div>
+                            <div class="emoji-item" onclick="insertEmoji('📍')">📍</div>
+                            <div class="emoji-item" onclick="insertEmoji('💰')">💰</div>
+                            <div class="emoji-item" onclick="insertEmoji('🤝')">🤝</div>
+                            <div class="emoji-item" onclick="insertEmoji('💡')">💡</div>
+                            <div class="emoji-item" onclick="insertEmoji('🚀')">🚀</div>
+                            <div class="emoji-item" onclick="insertEmoji('✨')">✨</div>
+                            <div class="emoji-item" onclick="insertEmoji('💪')">💪</div>
+                            <div class="emoji-item" onclick="insertEmoji('🎁')">🎁</div>
+                            <div class="emoji-item" onclick="insertEmoji('🏆')">🏆</div>
+                            <div class="emoji-item" onclick="insertEmoji('👋')">👋</div>
+                            <div class="emoji-item" onclick="insertEmoji('🙏')">🙏</div>
+                        </div>
+                    </div>
+                </div>
+
+                <textarea class="form-control modern-textarea" name="message" rows="8" placeholder="{{ get_text('type_message') }} ({{ get_text('html_supported') }})" id="messageInput"></textarea>
                 <div class="d-flex justify-content-between mt-2">
                     <div class="counter" id="charCounter">0 / 4000 {{ get_text('characters') }}</div>
                     <div class="text-muted small"><i class="bi bi-markdown"></i> {{ get_text('html_supported') }}</div>
@@ -592,21 +472,14 @@
                 </div>
             </div>
 
-            <!-- Warning Alert -->
-            <div class="alert-modern">
+            <div class="alert-modern mt-3" style="background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 20px; padding: 1rem;">
                 <i class="bi bi-exclamation-triangle-fill fs-4" style="color: #f59e0b;"></i>
-                <div>
-                    <strong>{{ get_text('warning') }}!</strong><br>
-                    {{ get_text('broadcast_warning') }}
-                </div>
+                <div><strong>{{ get_text('warning') }}!</strong><br>{{ get_text('broadcast_warning') }}</div>
             </div>
 
-            <!-- Actions -->
             <div class="footer-actions">
-                <a href="/" class="btn-modern-secondary">{{ get_text('cancel') }}</a>
-                <button type="submit" class="btn-modern-primary" id="submitBtn">
-                    <i class="bi bi-send-fill me-2"></i> {{ get_text('send_broadcast') }}
-                </button>
+                <!-- Кнопка "Отмена" удалена - оставлена только кнопка отправки -->
+                <button type="submit" class="btn-modern-primary" id="submitBtn"><i class="bi bi-send-fill me-2"></i> {{ get_text('send_broadcast') }}</button>
             </div>
         </form>
     </div>
@@ -615,6 +488,14 @@
 
 {% block extra_js %}
 <script>
+    let currentCompanyRecipients = [];
+    let currentConferenceRecipients = [];
+    let currentConferenceUsers = [];
+    let allUsers = {{ users|tojson }};
+
+    // ============================================
+    // TOGGLE SELECTORS
+    // ============================================
     function toggleSelects() {
         const targetCompany = document.querySelector('input[name="target_type"][value="company"]').checked;
         const targetSpecific = document.querySelector('input[name="target_type"][value="specific"]').checked;
@@ -628,49 +509,164 @@
         if (specificDiv) specificDiv.style.display = 'none';
         if (conferenceDiv) conferenceDiv.style.display = 'none';
 
-        if (targetCompany && companyDiv) {
-            companyDiv.style.display = 'block';
-        } else if (targetSpecific && specificDiv) {
-            specificDiv.style.display = 'block';
-        } else if (targetConference && conferenceDiv) {
-            conferenceDiv.style.display = 'block';
-        }
+        if (targetCompany && companyDiv) companyDiv.style.display = 'block';
+        else if (targetSpecific && specificDiv) specificDiv.style.display = 'block';
+        else if (targetConference && conferenceDiv) conferenceDiv.style.display = 'block';
     }
 
     document.querySelectorAll('input[name="target_type"]').forEach(radio => {
         radio.addEventListener('change', toggleSelects);
     });
 
-    function selectAllCompanies() {
-        document.querySelectorAll('#companyCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = true);
-        updateCompanyCount();
-    }
-
-    function deselectAllCompanies() {
-        document.querySelectorAll('#companyCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
-        updateCompanyCount();
-    }
-
-    function updateCompanyCount() {
+    // ============================================
+    // COMPANY RECIPIENTS PREVIEW
+    // ============================================
+    async function updateCompanyRecipients() {
         const selected = Array.from(document.querySelectorAll('#companyCheckboxes input[type="checkbox"]:checked')).map(cb => cb.value);
-        if (selected.length) {
-            fetch('/api/users/count', {
+        if (selected.length === 0) {
+            document.getElementById('companyRecipientPreview').style.display = 'none';
+            document.getElementById('companyCount').textContent = '0';
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/users/count', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ companies: selected })
-            }).then(res => res.json()).then(data => {
-                const statsDiv = document.getElementById('companyStats');
-                if (statsDiv) {
-                    statsDiv.style.display = 'block';
-                    document.getElementById('companyRecipientCount').textContent = data.count;
-                }
-            }).catch(err => console.error(err));
+            });
+            const data = await response.json();
+            document.getElementById('companyCount').textContent = data.count;
+
+            const usersResp = await fetch('/api/users/all');
+            const allUsersData = await usersResp.json();
+            currentCompanyRecipients = allUsersData.filter(u => selected.includes(u.company));
+            renderCompanyPreview();
+            document.getElementById('companyRecipientPreview').style.display = 'block';
+        } catch(e) { console.error(e); }
+    }
+
+    function renderCompanyPreview() {
+        const container = document.getElementById('companyRecipientList');
+        if (!container) return;
+        if (currentCompanyRecipients.length === 0) {
+            container.innerHTML = '<div class="text-muted text-center p-3">Нет данных</div>';
+            return;
+        }
+        let html = '';
+        currentCompanyRecipients.slice(0, 30).forEach(user => {
+            html += `
+                <div class="recipient-item">
+                    <div class="recipient-avatar">${(user.username || 'U')[0].toUpperCase()}</div>
+                    <div class="recipient-info">
+                        <div class="recipient-username">@${user.username || user.user_id}</div>
+                        <div class="recipient-company">${user.company || ''}</div>
+                    </div>
+                </div>
+            `;
+        });
+        if (currentCompanyRecipients.length > 30) {
+            html += `<div class="text-center text-muted p-2">... и еще ${currentCompanyRecipients.length - 30} пользователей</div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    function toggleCompanyPreview() {
+        const list = document.getElementById('companyRecipientList');
+        const btn = event.target.closest('button');
+        if (list.style.display === 'none') {
+            list.style.display = 'block';
+            btn.innerHTML = '<i class="bi bi-eye-slash"></i> Скрыть';
         } else {
-            const statsDiv = document.getElementById('companyStats');
-            if (statsDiv) statsDiv.style.display = 'none';
+            list.style.display = 'none';
+            btn.innerHTML = '<i class="bi bi-eye"></i> Показать';
         }
     }
 
+    // ============================================
+    // CONFERENCE RECIPIENTS PREVIEW - ИСПРАВЛЕНО
+    // ============================================
+    async function updateConferenceRecipients() {
+        const selected = Array.from(document.querySelectorAll('#conferenceCheckboxes input[type="checkbox"]:checked')).map(cb => cb.value);
+        if (selected.length === 0) {
+            document.getElementById('conferenceRecipientPreview').style.display = 'none';
+            document.getElementById('conferenceCount').textContent = '0';
+            return;
+        }
+
+        try {
+            // Получаем количество участников
+            const countResponse = await fetch('/api/users/count', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ conferences: selected })
+            });
+            const countData = await countResponse.json();
+            document.getElementById('conferenceCount').textContent = countData.count;
+
+            // Получаем детальный список участников конференций
+            const usersResponse = await fetch('/api/users/by_conferences', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ conferences: selected })
+            });
+            const usersData = await usersResponse.json();
+            currentConferenceUsers = usersData;
+            renderConferencePreview();
+            document.getElementById('conferenceRecipientPreview').style.display = 'block';
+        } catch(e) { console.error('Error loading conference recipients:', e); }
+    }
+
+    function renderConferencePreview() {
+        const container = document.getElementById('conferenceRecipientList');
+        if (!container) return;
+        if (!currentConferenceUsers || currentConferenceUsers.length === 0) {
+            container.innerHTML = '<div class="text-muted text-center p-3">Нет данных</div>';
+            return;
+        }
+        let html = '';
+        currentConferenceUsers.slice(0, 30).forEach(user => {
+            html += `
+                <div class="recipient-item">
+                    <div class="recipient-avatar">${(user.username || 'U')[0].toUpperCase()}</div>
+                    <div class="recipient-info">
+                        <div class="recipient-username">@${user.username || user.user_id}</div>
+                        <div class="recipient-company">${user.company || ''}</div>
+                    </div>
+                </div>
+            `;
+        });
+        if (currentConferenceUsers.length > 30) {
+            html += `<div class="text-center text-muted p-2">... и еще ${currentConferenceUsers.length - 30} участников</div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    function toggleConferencePreview() {
+        const list = document.getElementById('conferenceRecipientList');
+        const btn = event.target.closest('button');
+        if (list.style.display === 'none') {
+            list.style.display = 'block';
+            btn.innerHTML = '<i class="bi bi-eye-slash"></i> Скрыть';
+        } else {
+            list.style.display = 'none';
+            btn.innerHTML = '<i class="bi bi-eye"></i> Показать';
+        }
+    }
+
+    function selectAllConferences() {
+        document.querySelectorAll('#conferenceCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = true);
+        updateConferenceRecipients();
+    }
+
+    function deselectAllConferences() {
+        document.querySelectorAll('#conferenceCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
+        updateConferenceRecipients();
+    }
+
+    // ============================================
+    // USERS SELECTION
+    // ============================================
     function selectAllUsers() {
         document.querySelectorAll('.user-checkbox').forEach(cb => cb.checked = true);
         updateUserCount();
@@ -694,26 +690,17 @@
         }
     }
 
-    function updateConferenceCount() {
-        const selected = Array.from(document.querySelectorAll('#conferenceCheckboxes input[type="checkbox"]:checked')).map(cb => cb.value);
-        if (selected.length) {
-            fetch('/api/users/count', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ conferences: selected })
-            }).then(res => res.json()).then(data => {
-                const statsDiv = document.getElementById('conferenceStats');
-                if (statsDiv) {
-                    statsDiv.style.display = 'block';
-                    document.getElementById('conferenceRecipientCount').textContent = data.count;
-                }
-            }).catch(err => console.error(err));
-        } else {
-            const statsDiv = document.getElementById('conferenceStats');
-            if (statsDiv) statsDiv.style.display = 'none';
-        }
+    function selectAllCompanies() {
+        document.querySelectorAll('#companyCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = true);
+        updateCompanyRecipients();
     }
 
+    function deselectAllCompanies() {
+        document.querySelectorAll('#companyCheckboxes input[type="checkbox"]').forEach(cb => cb.checked = false);
+        updateCompanyRecipients();
+    }
+
+    // User search
     const searchInput = document.getElementById('userSearch');
     if (searchInput) {
         searchInput.addEventListener('input', function(e) {
@@ -726,54 +713,137 @@
         });
     }
 
+    // ============================================
+    // TEXT FORMATTING FUNCTIONS - ОТПРАВКА В HTML
+    // ============================================
     const messageInput = document.getElementById('messageInput');
     const charCounter = document.getElementById('charCounter');
     const previewDiv = document.getElementById('preview');
     const previewText = document.getElementById('previewText');
 
-    if (messageInput) {
-        messageInput.addEventListener('input', function() {
-            const len = this.value.length;
-            if (charCounter) {
-                charCounter.textContent = `${len} / 4000 {{ get_text('characters') }}`;
-                if (len > 3500) charCounter.classList.add('warning');
-                else charCounter.classList.remove('warning');
-            }
-            if (previewDiv && previewText) {
-                if (len > 0) {
-                    previewDiv.style.display = 'block';
-                    previewText.innerHTML = this.value.replace(/\n/g, '<br>');
-                } else {
-                    previewDiv.style.display = 'none';
-                }
-            }
-        });
+    function getSelectionStart() { return messageInput.selectionStart; }
+    function getSelectionEnd() { return messageInput.selectionEnd; }
+    function setSelectionRange(start, end) { messageInput.setSelectionRange(start, end); messageInput.focus(); }
+
+    function wrapText(openTag, closeTag) {
+        const start = messageInput.selectionStart;
+        const end = messageInput.selectionEnd;
+        const text = messageInput.value;
+        const selectedText = text.substring(start, end);
+
+        let newText;
+        if (selectedText) {
+            newText = text.substring(0, start) + openTag + selectedText + closeTag + text.substring(end);
+            messageInput.value = newText;
+            setSelectionRange(start + openTag.length, end + openTag.length);
+        } else {
+            newText = text.substring(0, start) + openTag + closeTag + text.substring(end);
+            messageInput.value = newText;
+            setSelectionRange(start + openTag.length, start + openTag.length);
+        }
+        updatePreview();
     }
 
-    document.getElementById('broadcastForm').addEventListener('submit', function(e) {
+    function insertLink() {
+        const url = prompt('Введите URL ссылки:', 'https://');
+        if (!url) return;
+        const text = prompt('Введите текст ссылки:', 'ссылка');
+        if (!text) return;
+
+        const start = messageInput.selectionStart;
+        // Используем HTML-тег для ссылки
+        const linkText = `<a href="${url}">${text}</a>`;
+        const newText = messageInput.value.substring(0, start) + linkText + messageInput.value.substring(start);
+        messageInput.value = newText;
+        const newPos = start + linkText.length;
+        setSelectionRange(newPos, newPos);
+        updatePreview();
+    }
+
+    function insertEmoji(emoji) {
+        const start = messageInput.selectionStart;
+        const newText = messageInput.value.substring(0, start) + emoji + messageInput.value.substring(start);
+        messageInput.value = newText;
+        setSelectionRange(start + emoji.length, start + emoji.length);
+        updatePreview();
+        document.getElementById('emojiPicker').classList.remove('show');
+    }
+
+    function toggleEmojiPicker() {
+        const picker = document.getElementById('emojiPicker');
+        picker.classList.toggle('show');
+        if (picker.classList.contains('show')) {
+            setTimeout(() => {
+                document.addEventListener('click', function closePicker(e) {
+                    if (!picker.contains(e.target) && !e.target.closest('.emoji-picker-btn')) {
+                        picker.classList.remove('show');
+                        document.removeEventListener('click', closePicker);
+                    }
+                });
+            }, 100);
+        }
+    }
+
+    // Keyboard shortcuts
+    messageInput.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'b') {
+            e.preventDefault();
+            wrapText('<b>', '</b>');
+        } else if (e.ctrlKey && e.key === 'i') {
+            e.preventDefault();
+            wrapText('<i>', '</i>');
+        }
+    });
+
+    function updatePreview() {
+        const len = messageInput.value.length;
+        charCounter.textContent = `${len} / 4000 ${len > 3500 ? '⚠️' : ''}`;
+        if (len > 3500) charCounter.classList.add('warning');
+        else charCounter.classList.remove('warning');
+
+        if (len > 0) {
+            previewDiv.style.display = 'block';
+            // Конвертируем Markdown в HTML для нормального отображения в превью
+            let html = messageInput.value
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/```(.*?)```/gs, '<code>$1</code>')
+                .replace(/\n/g, '<br>');
+            previewText.innerHTML = html;
+        } else {
+            previewDiv.style.display = 'none';
+        }
+    }
+
+    messageInput.addEventListener('input', updatePreview);
+
+    // Submit confirmation
+    document.getElementById('broadcastForm').addEventListener('submit', async function(e) {
         const message = messageInput?.value.trim() || '';
         const targetType = document.querySelector('input[name="target_type"]:checked')?.value;
-        let confirmText = '{{ get_text("confirm_broadcast_prefix") }}';
+        let confirmText = 'Отправить сообщение ';
 
         if (targetType === 'all') {
-            confirmText += '{{ get_text("confirm_broadcast_all") }}';
+            confirmText += 'ВСЕМ пользователям?';
         } else if (targetType === 'company') {
             const companies = Array.from(document.querySelectorAll('#companyCheckboxes input:checked')).map(cb => cb.value);
-            if (!companies.length) { alert('{{ get_text("select_company_warning") }}'); e.preventDefault(); return; }
-            confirmText += `{{ get_text("confirm_broadcast_companies") }} ${companies.join(', ')}?`;
+            if (!companies.length) { alert('Выберите хотя бы одну компанию!'); e.preventDefault(); return; }
+            confirmText += `пользователям компаний: ${companies.join(', ')}?`;
         } else if (targetType === 'specific') {
             const selected = document.querySelectorAll('.user-checkbox:checked').length;
-            if (!selected) { alert('{{ get_text("select_user_warning") }}'); e.preventDefault(); return; }
-            confirmText += `{{ get_text("confirm_broadcast_users") }} ${selected}?`;
+            if (!selected) { alert('Выберите хотя бы одного пользователя!'); e.preventDefault(); return; }
+            confirmText += `выбранным пользователям (${selected})?`;
         } else if (targetType === 'conference') {
             const conferences = Array.from(document.querySelectorAll('#conferenceCheckboxes input:checked')).map(cb => cb.value);
-            if (!conferences.length) { alert('{{ get_text("select_conference_warning") }}'); e.preventDefault(); return; }
-            confirmText += `{{ get_text("confirm_broadcast_conferences") }} ${conferences.join(', ')}?`;
+            if (!conferences.length) { alert('Выберите хотя бы одну конференцию!'); e.preventDefault(); return; }
+            confirmText += `участникам конференций: ${conferences.join(', ')}?`;
         }
 
         if (!confirm(confirmText)) e.preventDefault();
     });
 
+    // Initial setup
     toggleSelects();
+    updatePreview();
 </script>
 {% endblock %}

@@ -39,26 +39,26 @@ async def is_admin(user_id: int) -> bool:
         return user_id in admins
 
 
-@router.message(Command("admin"))
-async def admin_command(message: Message):
-    """Доступ к админ-панели"""
-    if not await is_admin(message.from_user.id):
-        await message.answer("⛔ У вас нет прав доступа к админ-панели")
-        return
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
-        [InlineKeyboardButton(text="👥 Управление пользователями", callback_data="admin_users")],
-        [InlineKeyboardButton(text="📝 Заявки", callback_data="admin_requests")],
-        [InlineKeyboardButton(text="⚙️ Настройки", callback_data="admin_settings")],
-        [InlineKeyboardButton(text="📨 Рассылка", callback_data="admin_broadcast")]
-    ])
-
-    await message.answer(
-        "🛠️ Админ-панель\n\n"
-        "Выберите раздел:",
-        reply_markup=keyboard
-    )
+# @router.message(Command("admin"))
+# async def admin_command(message: Message):
+#     """Доступ к админ-панели"""
+#     if not await is_admin(message.from_user.id):
+#         await message.answer("⛔ У вас нет прав доступа к админ-панели")
+#         return
+#
+#     keyboard = InlineKeyboardMarkup(inline_keyboard=[
+#         [InlineKeyboardButton(text="📊 Статистика", callback_data="admin_stats")],
+#         [InlineKeyboardButton(text="👥 Управление пользователями", callback_data="admin_users")],
+#         [InlineKeyboardButton(text="📝 Заявки", callback_data="admin_requests")],
+#         [InlineKeyboardButton(text="⚙️ Настройки", callback_data="admin_settings")],
+#         [InlineKeyboardButton(text="📨 Рассылка", callback_data="admin_broadcast")]
+#     ])
+#
+#     await message.answer(
+#         "🛠️ Админ-панель\n\n"
+#         "Выберите раздел:",
+#         reply_markup=keyboard
+#     )
 
 
 @router.callback_query(F.data == "admin_stats")

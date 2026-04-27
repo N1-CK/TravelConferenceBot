@@ -498,8 +498,8 @@ class Database:
                     select city
                     from (
                         SELECT distinct max(id) as idd, city
-                        FROM {db.db_schema_pr}.affil_restaurants
-                        WHERE created_at = (select max(created_at) from {db.db_schema_pr}.affil_restaurants)
+                        FROM {self.db_schema_pr}.affil_restaurants
+                        WHERE created_at = (select max(created_at) from {self.db_schema_pr}.affil_restaurants)
                         group by city) t1
                 """)
                 print(records)
@@ -1633,16 +1633,20 @@ class Database:
             logger.error(f"Error getting questions from {table}: {e}")
             return []
 
-    async def sync_whitelist_from_google_sheets(self, spreadsheet_name: str = "Whitelist") -> bool:
+    async def sync_whitelist_from_google_sheets(self, spreadsheet_name: str = "Whitelist",
+                                                clear_existing: bool = True) -> bool:
         """
         Синхронизация whitelist и конференций из Google Sheets
 
-        Структура:
-        - Лист "Общая информация": столбец A - список компаний → в config.companies
-        - Остальные листы - конференции:
-            * Столбцы A-C: TG_username, Дата начала поездки, Дата окончания поездки
-            * Столбцы E-J: Название конференции, Даты начала конференции, Дата окончания конференции, Город, Бот, Доп. информация
+        Args:
+            spreadsheet_name: Название Google Sheets таблицы
+            clear_existing: Очищать ли существующие данные перед синхронизацией
+                           (True - полная перезагрузка, False - добавление новых)
         """
+        if self.pool is None:
+            logger.error("Database pool not initialized")
+            return False
+
         try:
             from utility.sync import GoogleSheetsSync
             sync = GoogleSheetsSync()
@@ -1655,10 +1659,12 @@ class Database:
             worksheets = sh.worksheets()
 
             async with self.pool.acquire() as conn:
-                # Очищаем старые данные
-                await conn.execute(f"TRUNCATE TABLE {self.db_schema_config}.whitelist CASCADE")
-                await conn.execute(f"TRUNCATE TABLE {self.db_schema}.user_conferences CASCADE")
-                await conn.execute(f"TRUNCATE TABLE {self.db_schema_config}.conferences CASCADE")
+                # Очищаем старые данные только если нужно
+                if clear_existing:
+                    await conn.execute(f"TRUNCATE TABLE {self.db_schema_config}.whitelist CASCADE")
+                    await conn.execute(f"TRUNCATE TABLE {self.db_schema}.user_conferences CASCADE")
+                    await conn.execute(f"TRUNCATE TABLE {self.db_schema_config}.conferences CASCADE")
+                    logger.info("Cleared existing data before sync")
 
                 total_users = 0
                 total_conferences = 0
@@ -1793,6 +1799,20 @@ class Database:
 
                 logger.info(
                     f"✅ Synced {total_users} users, {total_conferences} conferences, {total_companies} companies")
+
+                # Логируем результат синхронизации
+                await self.log_user_action(
+                    user_id=0,
+                    username="system",
+                    action="whitelist_synced",
+                    details={
+                        "users": total_users,
+                        "conferences": total_conferences,
+                        "companies": total_companies,
+                        "clear_existing": clear_existing
+                    }
+                )
+
                 return True
 
         except Exception as e:
@@ -2468,13 +2488,18 @@ class Database:
             return []
 
     async def get_users_by_conference_list(self, conferences: list) -> list:
-        """Получить пользователей по списку конференций"""
+        """Получить пользователей по списку конференций с деталями"""
         try:
             async with self.pool.acquire() as conn:
                 query = f"""
-                    SELECT DISTINCT uc.user_id, uc.username, uc.company
-                    FROM {self.db_schema_config}.user_profiles uc
-                    JOIN {self.db_schema}.user_conferences uconf ON uc.username = uconf.username
+                    SELECT DISTINCT 
+                        up.user_id, 
+                        up.username, 
+                        up.full_name, 
+                        up.company,
+                        up.position
+                    FROM {self.db_schema_config}.user_profiles up
+                    JOIN {self.db_schema}.user_conferences uconf ON up.username = uconf.username
                     WHERE uconf.conference_name = ANY($1::text[])
                 """
                 rows = await conn.fetch(query, conferences)
