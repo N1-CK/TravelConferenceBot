@@ -249,11 +249,12 @@ class TelegramBot:
                 url = f"{self.api_url}/sendDocument"
                 form_data = aiohttp.FormData()
                 form_data.add_field('chat_id', str(chat_id))
-                form_data.add_field('document', file,
+                form_data.add_field('document', open(file, 'rb'),
                                     filename=os.path.basename(file),
                                     content_type='application/octet-stream')
                 if text:
-                    form_data.add_field('caption', text, content_type='text/plain')
+                    # Для файлов: caption без parse_mode, HTML теги работают
+                    form_data.add_field('caption', text)
 
                 try:
                     async with session.post(url, data=form_data) as resp:
@@ -262,13 +263,17 @@ class TelegramBot:
                 except Exception as e:
                     print(f"Error sending document: {e}")
                     return False
+                finally:
+                    # Закрываем файл
+                    if 'form_data' in locals():
+                        pass
             else:
                 # Отправка только текста
                 url = f"{self.api_url}/sendMessage"
                 payload = {
                     'chat_id': chat_id,
-                    'text': text,
-                    'parse_mode': 'HTML'
+                    'text': text if text else "",
+                    'parse_mode': 'HTML'  # Для текста parse_mode работает
                 }
 
                 try:
@@ -278,7 +283,6 @@ class TelegramBot:
                 except Exception as e:
                     print(f"Error sending message: {e}")
                     return False
-
 
     async def broadcast_to_users(self, users, message, files=None):
         """Массовая рассылка пользователям с файлами и HTML форматированием"""
@@ -293,35 +297,39 @@ class TelegramBot:
 
             success = False
             try:
-                # Конвертируем Markdown в HTML для корректного отображения
-                html_message = message
-                if html_message:
-                    html_message = html_message.replace('**', '<b>').replace('**', '</b>')
-                    html_message = html_message.replace('*', '<i>').replace('*', '</i>')
-                    # Ссылки уже в HTML формате, оставляем как есть
-                    # Эмодзи остаются как есть
+                # Оставляем HTML как есть (уже содержит <b>, <i>, <a> и т.д.)
+                html_message = message if message else ""
 
                 async with aiohttp.ClientSession() as session:
                     if files and len(files) > 0:
-                        # Отправляем первый файл с подписью
+                        # Отправляем файлы
                         for idx, file_path in enumerate(files):
                             if os.path.exists(file_path):
                                 url = f"{self.api_url}/sendDocument"
                                 form_data = aiohttp.FormData()
                                 form_data.add_field('chat_id', str(user_id))
-                                form_data.add_field('document', open(file_path, 'rb'),
-                                                    filename=os.path.basename(file_path))
-                                if idx == 0 and html_message:
-                                    form_data.add_field('caption', html_message, content_type='text/html')
-                                else:
-                                    form_data.add_field('caption', ' ', content_type='text/html')
 
-                                async with session.post(url, data=form_data) as resp:
-                                    result = await resp.json()
-                                    if result.get('ok'):
-                                        success = True
+                                with open(file_path, 'rb') as f:
+                                    form_data.add_field('document', f,
+                                                        filename=os.path.basename(file_path))
+
+                                    # Для файлов: caption НЕ поддерживает parse_mode отдельно
+                                    # HTML теги в caption работают автоматически
+                                    if idx == 0 and html_message:
+                                        form_data.add_field('caption', html_message)
+                                    elif idx == 0:
+                                        form_data.add_field('caption', ' ')
+
+                                    async with session.post(url, data=form_data) as resp:
+                                        result = await resp.json()
+                                        if result.get('ok'):
+                                            success = True
+                                            if 'description' in result:
+                                                logger.info(f"Sent to {user_id}: {result.get('description')}")
+                                        else:
+                                            logger.error(f"Failed to send to {user_id}: {result}")
                                 await asyncio.sleep(0.05)
-                        # Если файлы были отправлены, считаем успехом
+                        # Если хотя бы один файл был отправлен
                         if files and len(files) > 0:
                             success = True
                     else:
@@ -330,11 +338,14 @@ class TelegramBot:
                         payload = {
                             'chat_id': user_id,
                             'text': html_message,
-                            'parse_mode': 'HTML'
+                            'parse_mode': 'HTML'  # Для текста parse_mode работает
                         }
                         async with session.post(url, json=payload) as resp:
                             result = await resp.json()
                             success = result.get('ok', False)
+
+                            if not success and 'description' in result:
+                                logger.error(f"Telegram API error for user {user_id}: {result.get('description')}")
 
             except Exception as e:
                 logger.error(f"Error sending to {user_id}: {e}")
@@ -345,7 +356,7 @@ class TelegramBot:
             else:
                 results['failed'] += 1
 
-            await asyncio.sleep(0.05)  # Защита от лимитов Telegram
+            await asyncio.sleep(0.05)
 
         results['file_count'] = file_count
         return results
