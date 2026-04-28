@@ -253,8 +253,8 @@ class TelegramBot:
                                     filename=os.path.basename(file),
                                     content_type='application/octet-stream')
                 if text:
-                    # Для файлов: caption без parse_mode, HTML теги работают
                     form_data.add_field('caption', text)
+                    form_data.add_field('parse_mode', 'HTML')
 
                 try:
                     async with session.post(url, data=form_data) as resp:
@@ -313,10 +313,9 @@ class TelegramBot:
                                     form_data.add_field('document', f,
                                                         filename=os.path.basename(file_path))
 
-                                    # Для файлов: caption НЕ поддерживает parse_mode отдельно
-                                    # HTML теги в caption работают автоматически
                                     if idx == 0 and html_message:
                                         form_data.add_field('caption', html_message)
+                                        form_data.add_field('parse_mode', 'HTML')
                                     elif idx == 0:
                                         form_data.add_field('caption', ' ')
 
@@ -1394,6 +1393,16 @@ def user_chats():
     conversations = run_async(db.get_user_conversations())
     return render_template('user_chats.html', conversations=conversations)
 
+@app.route('/api/conversations')
+@login_required
+def api_get_conversations():
+    """API для получения списка диалогов для боковой панели"""
+    conversations = run_async(db.get_user_conversations())
+    # Форматируем даты для JSON
+    for conv in conversations:
+        if conv.get('last_message_time'):
+            conv['last_message_time'] = conv['last_message_time'].isoformat()
+    return jsonify(conversations)
 
 @app.route('/api/questions/forward', methods=['POST'])
 @login_required
@@ -1498,7 +1507,6 @@ def api_get_available_departments_for_forward(question_id):
 def api_get_user_messages(user_id):
     """API для получения сообщений пользователя"""
     messages = run_async(db.get_user_messages(user_id, limit=100))
-    # Получаем username
     user_data = run_async(db.get_user_data(user_id))
 
     # Форматируем сообщения для отображения
@@ -1508,14 +1516,16 @@ def api_get_user_messages(user_id):
             'id': msg['id'],
             'direction': msg['direction'],
             'message_text': msg['message_text'],
-            'file_type': msg['file_type'],
-            'file_id': msg['file_id'],
+            'sender_username': msg.get('username', ''),
+            'file_type': msg.get('file_type'),
+            'file_id': msg.get('file_id'),
             'created_at': msg['created_at'].isoformat()
         })
 
     return jsonify({
         'user_id': user_id,
         'username': user_data.get('username') if user_data else str(user_id),
+        'full_name': user_data.get('full_name', ''),
         'messages': formatted_messages
     })
 
@@ -1531,7 +1541,7 @@ def api_mark_messages_read(user_id):
 @app.route('/api/send_message', methods=['POST'])
 @login_required
 def api_send_message():
-    """Отправить сообщение пользователю"""
+    """Отправить сообщение пользователю (текст + файл)"""
     user_id = request.form.get('user_id', type=int)
     message = request.form.get('message')
     file = request.files.get('file')
@@ -1539,25 +1549,25 @@ def api_send_message():
     if not user_id:
         return jsonify({'error': 'User ID required'}), 400
 
-    if not message and not file:
-        return jsonify({'error': 'Message or file required'}), 400
+    # Сохраняем имя менеджера из сессии для отображения в чате
+    manager_display_name = session.get('full_name') or session.get('username', 'Admin')
 
-    # Сохраняем сообщение в БД
     file_id = None
     file_type = None
     filepath = None
 
     if file:
-        file_id = file.filename
-        file_type = file.content_type
         filename = secure_filename(file.filename)
+        file_id = filename
+        file_type = file.content_type
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
 
-    # Сохраняем исходящее сообщение - используем run_async_safe
+    # Сохраняем сообщение в БД.
+    # В поле username передаем manager_display_name для истории
     msg_id = run_async_safe(db.save_user_message(
         user_id=user_id,
-        username=session.get('username', 'admin'),
+        username=manager_display_name,
         message_text=message,
         file_type=file_type,
         file_id=file_id,
@@ -1567,45 +1577,33 @@ def api_send_message():
     if not msg_id:
         return jsonify({'error': 'Failed to save message'}), 500
 
-    # Отправляем сообщение через Telegram бота
+    # Отправка в Telegram
     try:
-        import asyncio
         from aiogram import Bot
         from aiogram.types import FSInputFile
-
         bot_token = os.getenv('TG_BOT_TOKEN')
 
         async def send():
             bot = Bot(token=bot_token)
             try:
                 if file and filepath and os.path.exists(filepath):
-                    input_file = FSInputFile(filepath)
                     await bot.send_document(
                         chat_id=user_id,
-                        document=input_file,
-                        caption=message
-                    )
-                else:
-                    await bot.send_message(
-                        chat_id=user_id,
-                        text=message,
+                        document=FSInputFile(filepath),
+                        caption=message,
                         parse_mode="HTML"
                     )
+                else:
+                    await bot.send_message(chat_id=user_id, text=message, parse_mode="HTML")
             finally:
                 await bot.session.close()
 
-        # Используем run_async_safe с нашим исправленным методом
         run_async_safe(send())
-
-        # Удаляем временный файл
         if filepath and os.path.exists(filepath):
-            try:
-                os.remove(filepath)
-            except:
-                pass
+            os.remove(filepath)
 
     except Exception as e:
-        logger.error(f"Error sending message to user {user_id}: {e}")
+        logger.error(f"Error sending: {e}")
         return jsonify({'error': str(e)}), 500
 
     return jsonify({'success': True, 'message_id': msg_id})
