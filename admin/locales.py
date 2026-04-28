@@ -21,7 +21,7 @@ TEXTS = {
         'users': 'Пользователи',
         'users_sidebar': '👥 Пользователи',
         'conferences': '📅 Конференции',
-        'conferences_for_broadcast': 'Конференции',
+        'conferences_for_broadcast': 'По конференциям',
 
         # Роли
         'role_admin': 'Администратор',
@@ -236,7 +236,7 @@ TEXTS = {
         'tickets_ready': 'Заявок на билеты (готово)',
         'ticket_requests': 'Заявки на билеты',
         'status_pending_event': 'В ожидании',
-        'status_in_progress': 'В процессе',
+        'status_in_progress': '🔄 В процессе',
         'status_ready': 'Готов',
         'country': 'Страна',
         'awaiting_processing': 'Ожидают обработки',
@@ -273,6 +273,8 @@ TEXTS = {
         'brand_style': 'Бренд-стиль',
         'yes': 'Да',
         'no': 'Нет',
+        'per_diem_card': "💳 Банковская карта",
+        'per_diem_crypto': "🪙 Криптокошелек",
 
 
         # Affiliate веб-панель
@@ -400,7 +402,7 @@ TEXTS = {
         'visa_request_status': 'Статус визовой заявки',
         'flight_request_status': 'Статус заявки на билет',
 
-        'travel_requests': 'Заявки на билеты',
+        'travel_requests': '✈️ Заявки на билеты',
         'visa_have': 'Есть виза',
         'visa_not_have': 'Нет визы',
         'visa_special': 'Особый случай',
@@ -423,6 +425,7 @@ TEXTS = {
         'users': 'Users',
         'users_sidebar': '👥 Users',
         'conferences': '📅 Conferences',
+        'conferences_for_broadcast': 'By conferences',
 
         # Roles
         'role_admin': 'Administrator',
@@ -450,8 +453,9 @@ TEXTS = {
         'travel_visa_support': '🛂 Visa Support',
         'travel_flight_info': '📋 Flight Information',
         'travel_hotel': '🏨 Hotel Booking',
-        'travel_per_diem': '💰 Per Diem',
+        'travel_per_diem': '💰 Daily allowance',
         'travel_my_requests': '📋 My Requests',
+
 
         # General
         'back': '◀️ Back',
@@ -641,7 +645,7 @@ TEXTS = {
         'tickets_ready': 'Ticket Requests (Ready)',
         'ticket_requests': 'Ticket Requests',
         'status_pending_event': 'Pending',
-        'status_in_progress': 'In Progress',
+        'status_in_progress': '🔄 In Progress',
         'status_ready': 'Ready',
         'country': 'Country',
         'awaiting_processing': 'Awaiting processing',
@@ -674,6 +678,8 @@ TEXTS = {
         'brand_style': 'Brand Style',
         'yes': 'Yes',
         'no': 'No',
+        'per_diem_card': "💳 Bank card",
+        'per_diem_crypto': "🪙 Crypto wallet",
 
         # Affiliate web panel
         'affiliate_bookings': 'Affiliate (Bookings)',
@@ -799,7 +805,7 @@ TEXTS = {
         'visa_request_status': 'Visa Request Status',
         'flight_request_status': 'Flight Request Status',
 
-        'travel_requests': 'Flight Requests',
+        'travel_requests': '✈️ Flight requests',
         'visa_have': 'Have visa',
         'visa_not_have': 'No visa',
         'visa_special': 'Special case',

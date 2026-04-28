@@ -13,7 +13,7 @@
     .conversation-item { padding: 15px; border-bottom: 1px solid #dee2e6; cursor: pointer; transition: background 0.2s; }
     .conversation-item:hover { background: #e9ecef; }
     .conversation-item.active { background: #e7f1ff; border-left: 3px solid #667eea; }
-    .conversation-avatar { width: 45px; height: 45px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; }
+    .conversation-avatar { width: 45px; height: 45px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; flex-shrink: 0;}
     .unread-badge { background: #dc3545; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; min-width: 20px; text-align: center; }
     .message { margin-bottom: 15px; display: flex; }
     .message.incoming { justify-content: flex-start; }
@@ -159,6 +159,27 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                 <button type="button" class="btn btn-primary" onclick="submitAnswer()">Отправить ответ</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="forwardModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Переслать вопрос</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Выберите отдел, в который нужно переслать вопрос:</p>
+                <select class="form-select" id="forwardTargetDept">
+                    </select>
+                <input type="hidden" id="forwardQuestionId">
+                <input type="hidden" id="forwardSourceDept">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="submitForward()">Переслать</button>
             </div>
         </div>
     </div>
@@ -334,7 +355,8 @@
 
             conversations.forEach(conv => {
                 const isActive = conv.user_id == currentUserId ? 'active' : '';
-                const displayName = conv.full_name ? `${conv.full_name} (@${conv.username})` : `@${conv.username}`;
+                // Формат: username (full_name) или просто @username
+                const displayName = conv.full_name ? `${conv.username} (${conv.full_name})` : `@${conv.username}`;
                 const time = conv.last_message_time ? new Date(conv.last_message_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
 
                 html += `
@@ -343,7 +365,7 @@
                         <div class="conversation-avatar me-3">${(conv.full_name || conv.username || '?')[0].toUpperCase()}</div>
                         <div class="flex-grow-1" style="min-width: 0;">
                             <div class="d-flex justify-content-between">
-                                <strong class="text-truncate">${displayName}</strong>
+                                <strong class="text-truncate" style="max-width: 100%; display: block;">@${displayName}</strong>
                                 <small class="text-muted">${time}</small>
                             </div>
                             <div class="d-flex justify-content-between">
@@ -355,7 +377,7 @@
                 </div>`;
             });
             listDiv.innerHTML = html;
-            filterChats(); // Сохраняем фильтр при обновлении
+            filterChats();
         } catch (e) { console.error(e); }
         setTimeout(updateSidebar, 10000);
     }
@@ -435,6 +457,151 @@
             const toast = toastContainer.lastElementChild;
             if (toast) toast.remove();
         }, 5000);
+    }
+
+    let allQuestions = [];
+
+    async function loadAllQuestions() {
+        try {
+            const resp = await fetch('/api/questions');
+            if (resp.ok) {
+                allQuestions = await resp.json();
+                filterQuestions('all');
+            }
+        } catch (e) {
+            console.error("Ошибка загрузки вопросов:", e);
+        }
+    }
+
+    function filterQuestions(dept) {
+        // Обновляем активную кнопку фильтра
+        document.querySelectorAll('.dept-btn').forEach(btn => btn.classList.remove('active'));
+        const activeBtn = document.querySelector(`.dept-btn[data-dept="${dept}"]`);
+        if (activeBtn) activeBtn.classList.add('active');
+
+        const list = document.getElementById('questionsList');
+        let filtered = allQuestions;
+
+        if (dept !== 'all') {
+            filtered = allQuestions.filter(q => q.department === dept);
+        }
+
+        if (filtered.length === 0) {
+            list.innerHTML = '<div class="text-center text-muted py-4">Нет вопросов в этой категории</div>';
+            return;
+        }
+
+        let html = '';
+        filtered.forEach(q => {
+            const time = new Date(q.created_at).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute:'2-digit'});
+
+            html += `
+            <div class="question-item">
+                <div class="d-flex justify-content-between mb-2">
+                    <div>
+                        <span class="question-department ${q.department}">${q.department.toUpperCase()}</span>
+                        <strong class="ms-2">@${q.username}</strong>
+                    </div>
+                    <small class="text-muted">${time}</small>
+                </div>
+                <div class="question-text">${escapeHtml(q.question)}</div>
+                <div class="text-end mt-2">
+                    <button class="btn btn-sm btn-outline-secondary me-2" onclick="openForwardModal(${q.id}, '${q.department}')">
+                        <i class="bi bi-share"></i> Переслать
+                    </button>
+                    <button class="btn btn-sm btn-primary" onclick="replyToQuestion(${q.id}, '${q.department}', ${q.user_id})">
+                        <i class="bi bi-reply"></i> Ответить
+                    </button>
+                </div>
+            </div>`;
+        });
+        list.innerHTML = html || '<div class="text-center text-muted py-4">Нет вопросов</div>';
+    }
+
+    async function openForwardModal(questionId, sourceDept) {
+        document.getElementById('forwardQuestionId').value = questionId;
+        document.getElementById('forwardSourceDept').value = sourceDept;
+
+        // Загружаем доступные отделы для пересылки
+        const resp = await fetch(`/api/questions/${questionId}/departments?source=${sourceDept}`);
+        const data = await resp.json();
+
+        const select = document.getElementById('forwardTargetDept');
+        select.innerHTML = data.departments.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+
+        new bootstrap.Modal(document.getElementById('forwardModal')).show();
+    }
+
+    function replyToQuestion(questionId, dept, userId) {
+        const q = allQuestions.find(x => x.id === questionId && x.department === dept);
+        if (q) {
+            document.getElementById('questionText').textContent = q.question;
+            document.getElementById('replyUserId').value = userId;
+            document.getElementById('replyDept').value = dept;
+            document.getElementById('replyQuestionId').value = questionId;
+            document.getElementById('replyAnswer').value = '';
+            new bootstrap.Modal(document.getElementById('replyModal')).show();
+        }
+    }
+
+    async function submitForward() {
+        const questionId = document.getElementById('forwardQuestionId').value;
+        const sourceDept = document.getElementById('forwardSourceDept').value;
+        const targetDept = document.getElementById('forwardTargetDept').value;
+
+        // Определяем имя таблицы на основе исходного отдела
+        const tableMap = { 'pr': 'travelconference_pr.pr_questions', 'event': 'travelconference_event.event_questions', 'travel': 'travelconference_travel.travel_questions' };
+
+        const resp = await fetch('/api/questions/forward', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                question_id: parseInt(questionId),
+                source_department: sourceDept,
+                target_department: targetDept,
+                source_table: tableMap[sourceDept]
+            })
+        });
+
+        if ((await resp.json()).success) {
+            bootstrap.Modal.getInstance(document.getElementById('forwardModal')).hide();
+            showToast('Вопрос переслан', 'success');
+            loadAllQuestions(); // Обновляем список
+        }
+    }
+
+    async function submitAnswer() {
+        const userId = document.getElementById('replyUserId').value;
+        const answer = document.getElementById('replyAnswer').value;
+        const questionText = document.getElementById('questionText').textContent;
+
+        if (!answer.trim()) return;
+
+        const formData = new FormData();
+        formData.append('user_id', userId);
+        // Формируем красивый ответ с цитированием
+        formData.append('message', `<b>На ваш вопрос:</b>\n<i>${questionText}</i>\n\n<b>Ответ менеджера:</b>\n${answer}`);
+
+        try {
+            const resp = await fetch('/api/send_message', { method: 'POST', body: formData });
+            const data = await resp.json();
+
+            if (data.success) {
+                const modalEl = document.getElementById('replyModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+
+                showToast('Ответ отправлен', 'success');
+
+                // Переключаемся в чат с пользователем
+                switchTab('chats');
+                loadChat(userId);
+            } else {
+                showToast('Ошибка отправки', 'danger');
+            }
+        } catch (e) {
+            showToast('Ошибка сети', 'danger');
+        }
     }
 
     // Инициализация при старте

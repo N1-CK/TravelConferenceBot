@@ -1549,8 +1549,18 @@ def api_send_message():
     if not user_id:
         return jsonify({'error': 'User ID required'}), 400
 
-    # Сохраняем имя менеджера из сессии для отображения в чате
-    manager_display_name = session.get('full_name') or session.get('username', 'Admin')
+    # 1) ИСПРАВЛЕНИЕ: Формируем Имя Фамилия + (@username) для менеджера
+    manager_full_name = session.get('full_name', '')
+    manager_username = session.get('username', '')
+
+    if manager_full_name and manager_username:
+        manager_display_name = f"{manager_full_name} (@{manager_username})"
+    elif manager_full_name:
+        manager_display_name = manager_full_name
+    elif manager_username:
+        manager_display_name = f"@{manager_username}"
+    else:
+        manager_display_name = "Admin"
 
     file_id = None
     file_type = None

@@ -79,12 +79,12 @@
     <ul class="nav nav-tabs mb-4" id="travelTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="flights-tab" data-bs-toggle="tab" data-bs-target="#flights" type="button" role="tab">
-                <i class="bi bi-airplane"></i> {{ get_text('travel_flight_request') }}
+                {{ get_text('travel_requests') }}
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="perdiem-tab" data-bs-toggle="tab" data-bs-target="#perdiem" type="button" role="tab">
-                <i class="bi bi-cash-stack"></i> {{ get_text('travel_per_diem') }}
+                {{ get_text('travel_per_diem') }}
             </button>
         </li>
     </ul>
@@ -141,7 +141,7 @@
                                     <th>{{ get_text('full_name') }}</th>
                                     <th>{{ get_text('departure_from') }}</th>
                                     <th>{{ get_text('return_to') }}</th>
-                                    <th>{{ get_text('visa_status') }}</th>
+                                    <th>{{ get_text('travel_visa_status') }}</th>
                                     <th>{{ get_text('visa_request_status') }}</th>
                                     <th>{{ get_text('flight_request_status') }}</th>
                                     <th>{{ get_text('created_at') }}</th>
@@ -168,22 +168,22 @@
                                     <td>
                                         <span class="status-badge status-{{ req.visa_request_status }}">
                                             {% if req.visa_request_status == 'pending' %}
-                                                ⏳ {{ get_text('status_pending') }}
+                                                {{ get_text('status_pending') }}
                                             {% elif req.visa_request_status == 'in_progress' %}
-                                                🔄 {{ get_text('status_in_progress') }}
+                                                {{ get_text('status_in_progress') }}
                                             {% elif req.visa_request_status == 'ready' %}
-                                                ✅ {{ get_text('status_ready') }}
+                                                {{ get_text('status_ready') }}
                                             {% endif %}
                                         </span>
                                     </td>
                                     <td>
                                         <span class="status-badge status-{{ req.flight_request_status }}">
                                             {% if req.flight_request_status == 'pending' %}
-                                                ⏳ {{ get_text('status_pending') }}
+                                                {{ get_text('status_pending') }}
                                             {% elif req.flight_request_status == 'in_progress' %}
-                                                🔄 {{ get_text('status_in_progress') }}
+                                                {{ get_text('status_in_progress') }}
                                             {% elif req.flight_request_status == 'purchased' %}
-                                                🎫 {{ get_text('flights_purchased') }}
+                                                {{ get_text('flights_purchased') }}
                                             {% endif %}
                                         </span>
                                     </td>
@@ -226,7 +226,7 @@
                 <div class="col-md-4 mb-3">
                     <div class="stat-card" onclick="filterPerDiem('pending')" id="statPerDiemPending">
                         <div class="stat-number text-warning" id="perDiemPending">0</div>
-                        <div class="stat-label">{{ get_text('status_pending') }}</div>
+                        <div class="stat-label">{{ get_text('pending_requests') }}</div>
                     </div>
                 </div>
                 <div class="col-md-4 mb-3">
@@ -240,7 +240,7 @@
             <!-- Per Diem Table -->
             <div class="card">
                 <div class="card-header">
-                    <i class="bi bi-cash-stack"></i> {{ get_text('travel_per_diem') }}
+                    {{ get_text('travel_per_diem') }}
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -377,6 +377,7 @@
             'created_at': '{{ get_text("created_at") }}',
             'updated_at': '{{ get_text("updated_at") }}',
             'actions': '{{ get_text("actions") }}',
+            'pending_requests': '{{ get_text("pending_requests") }}',
             'status_pending': '{{ get_text("status_pending") }}',
             'status_in_progress': '{{ get_text("status_in_progress") }}',
             'status_ready': '{{ get_text("status_ready") }}',
@@ -413,10 +414,10 @@
         };
 
         const statusTexts = {
-            'pending': '⏳ ' + getText('status_pending'),
-            'in_progress': '🔄 ' + getText('status_in_progress'),
-            'ready': '✅ ' + getText('status_ready'),
-            'purchased': '🎫 ' + getText('flights_purchased')
+            'pending': getText('status_pending'),
+            'in_progress': getText('status_in_progress'),
+            'ready': getText('status_ready'),
+            'purchased': getText('flights_purchased')
         };
 
         const statusClass = statusClasses[status] || 'bg-secondary';
@@ -661,7 +662,7 @@
         let html = '';
         for (const req of filtered) {
             const statusText = {
-                'pending': '⏳ {{ get_text("status_pending") }}',
+                'pending': '{{ get_text("status_pending") }}',
                 'in_progress': '🔄 {{ get_text("status_in_progress") }}',
                 'completed': '✅ {{ get_text("status_ready") }}'
             }[req.status] || req.status;
@@ -672,7 +673,7 @@
                 'completed': 'status-completed'
             }[req.status] || '';
 
-            const paymentTypeText = req.payment_type === 'card' ? '💳 {{ get_text("per_diem_card") }}' : '🪙 {{ get_text("per_diem_crypto") }}';
+            const paymentTypeText = req.payment_type === 'card' ? '{{ get_text("per_diem_card") }}' : '{{ get_text("per_diem_crypto") }}';
 
             html += `
                 <tr>
@@ -706,11 +707,11 @@
         const request = perDiemRequests.find(r => r.id === id);
         if (!request) return;
 
-        const paymentTypeText = request.payment_type === 'card' ? '💳 {{ get_text("per_diem_card") }}' : '🪙 {{ get_text("per_diem_crypto") }}';
+        const paymentTypeText = request.payment_type === 'card' ? '{{ get_text("per_diem_card") }}' : '{{ get_text("per_diem_crypto") }}';
         const statusText = {
-            'pending': '⏳ {{ get_text("status_pending") }}',
-            'in_progress': '🔄 {{ get_text("status_in_progress") }}',
-            'completed': '✅ {{ get_text("status_ready") }}'
+            'pending': '{{ get_text("status_pending") }}',
+            'in_progress': '{{ get_text("status_in_progress") }}',
+            'completed': '{{ get_text("status_ready") }}'
         }[request.status] || request.status;
 
         const html = `

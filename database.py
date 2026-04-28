@@ -3206,138 +3206,88 @@ class Database:
         """Получить список всех активных чатов (включая вопросы)"""
         try:
             async with self.pool.acquire() as conn:
-                # Получаем обычные сообщения
+                # ИСПРАВЛЕНИЕ 2 и 4: Джоиним профили пользователей, чтобы получать реальные Имя и Ник
                 messages = await conn.fetch(f"""
                     SELECT 
-                        user_id,
-                        username,
-                        MAX(created_at) as last_message_time,
-                        STRING_AGG(message_text, ' ') as all_messages,
-                        COUNT(*) FILTER (WHERE direction = 'incoming' AND read_at IS NULL) as unread_count
-                    FROM {self.db_schema}.user_messages
-                    GROUP BY user_id, username
+                        m.user_id,
+                        MAX(COALESCE(p.username, m.username)) as username,
+                        MAX(p.full_name) as full_name,
+                        MAX(m.created_at) as last_message_time,
+                        STRING_AGG(m.message_text, ' ') as all_messages,
+                        COUNT(*) FILTER (WHERE m.direction = 'incoming' AND m.read_at IS NULL) as unread_count
+                    FROM {self.db_schema}.user_messages m
+                    LEFT JOIN {self.db_schema_config}.user_profiles p ON m.user_id = p.user_id
+                    GROUP BY m.user_id
                 """)
 
-                # Получаем вопросы из PR таблицы
                 pr_questions = await conn.fetch(f"""
                     SELECT 
-                        user_id,
-                        username,
-                        MAX(created_at) as last_message_time,
-                        STRING_AGG(question, ' ') as all_messages,
+                        q.user_id,
+                        MAX(COALESCE(p.username, q.username)) as username,
+                        MAX(p.full_name) as full_name,
+                        MAX(q.created_at) as last_message_time,
+                        STRING_AGG(q.question, ' ') as all_messages,
                         0 as unread_count
-                    FROM {self.db_schema_pr}.pr_questions
-                    GROUP BY user_id, username
+                    FROM {self.db_schema_pr}.pr_questions q
+                    LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
+                    GROUP BY q.user_id
                 """)
 
-                # Получаем вопросы из EVENT таблицы
                 event_questions = await conn.fetch(f"""
                     SELECT 
-                        user_id,
-                        username,
-                        MAX(created_at) as last_message_time,
-                        STRING_AGG(question, ' ') as all_messages,
+                        q.user_id,
+                        MAX(COALESCE(p.username, q.username)) as username,
+                        MAX(p.full_name) as full_name,
+                        MAX(q.created_at) as last_message_time,
+                        STRING_AGG(q.question, ' ') as all_messages,
                         0 as unread_count
-                    FROM {self.db_schema_event}.event_questions
-                    GROUP BY user_id, username
+                    FROM {self.db_schema_event}.event_questions q
+                    LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
+                    GROUP BY q.user_id
                 """)
 
-                # Получаем вопросы из TRAVEL таблицы
                 travel_questions = await conn.fetch(f"""
                     SELECT 
-                        user_id,
-                        username,
-                        MAX(created_at) as last_message_time,
-                        STRING_AGG(question, ' ') as all_messages,
+                        q.user_id,
+                        MAX(COALESCE(p.username, q.username)) as username,
+                        MAX(p.full_name) as full_name,
+                        MAX(q.created_at) as last_message_time,
+                        STRING_AGG(q.question, ' ') as all_messages,
                         0 as unread_count
-                    FROM {self.db_schema_travel}.travel_questions
-                    GROUP BY user_id, username
+                    FROM {self.db_schema_travel}.travel_questions q
+                    LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
+                    GROUP BY q.user_id
                 """)
 
-                # Объединяем все источники
                 all_users = {}
 
-                for row in messages:
+                def update_user_dict(row, prefix=""):
                     user_id = row['user_id']
+                    msg_preview = f"{prefix} {row['all_messages'][:80]}" if prefix and row['all_messages'] else (
+                        row['all_messages'][:100] if row['all_messages'] else '')
+
                     if user_id not in all_users:
                         all_users[user_id] = {
                             'user_id': user_id,
                             'username': row['username'],
+                            'full_name': row['full_name'],
                             'last_message_time': row['last_message_time'],
-                            'last_message': row['all_messages'][:100] if row['all_messages'] else '',
+                            'last_message': msg_preview,
                             'unread_count': row['unread_count']
                         }
                     else:
-                        # Обновляем время последнего сообщения
-                        if row['last_message_time'] and (not all_users[user_id]['last_message_time'] or
-                                                         row['last_message_time'] > all_users[user_id][
-                                                             'last_message_time']):
+                        if row['last_message_time'] and (
+                                not all_users[user_id]['last_message_time'] or row['last_message_time'] >
+                                all_users[user_id]['last_message_time']):
                             all_users[user_id]['last_message_time'] = row['last_message_time']
-                            all_users[user_id]['last_message'] = row['all_messages'][:100] if row[
-                                'all_messages'] else ''
+                            all_users[user_id]['last_message'] = msg_preview
                         all_users[user_id]['unread_count'] += row['unread_count']
 
-                # Добавляем PR вопросы
-                for row in pr_questions:
-                    user_id = row['user_id']
-                    if user_id not in all_users:
-                        all_users[user_id] = {
-                            'user_id': user_id,
-                            'username': row['username'],
-                            'last_message_time': row['last_message_time'],
-                            'last_message': f"[Вопрос PR] {row['all_messages'][:80]}" if row[
-                                'all_messages'] else '[Вопрос PR]',
-                            'unread_count': row['unread_count']
-                        }
-                    else:
-                        if row['last_message_time'] and (not all_users[user_id]['last_message_time'] or
-                                                         row['last_message_time'] > all_users[user_id][
-                                                             'last_message_time']):
-                            all_users[user_id]['last_message_time'] = row['last_message_time']
-                            all_users[user_id]['last_message'] = f"[Вопрос PR] {row['all_messages'][:80]}" if row[
-                                'all_messages'] else '[Вопрос PR]'
+                for row in messages: update_user_dict(row)
+                for row in pr_questions: update_user_dict(row, "[Вопрос PR]")
+                for row in event_questions: update_user_dict(row, "[Вопрос EVENT]")
+                for row in travel_questions: update_user_dict(row, "[Вопрос TRAVEL]")
 
-                # Добавляем EVENT вопросы
-                for row in event_questions:
-                    user_id = row['user_id']
-                    if user_id not in all_users:
-                        all_users[user_id] = {
-                            'user_id': user_id,
-                            'username': row['username'],
-                            'last_message_time': row['last_message_time'],
-                            'last_message': f"[Вопрос EVENT] {row['all_messages'][:80]}" if row[
-                                'all_messages'] else '[Вопрос EVENT]',
-                            'unread_count': row['unread_count']
-                        }
-                    else:
-                        if row['last_message_time'] and (not all_users[user_id]['last_message_time'] or
-                                                         row['last_message_time'] > all_users[user_id][
-                                                             'last_message_time']):
-                            all_users[user_id]['last_message_time'] = row['last_message_time']
-                            all_users[user_id]['last_message'] = f"[Вопрос EVENT] {row['all_messages'][:80]}" if row[
-                                'all_messages'] else '[Вопрос EVENT]'
-
-                # Добавляем TRAVEL вопросы
-                for row in travel_questions:
-                    user_id = row['user_id']
-                    if user_id not in all_users:
-                        all_users[user_id] = {
-                            'user_id': user_id,
-                            'username': row['username'],
-                            'last_message_time': row['last_message_time'],
-                            'last_message': f"[Вопрос TRAVEL] {row['all_messages'][:80]}" if row[
-                                'all_messages'] else '[Вопрос TRAVEL]',
-                            'unread_count': row['unread_count']
-                        }
-                    else:
-                        if row['last_message_time'] and (not all_users[user_id]['last_message_time'] or
-                                                         row['last_message_time'] > all_users[user_id][
-                                                             'last_message_time']):
-                            all_users[user_id]['last_message_time'] = row['last_message_time']
-                            all_users[user_id]['last_message'] = f"[Вопрос TRAVEL] {row['all_messages'][:80]}" if row[
-                                'all_messages'] else '[Вопрос TRAVEL]'
-
-                # Преобразуем в список и сортируем
                 result = list(all_users.values())
                 result.sort(key=lambda x: x.get('last_message_time') or datetime.min, reverse=True)
 
