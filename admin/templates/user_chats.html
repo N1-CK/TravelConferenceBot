@@ -355,7 +355,6 @@
 
             conversations.forEach(conv => {
                 const isActive = conv.user_id == currentUserId ? 'active' : '';
-                // Формат: username (full_name) или просто @username
                 const displayName = conv.full_name ? `${conv.username} (${conv.full_name})` : `@${conv.username}`;
                 const time = conv.last_message_time ? new Date(conv.last_message_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
 
@@ -369,7 +368,7 @@
                                 <small class="text-muted">${time}</small>
                             </div>
                             <div class="d-flex justify-content-between">
-                                <div class="last-msg">${conv.last_message || 'Файл...'}</div>
+                                <div class="last-msg">${escapeHtml(conv.last_message) || 'Файл...'}</div>
                                 ${conv.unread_count > 0 ? `<span class="unread-badge">${conv.unread_count}</span>` : ''}
                             </div>
                         </div>
@@ -378,9 +377,19 @@
             });
             listDiv.innerHTML = html;
             filterChats();
-        } catch (e) { console.error(e); }
-        setTimeout(updateSidebar, 10000);
+        } catch (e) {
+            console.error("Ошибка обновления боковой панели:", e);
+        }
+        // Запускаем следующую проверку через 10 секунд
+        setTimeout(updateSidebar, 5000);
     }
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+            Notification.requestPermission();
+        }
+    });
 
     // ============================================
     // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ

@@ -471,7 +471,62 @@
             setTimeout(() => { const toast = toastContainer.lastElementChild; if (toast) toast.remove(); }, 5000);
         }
     </script>
+    <script>
+        // Глобальная система уведомлений о новых сообщениях
+        let globalPreviousConversations = {};
 
+        // === ДОБАВЛЯЕМ ЗВУК ===
+        // Я указал ссылку на бесплатный короткий звук уведомления.
+        // Если захотите свой — скачайте mp3, положите в папку static и поменяйте ссылку на '/static/ваш_звук.mp3'
+        const notificationSound = new Audio('./static/notification_sound.wav');
+        notificationSound.volume = 0.5; // Громкость от 0.0 до 1.0
+
+        async function checkGlobalNotifications() {
+            try {
+                const resp = await fetch('/api/conversations');
+                if (!resp.ok) return;
+                const conversations = await resp.json();
+
+                conversations.forEach(conv => {
+                    const prev = globalPreviousConversations[conv.user_id];
+
+                    if (prev && conv.unread_count > prev.unread_count) {
+                        // Проверяем, не открыт ли в данный момент чат именно с этим пользователем
+                        const isCurrentlyChatting = (typeof currentUserId !== 'undefined' && currentUserId === conv.user_id && !document.hidden);
+
+                        if (!isCurrentlyChatting) {
+                            showToast(`Новое сообщение от @${conv.username}`, 'info');
+
+                            // === ВОСПРОИЗВОДИМ ЗВУК ===
+                            // catch нужен, потому что браузеры блокируют звук, если пользователь еще ни разу не кликнул по странице
+                            notificationSound.play().catch(e => console.log('Звук заблокирован политикой браузера', e));
+
+                            if ("Notification" in window && Notification.permission === "granted") {
+                                new Notification("Новое сообщение", { body: `От: @${conv.username}` });
+                            }
+                        }
+                    }
+                    globalPreviousConversations[conv.user_id] = { unread_count: conv.unread_count };
+                });
+            } catch (e) {
+                console.error('Ошибка проверки уведомлений:', e);
+            }
+
+            setTimeout(checkGlobalNotifications, 5000);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Запрашиваем права на пуши от браузера
+            if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+                Notification.requestPermission();
+            }
+
+            // Запускаем глобальную проверку только если менеджер авторизован
+            {% if session.logged_in %}
+            checkGlobalNotifications();
+            {% endif %}
+        });
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

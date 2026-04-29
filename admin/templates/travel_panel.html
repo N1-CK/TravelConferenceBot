@@ -787,13 +787,17 @@
 
             const status = $(this).data('status');
             if (status === 'all') {
+                // Сбрасываем все фильтры
                 requestsTable.search('').columns().search('').draw();
             } else if (status === 'visa_pending') {
-                requestsTable.column(6).search('pending').draw();
+                requestsTable.column(7).search(''); // Сбрасываем билеты
+                requestsTable.column(6).search(getText('status_pending')).draw();
             } else if (status === 'flight_pending') {
-                requestsTable.column(7).search('pending').draw();
+                requestsTable.column(6).search(''); // Сбрасываем визы
+                requestsTable.column(7).search(getText('status_pending')).draw();
             } else if (status === 'flight_purchased') {
-                requestsTable.column(7).search('purchased').draw();
+                requestsTable.column(6).search(''); // Сбрасываем визы
+                requestsTable.column(7).search(getText('flights_purchased')).draw();
             }
         });
     }
@@ -819,7 +823,16 @@
         document.getElementById('statVisaPending').classList.add('active');
 
         if (requestsTable) {
-            requestsTable.column(6).search(status).draw();
+            // ОЧИЩАЕМ поиск по колонке "Билеты" (7)
+            requestsTable.column(7).search('');
+
+            let searchText = status;
+            if (status === 'pending') searchText = getText('status_pending');
+            else if (status === 'in_progress') searchText = getText('status_in_progress');
+            else if (status === 'ready') searchText = getText('status_ready');
+
+            // Применяем поиск по колонке "Визы" (6)
+            requestsTable.column(6).search(searchText).draw();
         }
     }
 
@@ -835,7 +848,16 @@
         }
 
         if (requestsTable) {
-            requestsTable.column(7).search(status).draw();
+            // ОЧИЩАЕМ поиск по колонке "Визы" (6)
+            requestsTable.column(6).search('');
+
+            let searchText = status;
+            if (status === 'pending') searchText = getText('status_pending');
+            else if (status === 'in_progress') searchText = getText('status_in_progress');
+            else if (status === 'purchased') searchText = getText('flights_purchased');
+
+            // Применяем поиск по колонке "Билеты" (7)
+            requestsTable.column(7).search(searchText).draw();
         }
     }
 
