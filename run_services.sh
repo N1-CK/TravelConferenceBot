@@ -147,7 +147,6 @@ check_service_status() {
         local pid=$(cat "$pid_file")
         if ps -p "$pid" > /dev/null 2>&1; then
             echo -e "${GREEN}●${NC} $service_name: запущен (PID: $pid)"
-            # Можно добавить проверку здоровья процесса здесь
             return 0
         else
             echo -e "${RED}●${NC} $service_name: не запущен (битый PID файл)"
@@ -179,11 +178,11 @@ case "$1" in
         print_status "Запуск всех сервисов бота..."
         echo "========================================"
 
-        # Запускаем основной бот
-        start_service "telegram_bot_AffilMeetBot" "main.py"
+        # Запускаем основной бот (Telegram бот)
+        start_service "telegram_bot" "main.py"
 
         # Запускаем сервис синхронизации с Google Sheets
-        start_service "google_sheets_sync_AffilMeetBot" "main2.py"
+        start_service "google_sheets_sync" "main2.py"
 
         echo "========================================"
         print_success "Все сервисы запущены"
@@ -193,8 +192,8 @@ case "$1" in
         print_status "Остановка всех сервисов бота..."
         echo "========================================"
 
-        stop_service "google_sheets_sync_AffilMeetBot"
-        stop_service "telegram_bot_AffilMeetBot"
+        stop_service "google_sheets_sync"
+        stop_service "telegram_bot"
 
         echo "========================================"
         print_success "Все сервисы остановлены"
@@ -210,28 +209,28 @@ case "$1" in
     status)
         print_status "Статус сервисов бота:"
         echo "========================================"
-        check_service_status "telegram_bot_AffilMeetBot"
-        check_service_status "google_sheets_sync_AffilMeetBot"
+        check_service_status "telegram_bot"
+        check_service_status "google_sheets_sync"
         echo "========================================"
         ;;
 
     logs)
         case "$2" in
             bot)
-                show_logs "telegram_bot_AffilMeetBot" "$3"
+                show_logs "telegram_bot" "$3"
                 ;;
             sync)
-                show_logs "google_sheets_sync_AffilMeetBot" "$3"
+                show_logs "google_sheets_sync" "$3"
                 ;;
             all)
-                show_logs "telegram_bot_AffilMeetBot" "$3"
+                show_logs "telegram_bot" "$3"
                 echo
-                show_logs "google_sheets_sync_AffilMeetBot" "$3"
+                show_logs "google_sheets_sync" "$3"
                 ;;
             *)
                 echo "Использование: $0 logs {bot|sync|all} [количество_строк]"
-                echo "  bot  - логи телеграм бота"
-                echo "  sync - логи синхронизации с Google Sheets"
+                echo "  bot  - логи Telegram бота (main.py)"
+                echo "  sync - логи синхронизации с Google Sheets (main2.py)"
                 echo "  all  - все логи"
                 echo "  количество_строк - опционально (по умолчанию: 50)"
                 ;;
@@ -270,8 +269,8 @@ case "$1" in
         echo "  restart   - перезапуск всех сервисов"
         echo "  status    - статус сервисов"
         echo "  logs      - просмотр логов"
-        echo "    logs bot [строк]   - логи бота"
-        echo "    logs sync [строк]  - логи синхронизации"
+        echo "    logs bot [строк]   - логи бота (main.py)"
+        echo "    logs sync [строк]  - логи синхронизации (main2.py)"
         echo "    logs all [строк]   - все логи"
         echo "  monitor   - режим мониторинга статуса"
         echo "  cleanup   - очистка PID файлов и логов"

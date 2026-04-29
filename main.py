@@ -62,7 +62,7 @@ async def main():
     try:
         from handlers import (
             start_router, menu_router, pr_router,
-            event_router, admin_router,
+            event_router,
             navigation_router, messages_router
         )
 
@@ -75,7 +75,6 @@ async def main():
         dp.include_router(pr_router)
         dp.include_router(event_router)
         dp.include_router(travel_router)
-        dp.include_router(admin_router)
         dp.include_router(navigation_router)
         dp.include_router(affiliate_router)
         dp.include_router(managers_chat_router)
