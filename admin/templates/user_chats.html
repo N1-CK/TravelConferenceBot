@@ -270,8 +270,38 @@
                     if (msg.source_type && msg.source_type.includes('_question')) {
                         const dept = msg.source_type.replace('_question', '').toUpperCase();
                         content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">[Вопрос из ${dept}]</small><br>${escapeHtml(msg.message_text)}`;
-                    } else if (msg.message_text) {
-                        content += `${escapeHtml(msg.message_text)}`;
+                    } else {
+                        // НОВОЕ: Отрисовка файла, если он есть
+                        if (msg.file_id) {
+                            const isIncoming = msg.direction === 'incoming';
+                            // Настраиваем цвета в зависимости от того, кто отправил сообщение
+                            const fileBg = isIncoming ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.15)';
+                            const fileColor = isIncoming ? '#2d3748' : '#ffffff';
+                            const iconBg = isIncoming ? 'rgba(102,126,234,0.1)' : 'rgba(255,255,255,0.2)';
+                            const iconColor = isIncoming ? '#667eea' : '#ffffff';
+                            const borderColor = isIncoming ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.2)';
+
+                            content += `
+                            <a href="/api/file/${msg.file_id}" target="_blank" class="d-flex align-items-center p-2 mb-2 rounded text-decoration-none" style="background: ${fileBg}; color: ${fileColor}; border: 1px solid ${borderColor}; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+                                <div class="me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border-radius: 10px; background: ${iconBg}; color: ${iconColor};">
+                                    <i class="bi bi-file-earmark-arrow-down-fill fs-5"></i>
+                                </div>
+                                <div class="text-truncate flex-grow-1" style="max-width: 160px;">
+                                    <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0px;">Прикрепленный файл</div>
+                                    <span style="font-size: 0.75rem; opacity: 0.85;">Скачать / Посмотреть</span>
+                                </div>
+                            </a>`;
+                        }
+
+                        // Отрисовка текста (если текст есть)
+                        if (msg.message_text) {
+                            // Добавляем поддержку переносов строк
+                            content += `<div>${escapeHtml(msg.message_text).replace(/\n/g, '<br>')}</div>`;
+                        }
+
+                        content += `<span class="message-time-inline">${time}</span></div>`;
+                        messageDiv.innerHTML = content;
+                        messagesDiv.appendChild(messageDiv);
                     }
 
                     // Время справа внизу внутри пузыря
@@ -321,24 +351,41 @@
         event.preventDefault();
         const msgInput = document.getElementById('replyMessage');
         const fileInput = document.getElementById('fileInput');
+        const submitBtn = event.target.querySelector('button[type="submit"]');
 
         if (!msgInput.value.trim() && !fileInput.files[0]) return;
+
+        // Блокируем кнопку на время отправки
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+        }
 
         const formData = new FormData();
         formData.append('user_id', currentUserId);
         formData.append('message', msgInput.value);
         if (fileInput.files[0]) formData.append('file', fileInput.files[0]);
 
-        const resp = await fetch('/api/send_message', { method: 'POST', body: formData });
-        const data = await resp.json();
+        try {
+            const resp = await fetch('/api/send_message', { method: 'POST', body: formData });
+            const data = await resp.json();
 
-        if (data.success) {
-            msgInput.value = '';
-            fileInput.value = '';
-            updateFileLabel();
-            loadChat(currentUserId, true);
-        } else {
-            showToast('Ошибка отправки', 'danger');
+            if (data.success) {
+                msgInput.value = '';
+                fileInput.value = '';
+                updateFileLabel();
+                loadChat(currentUserId, true);
+            } else {
+                showToast('Ошибка отправки', 'danger');
+            }
+        } catch (e) {
+            showToast('Ошибка сети', 'danger');
+        } finally {
+            // Разблокируем кнопку обратно
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-send"></i>';
+            }
         }
     }
 
@@ -358,6 +405,9 @@
                 const displayName = conv.full_name ? `${conv.username} (${conv.full_name})` : `@${conv.username}`;
                 const time = conv.last_message_time ? new Date(conv.last_message_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
 
+                let previewMsg = escapeHtml(conv.last_message) || 'Файл...';
+                previewMsg = previewMsg.replace(/<br\s*\/?>/gi, ' ');
+
                 html += `
                 <div class="conversation-item ${isActive}" data-user-id="${conv.user_id}" data-search="${displayName}" onclick="loadChat(${conv.user_id})">
                     <div class="d-flex align-items-center">
@@ -368,7 +418,7 @@
                                 <small class="text-muted">${time}</small>
                             </div>
                             <div class="d-flex justify-content-between">
-                                <div class="last-msg">${escapeHtml(conv.last_message) || 'Файл...'}</div>
+                                <div class="last-msg">${previewMsg}</div>
                                 ${conv.unread_count > 0 ? `<span class="unread-badge">${conv.unread_count}</span>` : ''}
                             </div>
                         </div>
@@ -399,7 +449,8 @@
         if (!text) return '';
         const div = document.createElement('div');
         div.textContent = text;
-        return div.innerHTML;
+        // Заменяем обычные переносы на HTML-тег <br>
+        return div.innerHTML.replace(/\n/g, '<br>');
     }
 
     function filterChats() {
@@ -583,12 +634,15 @@
         const userId = document.getElementById('replyUserId').value;
         const answer = document.getElementById('replyAnswer').value;
         const questionText = document.getElementById('questionText').textContent;
+        const submitBtn = document.querySelector('#replyModal .modal-footer .btn-primary');
 
         if (!answer.trim()) return;
 
+        // Блокируем кнопку отправки
+        if (submitBtn) submitBtn.disabled = true;
+
         const formData = new FormData();
         formData.append('user_id', userId);
-        // Формируем красивый ответ с цитированием
         formData.append('message', `<b>На ваш вопрос:</b>\n<i>${questionText}</i>\n\n<b>Ответ менеджера:</b>\n${answer}`);
 
         try {
@@ -602,7 +656,6 @@
 
                 showToast('Ответ отправлен', 'success');
 
-                // Переключаемся в чат с пользователем
                 switchTab('chats');
                 loadChat(userId);
             } else {
@@ -610,6 +663,9 @@
             }
         } catch (e) {
             showToast('Ошибка сети', 'danger');
+        } finally {
+            // Разблокируем кнопку
+            if (submitBtn) submitBtn.disabled = false;
         }
     }
 

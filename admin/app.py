@@ -12,6 +12,7 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from urllib.parse import unquote
+import requests
 
 
 import sys
@@ -520,6 +521,32 @@ def broadcast():
 
         # Отправляем сообщения
         results = run_async(bot.broadcast_to_users(users_to_send, message, saved_files))
+
+        manager_name = session.get('full_name') or session.get('username') or 'Менеджер'
+        display_name = f"{manager_name} (Рассылка)"
+
+        for user in users_to_send:
+            uid = user.get('user_id')
+            if uid:
+                # Сохраняем текстовую часть
+                if message:
+                    run_async(db.save_user_message(
+                        user_id=uid,
+                        username=display_name,
+                        message_text=message,
+                        direction='outgoing'
+                    ))
+                # Если были файлы, добавляем метку о файле в чат
+                if saved_files:
+                    for filepath in saved_files:
+                        filename = os.path.basename(filepath)
+                        run_async(db.save_user_message(
+                            user_id=uid,
+                            username=display_name,
+                            message_text="",
+                            file_id=filename,
+                            direction='outgoing'
+                        ))
 
         # Удаляем временные файлы
         for filepath in saved_files:
@@ -1541,80 +1568,53 @@ def api_mark_messages_read(user_id):
 @app.route('/api/send_message', methods=['POST'])
 @login_required
 def api_send_message():
-    """Отправить сообщение пользователю (текст + файл)"""
+    """Отправка сообщения с сохранением реального Telegram file_id"""
     user_id = request.form.get('user_id', type=int)
     message = request.form.get('message')
     file = request.files.get('file')
 
-    if not user_id:
-        return jsonify({'error': 'User ID required'}), 400
+    if not user_id: return jsonify({'error': 'User ID required'}), 400
 
-    # 1) ИСПРАВЛЕНИЕ: Формируем Имя Фамилия + (@username) для менеджера
-    manager_full_name = session.get('full_name', '')
-    manager_username = session.get('username', '')
+    manager_display_name = f"{session.get('full_name', '')} (@{session.get('username', '')})"
 
-    if manager_full_name and manager_username:
-        manager_display_name = f"{manager_full_name} (@{manager_username})"
-    elif manager_full_name:
-        manager_display_name = manager_full_name
-    elif manager_username:
-        manager_display_name = f"@{manager_username}"
-    else:
-        manager_display_name = "Admin"
-
-    file_id = None
-    file_type = None
     filepath = None
-
     if file:
         filename = secure_filename(file.filename)
-        file_id = filename
-        file_type = file.content_type
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
 
-    # Сохраняем сообщение в БД.
-    # В поле username передаем manager_display_name для истории
+    # 1. Сначала отправляем в Telegram, чтобы получить настоящий file_id
+    telegram_file_id = None
+    try:
+        bot_token = os.getenv('TG_BOT_TOKEN')
+
+        async def send_to_tg():
+            async with Bot(token=bot_token) as bot_obj:
+                if filepath:
+                    from aiogram.types import FSInputFile
+                    res = await bot_obj.send_document(user_id, FSInputFile(filepath), caption=message,
+                                                      parse_mode="HTML")
+                    return res.document.file_id
+                else:
+                    await bot_obj.send_message(user_id, message, parse_mode="HTML")
+                    return None
+
+        telegram_file_id = run_async_safe(send_to_tg())
+    except Exception as e:
+        logger.error(f"TG Send error: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if filepath and os.path.exists(filepath): os.remove(filepath)
+
+    # 2. Теперь сохраняем в базу уже с ПРАВИЛЬНЫМ file_id
     msg_id = run_async_safe(db.save_user_message(
         user_id=user_id,
         username=manager_display_name,
         message_text=message,
-        file_type=file_type,
-        file_id=file_id,
+        file_type=file.content_type if file else None,
+        file_id=telegram_file_id,  # Сохраняем ID от Telegram!
         direction='outgoing'
     ))
-
-    if not msg_id:
-        return jsonify({'error': 'Failed to save message'}), 500
-
-    # Отправка в Telegram
-    try:
-        from aiogram import Bot
-        from aiogram.types import FSInputFile
-        bot_token = os.getenv('TG_BOT_TOKEN')
-
-        async def send():
-            bot = Bot(token=bot_token)
-            try:
-                if file and filepath and os.path.exists(filepath):
-                    await bot.send_document(
-                        chat_id=user_id,
-                        document=FSInputFile(filepath),
-                        caption=message,
-                        parse_mode="HTML"
-                    )
-                else:
-                    await bot.send_message(chat_id=user_id, text=message, parse_mode="HTML")
-            finally:
-                await bot.session.close()
-
-        run_async_safe(send())
-        if filepath and os.path.exists(filepath):
-            os.remove(filepath)
-
-    except Exception as e:
-        logger.error(f"Error sending: {e}")
-        return jsonify({'error': str(e)}), 500
 
     return jsonify({'success': True, 'message_id': msg_id})
 
@@ -1622,10 +1622,34 @@ def api_send_message():
 @app.route('/api/file/<file_id>')
 @login_required
 def api_get_file(file_id):
-    """Получить файл по ID (из Telegram)"""
-    # Реализация получения файла из Telegram
-    # Для простоты пока возвращаем 404
-    return jsonify({'error': 'Not implemented'}), 404
+    """Маршрут для скачивания файлов из Telegram"""
+    bot_token = os.getenv('TG_BOT_TOKEN')
+    if not bot_token or not file_id:
+        return "Ошибка конфигурации", 500
+
+    # Если это просто имя файла (старые записи или ошибка), скачать не выйдет
+    if len(file_id) < 20:
+        return "Этот файл был удален с сервера и не имеет ID в Telegram", 404
+
+    try:
+        # 1. Получаем путь к файлу через API Telegram
+        file_info = requests.get(f"https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}").json()
+        if not file_info.get('ok'):
+            return "Файл не найден в Telegram", 404
+
+        file_path = file_info['result']['file_path']
+        download_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
+
+        # 2. Скачиваем и отдаем пользователю
+        file_data = requests.get(download_url)
+        return send_file(
+            io.BytesIO(file_data.content),
+            download_name=file_path.split('/')[-1],
+            as_attachment=True
+        )
+    except Exception as e:
+        logger.error(f"Download error: {e}")
+        return "Ошибка при загрузке файла", 500
 
 
 # Добавьте эти маршруты в app.py
