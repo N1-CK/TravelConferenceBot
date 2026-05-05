@@ -28,6 +28,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 from aiogram import Bot
+import threading
+import concurrent.futures
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -37,88 +39,46 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 app.config['UPLOAD_FOLDER'] = '/tmp'
 
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 # ============================================
 # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: ОДИН EVENT LOOP
 # ============================================
 
-# Создаем один event loop для всего приложения
-_loop = None
+_bg_loop = asyncio.new_event_loop()
 _db_initialized = False
+
+def _run_bg_loop(loop):
+    """Функция для работы фонового потока"""
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
+
+# Запускаем цикл навсегда в отдельном фоновом (daemon) потоке
+_bg_thread = threading.Thread(target=_run_bg_loop, args=(_bg_loop,), daemon=True)
+_bg_thread.start()
 
 @app.context_processor
 def inject_request():
     return {'request': request}
 
-def get_or_create_event_loop():
-    """Получить или создать event loop, не вызывая ошибки"""
-    global _loop
-    try:
-        loop = asyncio.get_running_loop()
-        return loop
-    except RuntimeError:
-        # Нет запущенного loop
-        if _loop is None or _loop.is_closed():
-            _loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(_loop)
-        return _loop
-
-def get_event_loop():
-    """Получить или создать единственный event loop"""
-    global _loop
-    if _loop is None or _loop.is_closed():
-        _loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(_loop)
-    return _loop
-
-
-def run_async_safe(coro):
+def run_async(coro, timeout=30):
     """
-    Безопасное выполнение асинхронной функции.
-    Всегда использует существующий event loop, никогда не создаёт новый внутри другого.
+    Универсальная функция. Отправляет асинхронную задачу в стабильный
+    фоновый цикл и ждет результат. Безопасна для Flask.
     """
+    future = asyncio.run_coroutine_threadsafe(coro, _bg_loop)
     try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = get_or_create_event_loop()
-
-    if loop.is_running():
-        # Если loop уже запущен, запускаем как таск и ждём
-        import concurrent.futures
-        future = asyncio.run_coroutine_threadsafe(coro, loop)
-        try:
-            return future.result(timeout=30)
-        except concurrent.futures.TimeoutError:
-            logger.error("Async operation timeout")
-            return None
-    else:
-        # Loop не запущен - запускаем
-        try:
-            return loop.run_until_complete(coro)
-        except Exception as e:
-            logger.error(f"Error in run_async_safe: {e}")
-            return None
-
-def run_async(coro):
-    """Выполнить асинхронную функцию в единственном event loop"""
-    loop = get_event_loop()
-    try:
-        if loop.is_running():
-            # Если loop уже запущен, создаем задачу
-            import concurrent.futures
-            future = asyncio.run_coroutine_threadsafe(coro, loop)
-            return future.result()
-        else:
-            # Если loop не запущен, запускаем его
-            return loop.run_until_complete(coro)
-    except RuntimeError as e:
-        if "cannot run" in str(e) or "closed" in str(e):
-            # Пересоздаем loop
-            global _loop
-            _loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(_loop)
-            return _loop.run_until_complete(coro)
-        raise
+        return future.result(timeout=timeout)
+    except concurrent.futures.TimeoutError:
+        logger.error("Async operation timeout")
+        return None
+    except Exception as e:
+        logger.error(f"Async execution error: {e}")
+        return None
 
 
 def init_db():
@@ -286,9 +246,12 @@ class TelegramBot:
                     return False
 
     async def broadcast_to_users(self, users, message, files=None):
-        """Массовая рассылка пользователям с файлами и HTML форматированием"""
-        results = {'success': 0, 'failed': 0}
+        """Массовая рассылка пользователям с файлами (с оптимизацией отправки по file_id)"""
+        results = {'success': 0, 'failed': 0, 'file_ids': []}
         file_count = len(files) if files else 0
+
+        # Кеш: загружаем файл в ТГ один раз, сохраняем его ID, дальше шлем всем мгновенно по ID
+        file_ids_map = {}
 
         for user in users:
             user_id = user.get('user_id')
@@ -298,7 +261,6 @@ class TelegramBot:
 
             success = False
             try:
-                # Оставляем HTML как есть (уже содержит <b>, <i>, <a> и т.д.)
                 html_message = message if message else ""
 
                 async with aiohttp.ClientSession() as session:
@@ -310,42 +272,49 @@ class TelegramBot:
                                 form_data = aiohttp.FormData()
                                 form_data.add_field('chat_id', str(user_id))
 
-                                with open(file_path, 'rb') as f:
-                                    form_data.add_field('document', f,
-                                                        filename=os.path.basename(file_path))
+                                # ОПТИМИЗАЦИЯ: Если файл уже в ТГ, просто отдаем его file_id
+                                if file_path in file_ids_map:
+                                    form_data.add_field('document', file_ids_map[file_path])
 
                                     if idx == 0 and html_message:
                                         form_data.add_field('caption', html_message)
                                         form_data.add_field('parse_mode', 'HTML')
-                                    elif idx == 0:
-                                        form_data.add_field('caption', ' ')
 
                                     async with session.post(url, data=form_data) as resp:
                                         result = await resp.json()
-                                        if result.get('ok'):
-                                            success = True
-                                            if 'description' in result:
-                                                logger.info(f"Sent to {user_id}: {result.get('description')}")
-                                        else:
-                                            logger.error(f"Failed to send to {user_id}: {result}")
+                                        if result.get('ok'): success = True
+                                else:
+                                    # ИНАЧЕ: Физически грузим файл (произойдет только для 1-го юзера)
+                                    with open(file_path, 'rb') as f:
+                                        form_data.add_field('document', f, filename=os.path.basename(file_path))
+
+                                        if idx == 0 and html_message:
+                                            form_data.add_field('caption', html_message)
+                                            form_data.add_field('parse_mode', 'HTML')
+
+                                        async with session.post(url, data=form_data) as resp:
+                                            result = await resp.json()
+                                            if result.get('ok'):
+                                                success = True
+                                                # Ловим настоящий Telegram file_id и сохраняем!
+                                                doc = result.get('result', {}).get('document', {})
+                                                if 'file_id' in doc:
+                                                    file_ids_map[file_path] = doc['file_id']
+
                                 await asyncio.sleep(0.05)
-                        # Если хотя бы один файл был отправлен
                         if files and len(files) > 0:
                             success = True
                     else:
-                        # Отправка только текста в HTML формате
+                        # Отправка только текста
                         url = f"{self.api_url}/sendMessage"
                         payload = {
                             'chat_id': user_id,
                             'text': html_message,
-                            'parse_mode': 'HTML'  # Для текста parse_mode работает
+                            'parse_mode': 'HTML'
                         }
                         async with session.post(url, json=payload) as resp:
                             result = await resp.json()
                             success = result.get('ok', False)
-
-                            if not success and 'description' in result:
-                                logger.error(f"Telegram API error for user {user_id}: {result.get('description')}")
 
             except Exception as e:
                 logger.error(f"Error sending to {user_id}: {e}")
@@ -356,9 +325,8 @@ class TelegramBot:
             else:
                 results['failed'] += 1
 
-            await asyncio.sleep(0.05)
-
         results['file_count'] = file_count
+        results['file_ids'] = list(file_ids_map.values())  # Передаем полученные ID в роут
         return results
 
 
@@ -477,6 +445,10 @@ def broadcast():
         # Сохраняем загруженные файлы временно
         for file in files:
             if file and file.filename:
+                if not allowed_file(file.filename):
+                    flash(f'Файл {file.filename} имеет запрещенный формат!', 'danger')
+                    continue  # Пропускаем опасный файл
+
                 filename = secure_filename(file.filename)
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(filepath)
@@ -522,31 +494,32 @@ def broadcast():
         # Отправляем сообщения
         results = run_async(bot.broadcast_to_users(users_to_send, message, saved_files))
 
+        # Вытаскиваем настоящие Telegram file_id, которые бот только что получил
+        telegram_file_ids = results.get('file_ids', [])
+
         manager_name = session.get('full_name') or session.get('username') or 'Менеджер'
         display_name = f"{manager_name} (Рассылка)"
+        messages_to_insert = []
 
         for user in users_to_send:
             uid = user.get('user_id')
             if uid:
-                # Сохраняем текстовую часть
-                if message:
-                    run_async(db.save_user_message(
-                        user_id=uid,
-                        username=display_name,
-                        message_text=message,
-                        direction='outgoing'
-                    ))
-                # Если были файлы, добавляем метку о файле в чат
-                if saved_files:
-                    for filepath in saved_files:
-                        filename = os.path.basename(filepath)
-                        run_async(db.save_user_message(
-                            user_id=uid,
-                            username=display_name,
-                            message_text="",
-                            file_id=filename,
-                            direction='outgoing'
-                        ))
+                # Если были файлы, объединяем текст и файл в ОДНО сообщение
+                if saved_files and telegram_file_ids:
+                    for idx, tg_file_id in enumerate(telegram_file_ids):
+                        # Текст прикрепляем только к первому файлу как подпись (caption)
+                        text_to_save = message if idx == 0 and message else ""
+                        messages_to_insert.append(
+                            (uid, display_name, 'outgoing', text_to_save, None, tg_file_id)
+                        )
+                # Если файлов нет, сохраняем просто текст
+                elif message:
+                    messages_to_insert.append(
+                        (uid, display_name, 'outgoing', message, None, None)
+                    )
+
+        if messages_to_insert:
+            run_async(db.save_user_messages_bulk(messages_to_insert))
 
         # Удаляем временные файлы
         for filepath in saved_files:
@@ -1599,7 +1572,7 @@ def api_send_message():
                     await bot_obj.send_message(user_id, message, parse_mode="HTML")
                     return None
 
-        telegram_file_id = run_async_safe(send_to_tg())
+        telegram_file_id = run_async(send_to_tg())
     except Exception as e:
         logger.error(f"TG Send error: {e}")
         return jsonify({'error': str(e)}), 500
@@ -1607,7 +1580,7 @@ def api_send_message():
         if filepath and os.path.exists(filepath): os.remove(filepath)
 
     # 2. Теперь сохраняем в базу уже с ПРАВИЛЬНЫМ file_id
-    msg_id = run_async_safe(db.save_user_message(
+    msg_id = run_async(db.save_user_message(
         user_id=user_id,
         username=manager_display_name,
         message_text=message,

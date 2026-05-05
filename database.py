@@ -3202,6 +3202,24 @@ class Database:
             logger.error(f"Error saving user message: {e}")
             return 0
 
+    async def save_user_messages_bulk(self, messages_data: list) -> bool:
+        """Массовое сохранение сообщений за один запрос к БД"""
+        if not messages_data:
+            return True
+
+        try:
+            async with self.pool.acquire() as conn:
+                query = f"""
+                    INSERT INTO {self.db_schema}.user_messages 
+                    (user_id, username, direction, message_text, file_type, file_id, created_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, NOW())
+                """
+                await conn.executemany(query, messages_data)
+                return True
+        except Exception as e:
+            logger.error(f"Error bulk saving messages: {e}")
+            return False
+
     async def get_user_conversations(self) -> list:
         """Получить список всех активных чатов (включая вопросы)"""
         try:
