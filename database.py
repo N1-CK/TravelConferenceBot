@@ -103,6 +103,9 @@ class Database:
                             bot_link TEXT,
                             additional_info TEXT,
                             sheet_name TEXT,
+                            hotel TEXT,
+                            hotel_address TEXT,
+                            site_url TEXT,
                             is_active BOOLEAN DEFAULT TRUE,
                             created_at TIMESTAMP DEFAULT NOW(),
                             updated_at TIMESTAMP DEFAULT NOW()
@@ -1364,25 +1367,6 @@ class Database:
             logger.error(f"Error updating bot status: {e}")
             return False
 
-    # ===== МЕТОДЫ ДЛЯ GROUP TRAVEL BOT (схема travel_bot) =====
-
-    async def get_user_flights_travel(self, username: str) -> List[str]:
-        """Получить конференции пользователя из схемы travel_bot"""
-        try:
-            async with self.pool.acquire() as conn:
-                query = f"""
-                        SELECT DISTINCT conference
-                        FROM travel_bot.flights
-                        WHERE telegram_name like '%{username}%'
-                        ORDER BY conference \
-                        """
-                print(f"Executing query for username: {username}")
-                result = await conn.fetch(query)
-                print(f"Query result: {result}")
-                return [row['conference'] for row in result]
-        except Exception as e:
-            print(f"Error getting user flights from travel_bot: {e}")
-            return []
 
     async def get_flight_details_travel(self, username: str, conference: str) -> List[Dict]:
         """Получить детали рейсов из схемы travel_bot"""
@@ -1402,19 +1386,20 @@ class Database:
             return []
 
     async def get_hotel_info_travel(self, conference: str) -> Dict:
-        """Получить информацию об отеле из схемы travel_bot"""
+        """Получить информацию об отеле из новой таблицы (ранее из travel_bot.hotels)"""
         try:
             async with self.pool.acquire() as conn:
+                # Используем алиасы, чтобы ответ словаря (address, site) соответствовал тому, что ожидает бот
                 query = f"""
-                        SELECT hotel, address, site
-                        FROM travel_bot.hotels
-                        WHERE conference like '%{conference}%'
-                        LIMIT 1 \
+                        SELECT hotel, hotel_address as address, site_url as site
+                        FROM {self.db_schema_config}.conferences
+                        WHERE conference_name ILIKE $1
+                        LIMIT 1
                         """
-                result = await conn.fetchrow(query)
+                result = await conn.fetchrow(query, f"%{conference}%")
                 return dict(result) if result else {}
         except Exception as e:
-            logger.error(f"Error getting hotel info from travel_bot: {e}")
+            logger.error(f"Error getting hotel info from conferences: {e}")
             return {}
 
     async def get_airline_url_travel(self, airline: str) -> str:
@@ -1733,26 +1718,43 @@ class Database:
                             'additional_info': ''
                         }
 
+                    hotel, hotel_address, site_url = '', '', ''
+                    try:
+                        hotel_data = worksheet.get_values('E5', 'G5')
+                        if hotel_data and len(hotel_data) > 0:
+                            row_data = hotel_data[0]
+                            hotel = str(row_data[0]).strip() if len(row_data) > 0 else ''
+                            hotel_address = str(row_data[1]).strip() if len(row_data) > 1 else ''
+                            site_url = str(row_data[2]).strip() if len(row_data) > 2 else ''
+                    except Exception as e:
+                        logger.warning(f"Could not get hotel data for {sheet_name}: {e}")
+
                     # Сохраняем конференцию
                     await conn.execute(f"""
-                        INSERT INTO {self.db_schema_config}.conferences 
-                        (conference_name, start_date, end_date, city, bot_link, additional_info, sheet_name)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7)
-                        ON CONFLICT (conference_name) DO UPDATE
-                        SET start_date = EXCLUDED.start_date,
-                            end_date = EXCLUDED.end_date,
-                            city = EXCLUDED.city,
-                            bot_link = EXCLUDED.bot_link,
-                            additional_info = EXCLUDED.additional_info,
-                            sheet_name = EXCLUDED.sheet_name
-                    """,
+                                            INSERT INTO {self.db_schema_config}.conferences 
+                                            (conference_name, start_date, end_date, city, bot_link, additional_info, sheet_name, hotel, hotel_address, site_url)
+                                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                                            ON CONFLICT (conference_name) DO UPDATE
+                                            SET start_date = EXCLUDED.start_date,
+                                                end_date = EXCLUDED.end_date,
+                                                city = EXCLUDED.city,
+                                                bot_link = EXCLUDED.bot_link,
+                                                additional_info = EXCLUDED.additional_info,
+                                                sheet_name = EXCLUDED.sheet_name,
+                                                hotel = EXCLUDED.hotel,
+                                                hotel_address = EXCLUDED.hotel_address,
+                                                site_url = EXCLUDED.site_url
+                                        """,
                                        conference_info['conference_name'],
                                        conference_info['conf_start'],
                                        conference_info['conf_end'],
                                        conference_info['city'],
                                        conference_info['bot_link'],
                                        conference_info['additional_info'],
-                                       sheet_name
+                                       sheet_name,
+                                       hotel,
+                                       hotel_address,
+                                       site_url
                                        )
                     total_conferences += 1
 
