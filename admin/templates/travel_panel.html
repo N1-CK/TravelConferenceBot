@@ -195,6 +195,11 @@
                                                     title="{{ get_text('view_details') }}">
                                                 <i class="bi bi-eye"></i>
                                             </button>
+                                            <button class="btn btn-sm btn-outline-info"
+                                                    onclick="openReplyModal('{{ req.user_id }}')"
+                                                    title="Написать пользователю">
+                                                <i class="bi bi-chat-dots"></i>
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -297,6 +302,37 @@
             </div>
         </div>
     </div>
+</div>
+<div class="modal fade" id="replyModal" tabindex="-1" aria-labelledby="replyModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="/admin/send_message_to_user" method="POST" enctype="multipart/form-data">
+        <div class="modal-header">
+          <h5 class="modal-title" id="replyModalLabel">
+              <i class="bi bi-chat-dots"></i> {{ get_text('reply_to_user') }}
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ get_text('close') }}"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="user_id" id="replyModalUserId">
+
+          <div class="mb-3">
+            <label for="messageText" class="form-label">{{ get_text('message_text') }}</label>
+            <textarea class="form-control" id="messageText" name="message_text" rows="4" required></textarea>
+          </div>
+
+          <div class="mb-3">
+            <label for="messageFile" class="form-label">{{ get_text('attach_file_optional') }}</label>
+            <input class="form-control" type="file" id="messageFile" name="file">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('close') }}</button>
+          <button type="submit" class="btn btn-success">{{ get_text('send_btn') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
@@ -610,6 +646,12 @@
                 tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">{{ get_text("error_loading_details") }}</td></tr>';
             }
         }
+    }
+
+    function openReplyModal(userId) {
+        document.getElementById('replyModalUserId').value = userId;
+        var myModal = new bootstrap.Modal(document.getElementById('replyModal'));
+        myModal.show();
     }
 
     function updatePerDiemStats() {

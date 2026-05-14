@@ -438,6 +438,14 @@ TEXTS = {
         'reply_btn': 'Ответить',
         'forward_btn_short': 'Переслать',
 
+        'reply_to_user': 'Написать пользователю',
+        'message_text': 'Текст сообщения',
+        'attach_file_optional': 'Прикрепить файл (опционально)',
+        'send_btn': 'Отправить',
+        'message_sent_success': 'Сообщение успешно отправлено!',
+        'error_sending_tg': 'Ошибка при отправке сообщения в Telegram.',
+        'error_user_not_found': 'Ошибка: ID пользователя не найден.'
+
     },
     'en': {
         # Navigation
@@ -870,6 +878,14 @@ TEXTS = {
         'question_from': 'Question from',
         'reply_btn': 'Reply',
         'forward_btn_short': 'Forward',
+
+        'reply_to_user': 'Message User',
+        'message_text': 'Message Text',
+        'attach_file_optional': 'Attach File (optional)',
+        'send_btn': 'Send',
+        'message_sent_success': 'Message sent successfully!',
+        'error_sending_tg': 'Error sending message to Telegram.',
+        'error_user_not_found': 'Error: User ID not found.',
     }
 }
 

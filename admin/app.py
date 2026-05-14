@@ -203,47 +203,27 @@ class TelegramBot:
         """Отправить сообщение через Telegram API"""
         import aiohttp
         import os
-
         async with aiohttp.ClientSession() as session:
             if file:
-                # Отправка с файлом
                 url = f"{self.api_url}/sendDocument"
                 form_data = aiohttp.FormData()
                 form_data.add_field('chat_id', str(chat_id))
-                form_data.add_field('document', open(file, 'rb'),
-                                    filename=os.path.basename(file),
-                                    content_type='application/octet-stream')
+                form_data.add_field('document', open(file, 'rb'), filename=os.path.basename(file))
                 if text:
                     form_data.add_field('caption', text)
                     form_data.add_field('parse_mode', 'HTML')
-
-                try:
-                    async with session.post(url, data=form_data) as resp:
-                        result = await resp.json()
-                        return result.get('ok', False)
-                except Exception as e:
-                    print(f"Error sending document: {e}")
+                async with session.post(url, data=form_data) as resp:
+                    result = await resp.json()
+                    if result.get('ok'):
+                        # ВОЗВРАЩАЕМ file_id, чтобы сохранить его в БД
+                        return result.get('result', {}).get('document', {}).get('file_id')
                     return False
-                finally:
-                    # Закрываем файл
-                    if 'form_data' in locals():
-                        pass
             else:
-                # Отправка только текста
                 url = f"{self.api_url}/sendMessage"
-                payload = {
-                    'chat_id': chat_id,
-                    'text': text if text else "",
-                    'parse_mode': 'HTML'  # Для текста parse_mode работает
-                }
-
-                try:
-                    async with session.post(url, json=payload) as resp:
-                        result = await resp.json()
-                        return result.get('ok', False)
-                except Exception as e:
-                    print(f"Error sending message: {e}")
-                    return False
+                payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
+                async with session.post(url, json=payload) as resp:
+                    result = await resp.json()
+                    return result.get('ok', False)
 
     async def broadcast_to_users(self, users, message, files=None):
         """Массовая рассылка пользователям с файлами (с оптимизацией отправки по file_id)"""
@@ -1536,6 +1516,59 @@ def api_mark_messages_read(user_id):
     """Отметить сообщения как прочитанные"""
     success = run_async(db.mark_messages_read(user_id, session.get('manager_id')))
     return jsonify({'success': success})
+
+
+@app.route('/admin/send_message_to_user', methods=['POST'])
+@login_required
+def send_message_to_user():
+    user_id = request.form.get('user_id')
+    message_text = request.form.get('message_text')
+    uploaded_file = request.files.get('file')
+
+    if not user_id:
+        flash(get_text('error_user_not_found'), "danger")
+        return redirect(url_for('travel_panel'))
+
+    manager_username = session.get('username', 'Manager')
+    manager_full_name = session.get('full_name', 'Manager')
+
+    # Добавляем подпись менеджера над сообщением
+    final_text = f"{message_text}"
+
+    filepath = None
+    if uploaded_file and uploaded_file.filename:
+        filename = secure_filename(uploaded_file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        uploaded_file.save(filepath)
+
+    try:
+        # Получаем реальный file_id от Telegram
+        tg_res = run_async(bot.send_message(chat_id=user_id, text=final_text, file=filepath))
+
+        if tg_res:
+            # Сохраняем в БД. Если tg_res — строка, значит это file_id файла
+            file_id_to_save = tg_res if isinstance(tg_res, str) else None
+
+            manager_display_name = f"{manager_full_name} (@{manager_username})"
+            run_async(db.save_user_message(
+                user_id=int(user_id),
+                username=manager_display_name,
+                message_text=final_text,
+                file_type=uploaded_file.content_type if uploaded_file and uploaded_file.filename else None,
+                file_id=file_id_to_save,  # Теперь файл появится в чате!
+                direction='outgoing'
+            ))
+            flash(get_text('message_sent_success'), "success")
+        else:
+            flash(get_text('error_sending_tg'), "danger")
+    except Exception as e:
+        logger.error(f"Error sending message: {e}")
+        flash(f"{get_text('error_occurred')}: {e}", "danger")
+    finally:
+        if filepath and os.path.exists(filepath):
+            os.remove(filepath)
+
+    return redirect(url_for('travel_panel'))
 
 
 @app.route('/api/send_message', methods=['POST'])
