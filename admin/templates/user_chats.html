@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Чаты с пользователями{% endblock %}
+{% block title %}{{ get_text('user_chats') }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -39,11 +39,7 @@
     .message.outgoing .message-sender { color: #f8f9fa; }
     .message.incoming .message-sender { color: #4a5568; }
     .message-time-inline { font-size: 0.65rem; opacity: 0.7; float: right; margin-left: 10px; margin-top: 5px; }
-    .message-bubble { min-width: 120px; }
-    .message-sender { font-size: 0.75rem; font-weight: bold; margin-bottom: 2px; opacity: 0.8; }
-    .message-time-inline { font-size: 0.65rem; opacity: 0.7; float: right; margin-left: 8px; margin-top: 4px; }
     .conversation-item .last-msg { font-size: 0.8rem; color: #6c757d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .search-container { padding: 10px 15px; border-bottom: 1px solid #dee2e6; }
 </style>
 {% endblock %}
 
@@ -51,10 +47,10 @@
 <div class="mb-3">
     <ul class="nav nav-tabs" id="chatTabs">
         <li class="nav-item">
-            <button class="nav-link active" data-tab="chats" onclick="switchTab('chats')">💬 Чаты</button>
+            <button class="nav-link active" data-tab="chats" onclick="switchTab('chats')">{{ get_text('chats_tab') }}</button>
         </li>
         <li class="nav-item">
-            <button class="nav-link" data-tab="questions" onclick="switchTab('questions')">❓ Вопросы</button>
+            <button class="nav-link" data-tab="questions" onclick="switchTab('questions')">{{ get_text('questions_tab') }}</button>
         </li>
     </ul>
 </div>
@@ -63,8 +59,8 @@
     <div class="chat-container">
         <div class="chat-sidebar" id="chatSidebar">
             <div class="p-3 border-bottom">
-                <h6 class="mb-2"><i class="bi bi-chat-dots"></i> Чаты</h6>
-                <input type="text" id="chatSearch" class="form-control form-control-sm" placeholder="Поиск по имени/нику..." onkeyup="filterChats()">
+                <h6 class="mb-2">{{ get_text('chats_tab') }}</h6>
+                <input type="text" id="chatSearch" class="form-control form-control-sm" placeholder="{{ get_text('search_chat_placeholder') }}" onkeyup="filterChats()">
             </div>
             <div id="conversationsList">
                 {% for conv in conversations %}
@@ -89,12 +85,12 @@
             <div class="chat-header" id="chatHeader">
                 <div class="d-flex align-items-center">
                     <div class="conversation-avatar me-3" style="width: 40px; height: 40px; font-size: 1rem;">?</div>
-                    <div><h6 class="mb-0" id="currentUserName">Выберите чат</h6><small class="text-muted" id="currentUserInfo">Нажмите на чат слева</small></div>
+                    <div><h6 class="mb-0" id="currentUserName">{{ get_text('select_chat_to_start') }}</h6><small class="text-muted" id="currentUserInfo"></small></div>
                 </div>
             </div>
 
             <div class="chat-messages" id="chatMessages">
-                <div class="text-center text-muted py-5"><i class="bi bi-chat-dots" style="font-size: 3rem;"></i><p class="mt-3">Выберите чат для начала общения</p></div>
+                <div class="text-center text-muted py-5"><i class="bi bi-chat-dots" style="font-size: 3rem;"></i><p class="mt-3">{{ get_text('select_chat_to_start') }}</p></div>
             </div>
 
             <div class="chat-input" id="chatInput" style="display: none;">
@@ -104,7 +100,7 @@
                             <i class="bi bi-paperclip"></i>
                             <input type="file" id="fileInput" style="display:none" onchange="updateFileLabel()">
                         </label>
-                        <textarea class="form-control" id="replyMessage" rows="1" placeholder="Введите сообщение..."></textarea>
+                        <textarea class="form-control" id="replyMessage" rows="1" placeholder="{{ get_text('type_message') }}"></textarea>
                         <button class="btn btn-primary" type="submit"><i class="bi bi-send"></i></button>
                     </div>
                     <small id="fileLabel" class="text-muted" style="display:none; margin-left: 45px;"></small>
@@ -117,11 +113,11 @@
 <div id="questionsTab" style="display: none;">
     <div class="card">
         <div class="card-header">
-            <i class="bi bi-question-circle"></i> Вопросы пользователей
+            <i class="bi bi-question-circle"></i> {{ get_text('user_questions') }}
         </div>
         <div class="card-body">
             <div class="department-filter" id="deptFilter">
-                <button class="dept-btn active" data-dept="all" onclick="filterQuestions('all')">📋 Все</button>
+                <button class="dept-btn active" data-dept="all" onclick="filterQuestions('all')">{{ get_text('tab_all') }}</button>
                 {% if 'pr' in session.groups or session.role == 'admin' %}
                 <button class="dept-btn pr" data-dept="pr" onclick="filterQuestions('pr')">📢 PR</button>
                 {% endif %}
@@ -133,53 +129,52 @@
                 {% endif %}
             </div>
             <div id="questionsList">
-                <div class="text-center text-muted py-4">Загрузка вопросов...</div>
+                <div class="text-center text-muted py-4">{{ get_text('loading_questions') }}</div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Модальное окно для ответа на вопрос -->
 <div class="modal fade" id="replyModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Ответить на вопрос</h5>
+                <h5 class="modal-title">{{ get_text('reply_to_question_title') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="mb-2"><strong>Вопрос:</strong></div>
+                <div class="mb-2"><strong>{{ get_text('question_label') }}</strong></div>
                 <div class="question-text p-2 bg-light rounded mb-3" id="questionText"></div>
-                <div class="mb-2"><strong>Ваш ответ:</strong></div>
-                <textarea class="form-control" id="replyAnswer" rows="4" placeholder="Введите ответ..."></textarea>
+                <div class="mb-2"><strong>{{ get_text('your_answer_label') }}</strong></div>
+                <textarea class="form-control" id="replyAnswer" rows="4" placeholder="{{ get_text('type_answer') }}"></textarea>
                 <input type="hidden" id="replyUserId">
                 <input type="hidden" id="replyDept">
                 <input type="hidden" id="replyQuestionId">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" onclick="submitAnswer()">Отправить ответ</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('btn_cancel') }}</button>
+                <button type="button" class="btn btn-primary" onclick="submitAnswer()">{{ get_text('send_answer') }}</button>
             </div>
         </div>
     </div>
 </div>
+
 <div class="modal fade" id="forwardModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Переслать вопрос</h5>
+                <h5 class="modal-title">{{ get_text('forward_question_title') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>Выберите отдел, в который нужно переслать вопрос:</p>
-                <select class="form-select" id="forwardTargetDept">
-                    </select>
+                <p>{{ get_text('select_dept_forward') }}</p>
+                <select class="form-select" id="forwardTargetDept"></select>
                 <input type="hidden" id="forwardQuestionId">
                 <input type="hidden" id="forwardSourceDept">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" onclick="submitForward()">Переслать</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('btn_cancel') }}</button>
+                <button type="button" class="btn btn-primary" onclick="submitForward()">{{ get_text('forward_btn') }}</button>
             </div>
         </div>
     </div>
@@ -188,6 +183,26 @@
 
 {% block extra_js %}
 <script>
+    // Передаем локализованные строки из Jinja в JavaScript
+    const locales = {
+        roleManager: "{{ get_text('role_manager') }}",
+        roleUser: "{{ get_text('role_user') }}",
+        loadingMessages: "{{ get_text('loading_messages') }}",
+        questionFrom: "{{ get_text('question_from') }}",
+        attachedFile: "{{ get_text('attached_file') }}",
+        downloadView: "{{ get_text('download_view') }}",
+        noQuestionsCat: "{{ get_text('no_questions_category') }}",
+        noQuestions: "{{ get_text('no_questions') }}",
+        replyBtn: "{{ get_text('reply_btn') }}",
+        forwardBtnShort: "{{ get_text('forward_btn_short') }}",
+        errorSending: "{{ get_text('error_sending') }}",
+        networkError: "{{ get_text('network_error') }}",
+        answerSent: "{{ get_text('answer_sent') }}",
+        questionForwarded: "{{ get_text('question_forwarded') }}",
+        managerAnswerPrefix: "{{ get_text('manager_answer_prefix') }}",
+        yourQuestionPrefix: "{{ get_text('your_question_prefix') }}"
+    };
+
     let currentUserId = null;
     let lastMessageId = 0;
     let isPolling = false;
@@ -195,25 +210,19 @@
     let sidebarPollTimer = null;
     let isScrolledToBottom = true;
 
-    // Отслеживаем скролл, чтобы авто-прокручивать чат только если мы в самом низу
     const messagesDiv = document.getElementById('chatMessages');
     messagesDiv.addEventListener('scroll', () => {
         isScrolledToBottom = messagesDiv.scrollHeight - messagesDiv.clientHeight <= messagesDiv.scrollTop + 50;
     });
 
-    // ============================================
-    // ЧАТ И СООБЩЕНИЯ (Умный поллинг)
-    // ============================================
-
     async function loadChat(userId, isPollingReq = false) {
-        // Если это принудительный выбор нового чата (клик в сайдбаре)
         if (!isPollingReq) {
             currentUserId = userId;
-            lastMessageId = 0; // Сбрасываем ID, чтобы загрузить историю заново
+            lastMessageId = 0;
             isPolling = true;
-            clearTimeout(chatPollTimer); // Очищаем старые таймеры
+            clearTimeout(chatPollTimer);
 
-            messagesDiv.innerHTML = '<div class="text-center text-muted py-5"><i class="bi bi-arrow-repeat spin"></i> Загрузка сообщений...</div>';
+            messagesDiv.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-arrow-repeat spin"></i> ${locales.loadingMessages}</div>`;
 
             document.querySelectorAll('.conversation-item').forEach(item => {
                 item.classList.remove('active');
@@ -223,58 +232,47 @@
 
         try {
             const resp = await fetch(`/api/user_messages/${userId}`);
-            if (!resp.ok) throw new Error('Ошибка сети');
+            if (!resp.ok) throw new Error('Network error');
             const data = await resp.json();
 
             if (!isPollingReq) messagesDiv.innerHTML = '';
 
             let hasNewIncoming = false;
             let hasAnyNew = false;
-
             const messages = (data.messages || []).reverse();
 
-            // 1. Обновляем заголовок чата (Имя Фамилия + Ник)
             if (!isPollingReq) {
                 const userFullName = data.full_name || '';
-                const headerName = userFullName
-                    ? `${userFullName} (@${data.username || userId})`
-                    : `@${data.username || userId}`;
+                const headerName = userFullName ? `${userFullName} (@${data.username || userId})` : `@${data.username || userId}`;
                 document.getElementById('currentUserName').textContent = headerName;
                 document.getElementById('currentUserInfo').textContent = `ID: ${userId}`;
                 document.getElementById('chatInput').style.display = 'block';
             }
 
-            // 2. Отрисовка новых сообщений
             for (const msg of messages) {
                 if (msg.id > lastMessageId) {
                     hasAnyNew = true;
                     if (msg.direction === 'incoming') hasNewIncoming = true;
-
                     lastMessageId = msg.id;
 
                     const messageDiv = document.createElement('div');
                     messageDiv.className = `message ${msg.direction === 'incoming' ? 'incoming' : 'outgoing'}`;
 
-                    // Определяем имя того, кто отправил (Менеджер или Пользователь)
                     const senderDisplay = msg.direction === 'outgoing'
-                        ? (msg.sender_username || 'Менеджер')
-                        : (data.full_name || data.username || 'Пользователь');
+                        ? (msg.sender_username || locales.roleManager)
+                        : (data.full_name || data.username || locales.roleUser);
 
-                    const time = new Date(msg.created_at).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'});
+                    const time = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
                     let content = `<div class="message-bubble">`;
-                    // Имя отправителя над текстом
                     content += `<div class="message-sender">${escapeHtml(senderDisplay)}</div>`;
 
-                    // Текст сообщения или вопрос из отдела
                     if (msg.source_type && msg.source_type.includes('_question')) {
                         const dept = msg.source_type.replace('_question', '').toUpperCase();
-                        content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">[Вопрос из ${dept}]</small><br>${escapeHtml(msg.message_text)}`;
+                        content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">[${locales.questionFrom} ${dept}]</small><br>${escapeHtml(msg.message_text)}`;
                     } else {
-                        // НОВОЕ: Отрисовка файла, если он есть
                         if (msg.file_id) {
                             const isIncoming = msg.direction === 'incoming';
-                            // Настраиваем цвета в зависимости от того, кто отправил сообщение
                             const fileBg = isIncoming ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.15)';
                             const fileColor = isIncoming ? '#2d3748' : '#ffffff';
                             const iconBg = isIncoming ? 'rgba(102,126,234,0.1)' : 'rgba(255,255,255,0.2)';
@@ -287,48 +285,30 @@
                                     <i class="bi bi-file-earmark-arrow-down-fill fs-5"></i>
                                 </div>
                                 <div class="text-truncate flex-grow-1" style="max-width: 160px;">
-                                    <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0px;">Прикрепленный файл</div>
-                                    <span style="font-size: 0.75rem; opacity: 0.85;">Скачать / Посмотреть</span>
+                                    <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0px;">${locales.attachedFile}</div>
+                                    <span style="font-size: 0.75rem; opacity: 0.85;">${locales.downloadView}</span>
                                 </div>
                             </a>`;
                         }
 
-                        // Отрисовка текста (если текст есть)
                         if (msg.message_text) {
-                            // Добавляем поддержку переносов строк
                             content += `<div>${escapeHtml(msg.message_text).replace(/\n/g, '<br>')}</div>`;
                         }
-
-                        content += `<span class="message-time-inline">${time}</span></div>`;
-                        messageDiv.innerHTML = content;
-                        messagesDiv.appendChild(messageDiv);
                     }
 
-                    // Время справа внизу внутри пузыря
-                    content += `<span class="message-time-inline">${time}</span>`;
-                    content += `</div>`;
-
+                    content += `<span class="message-time-inline">${time}</span></div>`;
                     messageDiv.innerHTML = content;
                     messagesDiv.appendChild(messageDiv);
                 }
             }
 
-            // 3. Управление прокруткой и статусом "Прочитано"
             if (!isPollingReq) {
                 messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                // При первом открытии всегда помечаем как прочитанное
-                if (messages.length > 0) {
-                    fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
-                }
+                if (messages.length > 0) fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
             } else if (hasAnyNew) {
-                if (isScrolledToBottom) {
-                    messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
-                }
-                // Помечаем прочитанным, только если реально пришло новое входящее от юзера
+                if (isScrolledToBottom) messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
                 if (hasNewIncoming) {
                     fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
-
-                    // Сразу убираем бейдж непрочитанных в сайдбаре для этого юзера
                     const convItem = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
                     if (convItem) {
                         const badge = convItem.querySelector('.unread-badge');
@@ -338,10 +318,9 @@
             }
 
         } catch (e) {
-            console.error("Ошибка обновления чата:", e);
+            console.error(e);
         }
 
-        // Рекурсивный запуск поллинга только если чат всё еще открыт
         if (isPolling && currentUserId === userId) {
             chatPollTimer = setTimeout(() => loadChat(userId, true), 2500);
         }
@@ -355,7 +334,6 @@
 
         if (!msgInput.value.trim() && !fileInput.files[0]) return;
 
-        // Блокируем кнопку на время отправки
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
@@ -376,22 +354,17 @@
                 updateFileLabel();
                 loadChat(currentUserId, true);
             } else {
-                showToast('Ошибка отправки', 'danger');
+                showToast(locales.errorSending, 'danger');
             }
         } catch (e) {
-            showToast('Ошибка сети', 'danger');
+            showToast(locales.networkError, 'danger');
         } finally {
-            // Разблокируем кнопку обратно
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="bi bi-send"></i>';
             }
         }
     }
-
-    // ============================================
-    // БОКОВАЯ ПАНЕЛЬ С ДИАЛОГАМИ
-    // ============================================
 
     async function updateSidebar() {
         try {
@@ -405,7 +378,7 @@
                 const displayName = conv.full_name ? `${conv.username} (${conv.full_name})` : `@${conv.username}`;
                 const time = conv.last_message_time ? new Date(conv.last_message_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
 
-                let previewMsg = escapeHtml(conv.last_message) || 'Файл...';
+                let previewMsg = escapeHtml(conv.last_message) || '...';
                 previewMsg = previewMsg.replace(/<br\s*\/?>/gi, ' ');
 
                 html += `
@@ -427,29 +400,14 @@
             });
             listDiv.innerHTML = html;
             filterChats();
-        } catch (e) {
-            console.error("Ошибка обновления боковой панели:", e);
-        }
-        // Запускаем следующую проверку через 10 секунд
+        } catch (e) {}
         setTimeout(updateSidebar, 5000);
     }
-
-
-    document.addEventListener('DOMContentLoaded', () => {
-        if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
-            Notification.requestPermission();
-        }
-    });
-
-    // ============================================
-    // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-    // ============================================
 
     function escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
         div.textContent = text;
-        // Заменяем обычные переносы на HTML-тег <br>
         return div.innerHTML.replace(/\n/g, '<br>');
     }
 
@@ -462,7 +420,6 @@
     }
 
     function switchTab(tab) {
-        // Исправляем ID вкладок, чтобы они точно соответствовали HTML
         document.getElementById('chatsTab').style.display = (tab === 'chats') ? 'block' : 'none';
         document.getElementById('questionsTab').style.display = (tab === 'questions') ? 'block' : 'none';
 
@@ -488,30 +445,16 @@
         const toastContainer = document.querySelector('.toast-container');
         if (!toastContainer) return;
 
-        const typeMap = {
-            success: 'check-circle-fill text-success',
-            danger: 'exclamation-triangle-fill text-danger',
-            warning: 'exclamation-triangle-fill text-warning',
-            info: 'info-circle-fill text-info'
-        };
-        const typeText = {
-            success: 'Успешно',
-            danger: 'Ошибка',
-            warning: 'Внимание',
-            info: 'Информация'
-        };
+        const typeMap = { success: 'check-circle-fill text-success', danger: 'exclamation-triangle-fill text-danger' };
 
         const toastHtml = `
             <div class="toast show" role="alert" data-bs-autohide="true" data-bs-delay="5000">
                 <div class="toast-header">
-                    <i class="bi ${typeMap[type] || typeMap.info} me-2"></i>
-                    <strong class="me-auto">${typeText[type] || typeText.info}</strong>
-                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                    <i class="bi ${typeMap[type] || 'info-circle-fill'} me-2"></i>
+                    <button type="button" class="btn-close ms-auto" data-bs-dismiss="toast"></button>
                 </div>
                 <div class="toast-body">${escapeHtml(message)}</div>
-            </div>
-        `;
-
+            </div>`;
         toastContainer.insertAdjacentHTML('beforeend', toastHtml);
         setTimeout(() => {
             const toast = toastContainer.lastElementChild;
@@ -528,13 +471,10 @@
                 allQuestions = await resp.json();
                 filterQuestions('all');
             }
-        } catch (e) {
-            console.error("Ошибка загрузки вопросов:", e);
-        }
+        } catch (e) {}
     }
 
     function filterQuestions(dept) {
-        // Обновляем активную кнопку фильтра
         document.querySelectorAll('.dept-btn').forEach(btn => btn.classList.remove('active'));
         const activeBtn = document.querySelector(`.dept-btn[data-dept="${dept}"]`);
         if (activeBtn) activeBtn.classList.add('active');
@@ -542,18 +482,16 @@
         const list = document.getElementById('questionsList');
         let filtered = allQuestions;
 
-        if (dept !== 'all') {
-            filtered = allQuestions.filter(q => q.department === dept);
-        }
+        if (dept !== 'all') filtered = allQuestions.filter(q => q.department === dept);
 
         if (filtered.length === 0) {
-            list.innerHTML = '<div class="text-center text-muted py-4">Нет вопросов в этой категории</div>';
+            list.innerHTML = `<div class="text-center text-muted py-4">${locales.noQuestionsCat}</div>`;
             return;
         }
 
         let html = '';
         filtered.forEach(q => {
-            const time = new Date(q.created_at).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute:'2-digit'});
+            const time = new Date(q.created_at).toLocaleString([], {day: '2-digit', month: '2-digit', hour: '2-digit', minute:'2-digit'});
 
             html += `
             <div class="question-item">
@@ -567,22 +505,21 @@
                 <div class="question-text">${escapeHtml(q.question)}</div>
                 <div class="text-end mt-2">
                     <button class="btn btn-sm btn-outline-secondary me-2" onclick="openForwardModal(${q.id}, '${q.department}')">
-                        <i class="bi bi-share"></i> Переслать
+                        <i class="bi bi-share"></i> ${locales.forwardBtnShort}
                     </button>
                     <button class="btn btn-sm btn-primary" onclick="replyToQuestion(${q.id}, '${q.department}', ${q.user_id})">
-                        <i class="bi bi-reply"></i> Ответить
+                        <i class="bi bi-reply"></i> ${locales.replyBtn}
                     </button>
                 </div>
             </div>`;
         });
-        list.innerHTML = html || '<div class="text-center text-muted py-4">Нет вопросов</div>';
+        list.innerHTML = html || `<div class="text-center text-muted py-4">${locales.noQuestions}</div>`;
     }
 
     async function openForwardModal(questionId, sourceDept) {
         document.getElementById('forwardQuestionId').value = questionId;
         document.getElementById('forwardSourceDept').value = sourceDept;
 
-        // Загружаем доступные отделы для пересылки
         const resp = await fetch(`/api/questions/${questionId}/departments?source=${sourceDept}`);
         const data = await resp.json();
 
@@ -609,7 +546,6 @@
         const sourceDept = document.getElementById('forwardSourceDept').value;
         const targetDept = document.getElementById('forwardTargetDept').value;
 
-        // Определяем имя таблицы на основе исходного отдела
         const tableMap = { 'pr': 'travelconference_pr.pr_questions', 'event': 'travelconference_event.event_questions', 'travel': 'travelconference_travel.travel_questions' };
 
         const resp = await fetch('/api/questions/forward', {
@@ -625,8 +561,8 @@
 
         if ((await resp.json()).success) {
             bootstrap.Modal.getInstance(document.getElementById('forwardModal')).hide();
-            showToast('Вопрос переслан', 'success');
-            loadAllQuestions(); // Обновляем список
+            showToast(locales.questionForwarded, 'success');
+            loadAllQuestions();
         }
     }
 
@@ -637,39 +573,33 @@
         const submitBtn = document.querySelector('#replyModal .modal-footer .btn-primary');
 
         if (!answer.trim()) return;
-
-        // Блокируем кнопку отправки
         if (submitBtn) submitBtn.disabled = true;
 
         const formData = new FormData();
         formData.append('user_id', userId);
-        formData.append('message', `<b>На ваш вопрос:</b>\n<i>${questionText}</i>\n\n<b>Ответ менеджера:</b>\n${answer}`);
+        formData.append('message', `<b>${locales.yourQuestionPrefix}</b>\n<i>${questionText}</i>\n\n<b>${locales.managerAnswerPrefix}</b>\n${answer}`);
 
         try {
             const resp = await fetch('/api/send_message', { method: 'POST', body: formData });
             const data = await resp.json();
 
             if (data.success) {
-                const modalEl = document.getElementById('replyModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
+                const modal = bootstrap.Modal.getInstance(document.getElementById('replyModal'));
                 if (modal) modal.hide();
 
-                showToast('Ответ отправлен', 'success');
-
+                showToast(locales.answerSent, 'success');
                 switchTab('chats');
                 loadChat(userId);
             } else {
-                showToast('Ошибка отправки', 'danger');
+                showToast(locales.errorSending, 'danger');
             }
         } catch (e) {
-            showToast('Ошибка сети', 'danger');
+            showToast(locales.networkError, 'danger');
         } finally {
-            // Разблокируем кнопку
             if (submitBtn) submitBtn.disabled = false;
         }
     }
 
-    // Инициализация при старте
     loadAllQuestions();
     updateSidebar();
 </script>
