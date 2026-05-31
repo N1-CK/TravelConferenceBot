@@ -126,6 +126,7 @@
                                     <th>{{ get_text('id') }}</th>
                                     <th>{{ get_text('username') }}</th>
                                     <th>{{ get_text('full_name') }}</th>
+                                    <th>{{ get_text('position') }}</th>
                                     <th>{{ get_text('company') }}</th>
                                     <th>{{ get_text('language') }}</th>
                                     <th>{{ get_text('created_at') }}</th>
@@ -139,6 +140,7 @@
                                     <td>{{ req.id }}</td>
                                     <td><strong>@{{ req.username }}</strong></td>
                                     <td>{{ req.full_name or '-' }}</td>
+                                    <td>{{ req.position or '-' }}</td>
                                     <td>{{ req.company or '-' }}</td>
                                     <td>{{ '🇷🇺 RU' if req.language == 'ru' else '🇬🇧 EN' }}</td>
                                     <td>{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</td>

@@ -21,7 +21,6 @@ class PRBannerForm(StatesGroup):
     waiting_for_position = State()
     waiting_for_company = State()
     waiting_for_language = State()
-    waiting_for_photo = State()  # Сразу фото
     waiting_for_comments = State()
 
 
@@ -267,7 +266,7 @@ async def back_to_position_from_company(callback: CallbackQuery, state: FSMConte
 
 @router.callback_query(F.data.startswith("banner_lang_"), PRBannerForm.waiting_for_language)
 async def process_language(callback: CallbackQuery, state: FSMContext):
-    """Обработка выбора языка - Шаг 4/6, затем запрос фото"""
+    """Обработка выбора языка - Шаг 4/6, затем запрос комментариев (пропускаем фото)"""
     lang_map = {
         "banner_lang_ru": "🇷🇺 Русский",
         "banner_lang_en": "🇬🇧 English"
@@ -275,43 +274,48 @@ async def process_language(callback: CallbackQuery, state: FSMContext):
     language = lang_map.get(callback.data, callback.data)
     await state.update_data(language=language)
 
-    # Переходим к загрузке фото (без вопроса)
-    await state.set_state(PRBannerForm.waiting_for_photo)
+    # Переходим сразу к комментариям
+    await state.set_state(PRBannerForm.waiting_for_comments)
 
     user_id = callback.from_user.id
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=await t(user_id, 'skip'), callback_data="banner_skip_comments")],
+        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="banner_back_step4")]
+    ])
+
     await callback.message.edit_text(
-        await t(user_id, 'banner_step5'),  # "Шаг 5 из 6\nПожалуйста, прикрепите изображение для баннера:"
-        reply_markup=await get_back_next_keyboard(back_to="banner_back_step4", user_id=user_id)
+        await t(user_id, 'banner_step6'),  # Текст шага с комментариями
+        reply_markup=keyboard
     )
     await callback.answer()
 
 
-@router.message(PRBannerForm.waiting_for_photo, F.photo)
-async def process_photo_upload(message: Message, state: FSMContext):
-    """Обработка загруженного фото - Шаг 5/6"""
-    photo_id = message.photo[-1].file_id
-    await state.update_data(photo_id=photo_id)
-    await state.set_state(PRBannerForm.waiting_for_comments)
+# @router.message(PRBannerForm.waiting_for_photo, F.photo)
+# async def process_photo_upload(message: Message, state: FSMContext):
+#     """Обработка загруженного фото - Шаг 5/6"""
+#     photo_id = message.photo[-1].file_id
+#     await state.update_data(photo_id=photo_id)
+#     await state.set_state(PRBannerForm.waiting_for_comments)
+#
+#     user_id = message.from_user.id
+#     keyboard = InlineKeyboardMarkup(inline_keyboard=[
+#         [InlineKeyboardButton(text=await t(user_id, 'skip'), callback_data="banner_skip_comments")],
+#         [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="banner_back_step5")]
+#     ])
+#     await message.answer(
+#         await t(user_id, 'banner_step6'),  # "Шаг 6 из 6\n📝 Ваши комментарии (необязательно):"
+#         reply_markup=keyboard
+#     )
 
-    user_id = message.from_user.id
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=await t(user_id, 'skip'), callback_data="banner_skip_comments")],
-        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="banner_back_step5")]
-    ])
-    await message.answer(
-        await t(user_id, 'banner_step6'),  # "Шаг 6 из 6\n📝 Ваши комментарии (необязательно):"
-        reply_markup=keyboard
-    )
 
-
-@router.message(PRBannerForm.waiting_for_photo)
-async def process_photo_required(message: Message, state: FSMContext):
-    """Если прислали не фото"""
-    user_id = message.from_user.id
-    await message.answer(
-        await t(user_id, 'banner_photo_required_error'),
-        reply_markup=await get_back_next_keyboard(back_to="banner_back_step4", user_id=user_id)
-    )
+# @router.message(PRBannerForm.waiting_for_photo)
+# async def process_photo_required(message: Message, state: FSMContext):
+#     """Если прислали не фото"""
+#     user_id = message.from_user.id
+#     await message.answer(
+#         await t(user_id, 'banner_photo_required_error'),
+#         reply_markup=await get_back_next_keyboard(back_to="banner_back_step4", user_id=user_id)
+#     )
 
 
 @router.message(PRBannerForm.waiting_for_comments, F.text)
@@ -328,15 +332,15 @@ async def skip_banner_comments(callback: CallbackQuery, state: FSMContext):
     await submit_banner_request(callback, state)
 
 
-@router.callback_query(F.data == "banner_back_step5")
-async def back_to_photo(callback: CallbackQuery, state: FSMContext):
-    """Назад к загрузке фото"""
-    await state.set_state(PRBannerForm.waiting_for_photo)
-    user_id = callback.from_user.id
-    await callback.message.edit_text(
-        await t(user_id, 'banner_step5'),
-        reply_markup=await get_back_next_keyboard(back_to="banner_back_step4", user_id=user_id)
-    )
+# @router.callback_query(F.data == "banner_back_step5")
+# async def back_to_photo(callback: CallbackQuery, state: FSMContext):
+#     """Назад к загрузке фото"""
+#     await state.set_state(PRBannerForm.waiting_for_photo)
+#     user_id = callback.from_user.id
+#     await callback.message.edit_text(
+#         await t(user_id, 'banner_step5'),
+#         reply_markup=await get_back_next_keyboard(back_to="banner_back_step4", user_id=user_id)
+#     )
 
 
 async def submit_banner_request(update, state: FSMContext):
@@ -359,8 +363,8 @@ async def submit_banner_request(update, state: FSMContext):
         'position': data.get('position', ''),
         'company': data.get('company', ''),
         'language': data.get('language', ''),
-        'photo_required': True,
-        'photo_file_id': data.get('photo_id', ''),
+        'photo_required': False,
+        'photo_file_id': '',
         'comments': data.get('comments', '')
     }
 

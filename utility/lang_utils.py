@@ -107,12 +107,12 @@ COMMON_TEXTS = {
         'pr_conference_rules': "📝 Правила поведения",
         'pr_question': "❓ Вопрос PR",
         'pr_banner_form_title': "🎨 Заказ баннера для соцсетей",
-        'pr_banner_step1': "Шаг 1 из 6\nУкажите ваше имя и фамилию:",
-        'pr_banner_step2': "Шаг 2 из 6\nНапишите свою должность/роль:",
-        'pr_banner_step3': "Шаг 3 из 6\nНазвание компании/партнерской программы:",
-        'pr_banner_step4': "Шаг 4 из 6\nВыберите желаемый язык баннера:",
+        'pr_banner_step1': "Шаг 1 из 5\nУкажите ваше имя и фамилию:",
+        'pr_banner_step2': "Шаг 2 из 5\nНапишите свою должность/роль:",
+        'pr_banner_step3': "Шаг 3 из 5\nНазвание компании/партнерской программы:",
+        'pr_banner_step4': "Шаг 4 из 5\nВыберите желаемый язык баннера:",
         'pr_banner_step5': "Шаг 5 из 6\nПожалуйста, прикрепите изображение",
-        'pr_banner_step6': "Шаг 6 из 6\n📝 Ваши комментарии (необязательно):",
+        'pr_banner_step6': "Шаг 5 из 5\n📝 Ваши комментарии (необязательно):",
         'banner_success': "✅ Заявка на баннер отправлена!\n\nБлагодарим за ответ, наша команда получила твой запрос. Следи за уведомлениями, чтобы не пропустить обновлений по статусу задачи.",
 
         # PR Business Cards Form (визитки)
@@ -570,12 +570,12 @@ COMMON_TEXTS = {
         'pr_conference_rules': "📝 Behaviour rules",
         'pr_question': "❓ Question to PR Department",
         'pr_banner_form_title': "🎨 Banner request for social networks",
-        'pr_banner_step1': "Step 1 of 6\nEnter your full name:",
-        'pr_banner_step2': "Step 2 of 6\nEnter your job title:",
-        'pr_banner_step3': "Step 3 of 6\nEnter the name of your partner program / company name:",
-        'pr_banner_step4': "Step 4 of 6\nChoose the language for the banner:",
+        'pr_banner_step1': "Step 1 of 5\nEnter your full name:",
+        'pr_banner_step2': "Step 2 of 5\nEnter your job title:",
+        'pr_banner_step3': "Step 3 of 5\nEnter the name of your partner program / company name:",
+        'pr_banner_step4': "Step 4 of 5\nChoose the language for the banner:",
         'pr_banner_step5': "Step 5 of 6\nPlease attach the image",
-        'pr_banner_step6': "Step 6 of 6\nYour comments (optional)"
+        'pr_banner_step6': "Step 5 of 5\nYour comments (optional)"
                                 "\n\nOr click 'Skip':",
         'banner_success': "✅ Banner request submitted!\n\nThank you for your response. "
                           "Our team has received your request. "

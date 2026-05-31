@@ -1300,10 +1300,18 @@ def add_manager():
 @login_required
 def delete_manager(manager_id):
     if session.get('role') != 'admin':
-        return jsonify({'error': 'Access denied'}), 403
+        flash('Доступ запрещен', 'danger')
+        return redirect(url_for('admin_managers'))
 
     success = run_async(db.delete_manager(manager_id))
-    return jsonify({'success': success})
+
+    if success:
+        flash('Менеджер успешно удален', 'success')
+    else:
+        flash('Ошибка при удалении. Невозможно удалить главного администратора.', 'danger')
+
+    # Делаем обратный редирект на страницу управления вместо возврата JSON
+    return redirect(url_for('admin_managers'))
 
 
 # app.py - добавить маршруты для управления менеджерами
