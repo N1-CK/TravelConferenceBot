@@ -21,8 +21,6 @@ def get_agreement_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-# keyboards.py - заменить get_main_menu_keyboard
-
 async def get_main_menu_keyboard(user_id: int = None) -> InlineKeyboardMarkup:
     """Главное меню с кнопками Помощь и Профиль"""
     builder = InlineKeyboardBuilder()
@@ -61,7 +59,6 @@ async def get_main_menu_keyboard(user_id: int = None) -> InlineKeyboardMarkup:
 
 
 async def get_pr_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    """Меню PR с локализацией"""
     lang = await get_user_lang(user_id)
     builder = InlineKeyboardBuilder()
     builder.row(
@@ -73,9 +70,10 @@ async def get_pr_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text=get_text_sync(lang, 'pr_conference_bot'), callback_data="pr_conference_bot")
     )
     builder.row(
-        InlineKeyboardButton(text=get_text_sync(lang, 'question_button'), callback_data="pr_question"),
-        InlineKeyboardButton(text=get_text_sync(lang, 'pr_conference_rules'), callback_data="pr_conference_rules")
+        InlineKeyboardButton(text=get_text_sync(lang, 'pr_conference_rules'), callback_data="pr_conference_rules"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'question_button'), callback_data="pr_question")
     )
+    # Кнопку назад оставляем одну в самом низу
     builder.row(
         InlineKeyboardButton(text=get_text_sync(lang, 'back'), callback_data="menu_main")
     )

@@ -290,8 +290,8 @@ COMMON_TEXTS = {
 
         # Багаж и отель
         'baggage_question': "Шаг 11 из 12\nНужен ли зарегистрированный багаж?",
-        'baggage_yes': "✅ Да, нужен багаж",
-        'baggage_no': "❌ Нет, только ручная кладь",
+        'baggage_yes': "✅ Да",
+        'baggage_no': "❌ Нет",
         'hotel_question': "🏨 *Нужен ли отель?*\n\nБудет ли вам нужен отель для этой конференции?\n\n*Примечание:* Компания не возмещает расходы за самостоятельно забронированные отели или брони для сопровождающих лиц.",
         'hotel_needed_yes': "✅ Да, нужен отель",
         'hotel_needed_no': "❌ Нет, отель не нужен",
@@ -462,6 +462,13 @@ COMMON_TEXTS = {
         'affiliate_spending_limits': "💰 Лимиты расходов",
         'affiliate_no_access': "⛔ У вас нет доступа к партнерским ужинам",
         'affiliate_wrong_date_format': "❌ Неверный формат даты. Используйте ДД.ММ.ГГГГ",
+
+        'help_message': 'Раздел будет дополняться и обновляться',
+        'travel_compensation': '🚕 Компенсация за такси и визы',
+        'stub_compensation': 'Тут будет информация по компенсации',
+        'no_bot_link': 'Извините, у вас нет доступа к боту конференции',
+        'stub_rules': 'Тут будут правила поведения',
+        'change_conference': '🔄 Сменить конференцию',
     },
     'en': {
         # ============================================
@@ -756,8 +763,8 @@ COMMON_TEXTS = {
 
         # Baggage and hotel
         'baggage_question': "Step 11 of 12\nDo you need checked baggage?",
-        'baggage_yes': "✅ Yes, need baggage",
-        'baggage_no': "❌ No, only carry-on",
+        'baggage_yes': "✅ Yes",
+        'baggage_no': "❌ No",
         'hotel_question': "🏨 *Hotel needed?*\n\nWill you need a hotel for this conference?\n\n*Note:* Company does not reimburse independent bookings or +1 accompanying persons.",
         'hotel_needed_yes': "✅ Yes, need hotel",
         'hotel_needed_no': "❌ No, don't need hotel",
@@ -928,6 +935,13 @@ COMMON_TEXTS = {
         'affiliate_spending_limits': "💰 Spending Limits",
         'affiliate_no_access': "⛔ You do not have access to partner dinners",
         'affiliate_wrong_date_format': "❌ Wrong date format. Use DD.MM.YYYY",
+
+        'help_message': 'This section will be updated and expanded',
+        'travel_compensation': '🚕 Taxi and Visa Compensation',
+        'stub_compensation': 'Information about compensation will be here',
+        'no_bot_link': 'Sorry, you do not have access to the conference bot',
+        'stub_rules': 'Here will be the rules of conduct',
+        'change_conference': '🔄 Change Conference',
 
     }
 }

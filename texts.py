@@ -4,6 +4,7 @@ from typing import Dict, Any
 class MessageTemplates:
     """Шаблоны сообщений для бота"""
 
+
     # Приветственные сообщения
     GREETINGS = {
         'welcome': (
@@ -152,41 +153,41 @@ class MessageTemplates:
         """Форматирование подтверждения заявки"""
         templates = {
             'banner': (
-                "🎨 Подтверждение заявки на баннер:\n\n"
-                f"👤 Имя: {data.get('full_name', 'Не указано')}\n"
-                f"💼 Должность: {data.get('position', 'Не указано')}\n"
-                f"🏢 Компания: {data.get('company', 'Не указано')}\n"
-                f"🌐 Язык: {data.get('language', 'Не указано')}\n"
-                f"📸 Фото: {'Да' if data.get('photo_required') else 'Нет'}\n\n"
+                "Подтверждение заявки на баннер:\n\n"
+                f"Имя: {data.get('full_name', 'Не указано')}\n"
+                f" Должность: {data.get('position', 'Не указано')}\n"
+                f" Компания: {data.get('company', 'Не указано')}\n"
+                f" Язык: {data.get('language', 'Не указано')}\n"
+                f" Фото: {'Да' if data.get('photo_required') else 'Нет'}\n\n"
                 "✅ Все данные верны? Нажмите «Далее» для отправки."
             ),
             'business_cards': (
-                "📇 Подтверждение заявки на визитки:\n\n"
-                f"👤 Имя: {data.get('full_name', 'Не указано')}\n"
-                f"💼 Должность (EN): {data.get('position_en', 'Не указано')}\n"
-                f"🏢 Компания: {data.get('company', 'Не указано')}\n"
-                f"📞 Контакты: {data.get('contacts', 'Не указано')}\n"
-                f"🎨 Фирменный стиль: {'Да' if data.get('brand_style') else 'Нет'}\n\n"
+                "Подтверждение заявки на визитки:\n\n"
+                f"Имя: {data.get('full_name', 'Не указано')}\n"
+                f"Должность (EN): {data.get('position_en', 'Не указано')}\n"
+                f"Компания: {data.get('company', 'Не указано')}\n"
+                f"Контакты: {data.get('contacts', 'Не указано')}\n"
+                f"Фирменный стиль: {'Да' if data.get('brand_style') else 'Нет'}\n\n"
                 "✅ Все данные верны? Нажмите «Далее» для отправки."
             ),
             'certificate': (
-                "📄 Подтверждение заявки на справку-вызов:\n\n"
-                f"👤 ФИО: {data.get('full_name', 'Не указано')}\n"
-                f"💼 Должность: {data.get('position', 'Не указано')}\n"
-                f"🏢 Компания: {data.get('company', 'Не указано')}\n"
-                f"⚖️ Юр. данные: {data.get('company_legal', 'Не указано')}\n"
-                f"📮 Адресат: {data.get('addressee', 'Не указано')}\n"
-                f"📅 Даты: {data.get('dates', 'Не указано')}\n\n"
+                "Подтверждение заявки на справку-вызов:\n\n"
+                f"ФИО: {data.get('full_name', 'Не указано')}\n"
+                f"Должность: {data.get('position', 'Не указано')}\n"
+                f"Компания: {data.get('company', 'Не указано')}\n"
+                f"Юр. данные: {data.get('company_legal', 'Не указано')}\n"
+                f"Адресат: {data.get('addressee', 'Не указано')}\n"
+                f"Даты: {data.get('dates', 'Не указано')}\n\n"
                 "✅ Все данные верны? Нажмите «Далее» для отправки."
             ),
             'visa': (
-                "🛂 Подтверждение заявки на визовую поддержку:\n\n"
-                f"📋 Статус визы: {data.get('visa_status', 'Не указано')}\n"
-                f"📕 Паспорт: {data.get('passport_data', 'Не указано')}\n"
-                f"📍 Отправление: {data.get('city_from', 'Не указано')}\n"
-                f"🎯 Назначение: {data.get('city_to', 'Не указано')}\n"
-                f"🧳 Багаж: {'Да' if data.get('needs_baggage') else 'Нет'}\n"
-                f"⭐ Предпочтения: {data.get('preferences', 'Не указано')}\n\n"
+                "Подтверждение заявки на визовую поддержку:\n\n"
+                f"Статус визы: {data.get('visa_status', 'Не указано')}\n"
+                f"Паспорт: {data.get('passport_data', 'Не указано')}\n"
+                f"Отправление: {data.get('city_from', 'Не указано')}\n"
+                f"Назначение: {data.get('city_to', 'Не указано')}\n"
+                f"Багаж: {'Да' if data.get('needs_baggage') else 'Нет'}\n"
+                f"Предпочтения: {data.get('preferences', 'Не указано')}\n\n"
                 "✅ Все данные верны? Нажмите «Далее» для отправки."
             )
         }

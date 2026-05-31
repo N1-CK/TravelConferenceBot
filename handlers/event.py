@@ -523,11 +523,11 @@ async def show_booth_info(callback: CallbackQuery):
     if stand_info:
         text = (
             f"ℹ️ <b>Информация о вашем стенде на {conference}</b>\n\n"
-            f"🏢 <b>Компания:</b> {company}\n"
-            f"🎨 <b>Стиль стенда:</b> {stand_info.get('stand_style', 'Не указан')}\n"
-            f"🔢 <b>Номер стенда:</b> {stand_info.get('stand_number', 'Не указан')}\n"
-            f"🕐 <b>Время работы:</b> {stand_info.get('working_hours', 'Не указано')}\n"
-            f"👔 <b>Дресс-код:</b> {stand_info.get('dress_code', 'Не указан')}"
+            f"<b>Компания:</b> {company}\n"
+            f"<b>Стиль стенда:</b> {stand_info.get('stand_style', 'Не указан')}\n"
+            f"<b>Номер стенда:</b> {stand_info.get('stand_number', 'Не указан')}\n"
+            f"<b>Время работы:</b> {stand_info.get('working_hours', 'Не указано')}\n"
+            f"<b>Дресс-код:</b> {stand_info.get('dress_code', 'Не указан')}"
         )
     else:
         text = f"К сожалению, у вашей компании (<b>{company or 'не указана'}</b>) нет стенда на конференцию «<b>{conference or 'не выбрана'}</b>»."

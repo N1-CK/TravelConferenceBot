@@ -2,6 +2,8 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from keyboards import get_pr_menu_keyboard, get_back_next_keyboard
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import db
@@ -77,8 +79,18 @@ async def submit_business_cards_request(update, state: FSMContext):
             details={"data": business_cards_data}
         )
 
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text=await t(user_id, 'main_menu'),
+            callback_data="menu_main"
+        )
+    )
+
     await message_obj.answer(
-        await t(user_id, 'business_cards_success')
+        text=await t(user_id, 'business_cards_success'),
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
     )
     await state.clear()
 
@@ -552,6 +564,22 @@ async def start_pr_question(callback: CallbackQuery, state: FSMContext):
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
+
+
+@router.callback_query(F.data == "pr_conference_rules")
+async def pr_conference_rules_handler(callback: CallbackQuery):
+    user_id = callback.from_user.id
+
+    from keyboards import get_pr_menu_keyboard
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from aiogram.types import InlineKeyboardButton
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="menu_pr"))
+
+    text = await t(user_id, 'stub_rules')
+    await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    await callback.answer()
 
 
 @router.message(PRQuestionForm.waiting_for_question, F.text.len() <= 500)

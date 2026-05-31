@@ -1285,6 +1285,21 @@ async def back_to_baggage(callback: CallbackQuery, state: FSMContext):
     )
 
 
+@router.callback_query(F.data == "travel_compensation")
+async def travel_compensation_handler(callback: CallbackQuery):
+    user_id = callback.from_user.id
+
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from aiogram.types import InlineKeyboardButton
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="menu_travel"))
+
+    text = await t(user_id, 'stub_compensation')
+    await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    await callback.answer()
+
+
 @router.callback_query(F.data == "back_to_per_diem_type")
 async def back_to_per_diem_type(callback: CallbackQuery, state: FSMContext):
     """Назад к выбору типа выплаты суточных"""

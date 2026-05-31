@@ -60,21 +60,25 @@ async def show_main_menu(callback: CallbackQuery, state: FSMContext):
 async def change_conference_handler(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     username = callback.from_user.username
-    lang = await get_user_lang(user_id)
 
     confs = await db.get_user_active_conferences(username)
     if not confs:
-        await callback.message.answer("Нет доступных конференций.")
+        await callback.message.answer("Нет доступных конференций / No available conferences.")
         await callback.answer()
         return
 
-    from keyboards import get_conference_keyboard
-    # Выводим меню выбора конференций
-    await callback.message.edit_text(
-        await t(user_id, 'choose_conference'),
-        reply_markup=await get_conference_keyboard(confs)
-    )
+    # Удаляем текущее сообщение с меню
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    # Вызываем твою готовую функцию показа конференций
+    from handlers.start import show_conferences_selection
+    await show_conferences_selection(callback.message, username, user_id)
+
     await callback.answer()
+
 
 @router.callback_query(F.data == "menu_pr")
 async def show_pr_menu(callback: CallbackQuery, state: FSMContext):
@@ -554,7 +558,7 @@ async def pr_conference_bot_handler(callback: CallbackQuery):
     if bot_link:
         text = f"🤖 Бот конференции: {bot_link}"
     else:
-        text = "К сожалению, ссылка на бота конференции не найдена."
+        text = await t(user_id, 'no_bot_link')
 
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
     await callback.answer()
