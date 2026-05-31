@@ -50,6 +50,12 @@ async def get_main_menu_keyboard(user_id: int = None) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text=help_text, callback_data="menu_help"),
         InlineKeyboardButton(text=profile_text, callback_data="menu_profile")
     )
+    builder.row(
+        InlineKeyboardButton(
+            text=get_text_sync(lang, 'change_conference', default="🔄 Сменить конференцию"),
+            callback_data="change_conference"
+        )
+    )
 
     return builder.as_markup()
 
@@ -71,8 +77,7 @@ async def get_pr_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text=get_text_sync(lang, 'pr_conference_rules'), callback_data="pr_conference_rules")
     )
     builder.row(
-        InlineKeyboardButton(text=get_text_sync(lang, 'back'), callback_data="menu_main"),
-        InlineKeyboardButton(text=get_text_sync(lang, 'main_menu'), callback_data="menu_main")
+        InlineKeyboardButton(text=get_text_sync(lang, 'back'), callback_data="menu_main")
     )
     return builder.as_markup()
 

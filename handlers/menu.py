@@ -33,55 +33,48 @@ def escape_md(text: str) -> str:
         text = text.replace(c, f'\\{c}')
     return text
 
+
 @router.callback_query(F.data == "menu_main")
 async def show_main_menu(callback: CallbackQuery, state: FSMContext):
-    """Показать главное меню"""
-    await state.clear()  # Очищаем все состояния
-
+    await state.clear()
     user_id = callback.from_user.id
     lang = await get_user_lang(user_id)
 
-    # Получаем выбранную конференцию из БД
-    async with db.pool.acquire() as conn:
-        selected_conf = await conn.fetchval(f"""
-            SELECT selected_conference FROM {db.db_schema_config}.user_profiles 
-            WHERE user_id = $1
-        """, user_id)
+    # Получаем выбранную конференцию
+    selected_conf = await db.get_selected_conference(user_id)
+    conf_text = selected_conf if selected_conf else "Не выбрана"
 
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text=get_text_sync(lang, 'pr'), callback_data="menu_pr"),
-        InlineKeyboardButton(text=get_text_sync(lang, 'event'), callback_data="menu_event"),
-        InlineKeyboardButton(text=get_text_sync(lang, 'travel'), callback_data="menu_travel")
+    welcome_text = await t(user_id, 'welcome')
+    text = f"{welcome_text}\n\nВыбранная конференция: *{conf_text}*"
+
+    from keyboards import get_main_menu_keyboard
+    await callback.message.edit_text(
+        text,
+        reply_markup=await get_main_menu_keyboard(user_id),
+        parse_mode="Markdown"
     )
-    builder.row(
-        InlineKeyboardButton(text=get_text_sync(lang, 'help'), callback_data="menu_help"),
-        InlineKeyboardButton(text=get_text_sync(lang, 'my_profile'), callback_data="menu_profile")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "change_conference")
+async def change_conference_handler(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    username = callback.from_user.username
+    lang = await get_user_lang(user_id)
+
+    confs = await db.get_user_active_conferences(username)
+    if not confs:
+        await callback.message.answer("Нет доступных конференций.")
+        await callback.answer()
+        return
+
+    from keyboards import get_conference_keyboard
+    # Выводим меню выбора конференций
+    await callback.message.edit_text(
+        await t(user_id, 'choose_conference'),
+        reply_markup=await get_conference_keyboard(confs)
     )
-
-    if selected_conf:
-        conf_text = get_text_sync(lang, 'switch_conference')
-        welcome_text = f"{get_text_sync(lang, 'conference_selected', conference=selected_conf)}\n\n{get_text_sync(lang, 'main_menu_title')}"
-    else:
-        conf_text = get_text_sync(lang, 'select_conference_button')
-        welcome_text = get_text_sync(lang, 'main_menu_title')
-
-    builder.row(InlineKeyboardButton(text=conf_text, callback_data="show_conference_list"))
-
-    try:
-        await callback.message.edit_text(
-            welcome_text,
-            reply_markup=builder.as_markup(),
-            parse_mode="Markdown" if selected_conf else None
-        )
-    except:
-        await callback.message.delete()
-        await callback.message.answer(
-            welcome_text,
-            reply_markup=builder.as_markup(),
-            parse_mode="Markdown" if selected_conf else None
-        )
-
+    await callback.answer()
 
 @router.callback_query(F.data == "menu_pr")
 async def show_pr_menu(callback: CallbackQuery, state: FSMContext):
@@ -247,6 +240,7 @@ async def edit_name_start(callback: CallbackQuery, state: FSMContext):
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
+
 
 
 @router.message(ProfileEditStates.waiting_for_fullname)

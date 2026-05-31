@@ -51,6 +51,7 @@ async def check_and_register_user(user_id: int, username: str) -> bool:
 
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
+    await state.clear()  # Сбрасываем состояния при новом старте
     user_id = message.from_user.id
     username = message.from_user.username
 
@@ -63,9 +64,25 @@ async def cmd_start(message: Message, state: FSMContext):
         return
 
     if await check_and_register_user(user_id, username):
-        await show_conferences_selection(message, username, user_id)
+        # Проверяем, выбрана ли уже конференция
+        selected_conf = await db.get_selected_conference(user_id)
+
+        if selected_conf:
+            # Конференция есть — показываем главное меню
+            welcome_text = await t(user_id, 'welcome')
+            text = f"{welcome_text}\n\nВыбранная конференция: *{selected_conf}*"
+
+            await message.answer(
+                text,
+                reply_markup=await get_main_menu_keyboard(user_id),
+                parse_mode="Markdown"
+            )
+        else:
+            # Конференции нет — показываем выбор
+            await show_conferences_selection(message, username, user_id)
         return
 
+    # Если пользователь новый — запускаем регистрацию
     await state.set_state(RegistrationStates.waiting_for_language)
     await message.answer(
         await t(user_id, 'choose_lang'),

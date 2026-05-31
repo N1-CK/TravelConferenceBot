@@ -34,7 +34,7 @@ COMMON_TEXTS = {
         'language_selected': "🇷🇺 Выбран русский язык",
         'ask_fullname': "Пожалуйста, введите ваше имя и фамилию:",
         'ask_position': "Укажите вашу должность:",
-        'ask_company': "Укажите название вашей компании / партнерской программы:",
+        'ask_company': "Укажите полное название партнерской программы/ компании на английском, где вы работаете:",
         'welcome': "Добро пожаловать в Travel Conference Bot!",
         'main_menu_title': "Главное меню. Выберите раздел:",
         'select_conference': "Выберите вашу конференцию:",
@@ -72,7 +72,7 @@ COMMON_TEXTS = {
         'travel': "✈️ TRAVEL",
         'help': "❓ Помощь",
         'my_profile': "👤 Профиль",
-        'help_text': "🆘 Помощь по боту:\n\n• Для возврата в главное меню нажмите кнопку ниже\n• По вопросам доступа обращайтесь к администратору\n• Технические проблемы: support@conference.com",
+        'help_text': "🆘 Помощь по боту:\n\n• Для возврата в главное меню нажмите кнопку ниже\n• По вопросам доступа обращайтесь к администратору\n",
 
         # ============================================
         # ПРОФИЛЬ
@@ -360,7 +360,7 @@ COMMON_TEXTS = {
         'company_not_found_simple': "Компания '{company}' не найдена в списке.\n\nЕсли это правильное название, нажмите подтвердить.\nИначе введите название заново:",
         'confirm_company': "✅ Подтвердить '{company}'",
         'retry_input': "🔄 Повторить ввод",
-        'ask_company_prompt': "Укажите название вашей компании / партнерской программы:",
+        'ask_company_prompt': "Укажите полное название партнерской программы/ компании на английском, где вы работаете:",
 
 
         # ===== AFFILIATE MODULE (Партнерские ужины) =====
@@ -491,7 +491,7 @@ COMMON_TEXTS = {
         'language_selected': "🇬🇧 English selected",
         'ask_fullname': "Please enter your full name:",
         'ask_position': "Enter your job title:",
-        'ask_company': "Enter your company/partner program name:",
+        'ask_company': "Please provide the full name of the affiliate program/company where you work:",
         'welcome': "Welcome to Travel Conference Bot!",
         'main_menu_title': "Main menu. Select a section:",
         'select_conference': "Select your conference:",
@@ -528,7 +528,7 @@ COMMON_TEXTS = {
         'travel': "✈️ TRAVEL",
         'help': "❓ Help",
         'my_profile': "👤 Profile",
-        'help_text': "🆘 Bot help:\n\n• To return to main menu press the button below\n• For access issues contact administrator\n• Technical problems: support@conference.com",
+        'help_text': "🆘 Bot help:\n\n• To return to main menu press the button below\n• For access issues contact administrator\n",
 
         # ============================================
         # PROFILE
@@ -826,7 +826,7 @@ COMMON_TEXTS = {
         'company_not_found_simple': "Company '{company}' not found in the list.\n\nIf this is the correct name, click confirm.\nOtherwise enter the company name again:",
         'confirm_company': "✅ Confirm '{company}'",
         'retry_input': "🔄 Retry input",
-        'ask_company_prompt': "Enter your company/partner program name:",
+        'ask_company_prompt': "Please provide the full name of the affiliate program/company where you work:",
 
 
         # ===== AFFILIATE MODULE (Partner Dinners) =====
