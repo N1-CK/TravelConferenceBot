@@ -253,6 +253,20 @@ class Database:
                     ''',
 
                     f'''
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_event}.event_stands (
+                        id SERIAL PRIMARY KEY,
+                        company TEXT NOT NULL,
+                        conference TEXT NOT NULL,
+                        stand_style TEXT,
+                        stand_number TEXT,
+                        working_hours TEXT,
+                        dress_code TEXT,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        UNIQUE(company, conference)
+                    )
+                    ''',
+
+                    f'''
                     CREATE TABLE IF NOT EXISTS {self.db_schema_event}.event_ticket_requests (
                         id SERIAL PRIMARY KEY,
                         username TEXT,
@@ -670,6 +684,20 @@ class Database:
         except Exception as e:
             logger.error(f"Error saving event question: {e}")
             return False
+
+    async def get_event_stand(self, company: str, conference: str) -> dict:
+        """Получить информацию о стенде компании на конференции"""
+        try:
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(f"""
+                    SELECT stand_style, stand_number, working_hours, dress_code 
+                    FROM {self.db_schema_event}.event_stands 
+                    WHERE company = $1 AND conference = $2
+                """, company, conference)
+                return dict(row) if row else None
+        except Exception as e:
+            logger.error(f"Error getting event stand: {e}")
+            return None
 
     async def save_visa_request(self, data: dict) -> bool:
         """Сохранение заявки на визу"""

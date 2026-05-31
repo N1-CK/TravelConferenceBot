@@ -97,25 +97,23 @@ async def get_event_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
 
 
 async def get_travel_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    """Главное меню Travel в новом порядке"""
+    """Главное меню Travel без кнопки визовой поддержки"""
     lang = await get_user_lang(user_id)
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text=get_text_sync(lang, 'travel_flight_request'), callback_data="travel_flight_request")
     )
     builder.row(
-        InlineKeyboardButton(text=get_text_sync(lang, 'travel_visa_support'), callback_data="travel_visa_support"),
-        InlineKeyboardButton(text=get_text_sync(lang, 'travel_flight_info'), callback_data="travel_flight_info")
+        # Кнопка visa support удалена
+        InlineKeyboardButton(text=get_text_sync(lang, 'travel_flight_info'), callback_data="travel_flight_info"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'travel_hotel'), callback_data="travel_hotel")
     )
     builder.row(
-        InlineKeyboardButton(text=get_text_sync(lang, 'travel_hotel'), callback_data="travel_hotel"),
-        InlineKeyboardButton(text=get_text_sync(lang, 'travel_per_diem'), callback_data="travel_per_diem")
+        InlineKeyboardButton(text=get_text_sync(lang, 'travel_per_diem'), callback_data="travel_per_diem"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'travel_my_requests'), callback_data="travel_my_requests")
     )
     builder.row(
-        InlineKeyboardButton(text=get_text_sync(lang, 'travel_my_requests'), callback_data="travel_my_requests"),
-        InlineKeyboardButton(text=get_text_sync(lang, 'question_button'), callback_data="travel_question")
-    )
-    builder.row(
+        InlineKeyboardButton(text=get_text_sync(lang, 'question_button'), callback_data="travel_question"),
         InlineKeyboardButton(text=get_text_sync(lang, 'back'), callback_data="menu_main")
     )
     return builder.as_markup()

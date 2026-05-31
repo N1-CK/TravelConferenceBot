@@ -15,6 +15,7 @@ from utility.lang_utils import *
 logger = logging.getLogger(__name__)
 router = Router()
 
+
 class ProfileEditStates(StatesGroup):
     """Состояния для редактирования профиля"""
     waiting_for_fullname = State()
@@ -22,6 +23,15 @@ class ProfileEditStates(StatesGroup):
     waiting_for_company = State()
     waiting_for_language = State()
 
+def escape_md(text: str) -> str:
+    """Экранирование символов для Markdown во избежание Telegram API Errors"""
+    if not text:
+        return str(text)
+    chars = ['_', '*', '[', ']', '`']
+    text = str(text)
+    for c in chars:
+        text = text.replace(c, f'\\{c}')
+    return text
 
 @router.callback_query(F.data == "menu_main")
 async def show_main_menu(callback: CallbackQuery, state: FSMContext):
@@ -129,7 +139,7 @@ async def show_profile(callback: CallbackQuery):
         user_data = {
             'user_id': user_id,
             'username': username,
-            'full_name': callback.from_user.full_name,
+            'full_name': get_text_sync(lang, 'not_specified'),
             'position': get_text_sync(lang, 'not_specified'),
             'company': get_text_sync(lang, 'not_specified'),
             'language': 'ru'
@@ -137,14 +147,20 @@ async def show_profile(callback: CallbackQuery):
         await db.save_user_registration(user_data)
 
     lang = user_data.get('language', 'ru')
+
+    # Экранируем поля, чтобы символы вроде подчеркивания не ломали Markdown
+    f_name = escape_md(user_data.get('full_name', get_text_sync(lang, 'not_specified')))
+    pos = escape_md(user_data.get('position', get_text_sync(lang, 'not_specified')))
+    comp = escape_md(user_data.get('company', get_text_sync(lang, 'not_specified')))
+
     profile_text = await t(
         user_id,
         'profile_template',
         userid=user_id,
-        username=username,
-        full_name=user_data.get('full_name', get_text_sync(lang, 'not_specified')),
-        position=user_data.get('position', get_text_sync(lang, 'not_specified')),
-        company=user_data.get('company', get_text_sync(lang, 'not_specified')),
+        username=escape_md(username),
+        full_name=f_name,
+        position=pos,
+        company=comp,
         language='🇷🇺 Русский' if user_data.get('language') == 'ru' else '🇬🇧 English',
         registered_at=user_data.get('registered_at', '').strftime('%d.%m.%Y') if user_data.get(
             'registered_at') else get_text_sync(lang, 'not_specified')
@@ -172,13 +188,22 @@ async def show_profile(callback: CallbackQuery):
             parse_mode="Markdown"
         )
     except Exception as e:
-        await callback.message.delete()
-        await callback.message.answer(
-            profile_text,
-            reply_markup=builder.as_markup(),
-            parse_mode="Markdown"
-        )
-    await callback.answer()
+        # Игнорируем ошибку, если сообщение просто не изменилось
+        if "message is not modified" not in str(e).lower():
+            try:
+                await callback.message.delete()
+            except Exception:
+                pass
+            await callback.message.answer(
+                profile_text,
+                reply_markup=builder.as_markup(),
+                parse_mode="Markdown"
+            )
+
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 
 @router.callback_query(F.data == "profile_refresh")
@@ -466,20 +491,22 @@ async def show_profile_as_new_message(message: Message):
             'language': 'ru'
         }
 
+    # Экранируем
+    f_name = escape_md(user_data.get('full_name', get_text_sync(lang, 'not_specified')))
+    pos = escape_md(user_data.get('position', get_text_sync(lang, 'not_specified')))
+    comp = escape_md(user_data.get('company', get_text_sync(lang, 'not_specified')))
+
     profile_text = await t(
         user_id,
         'profile_template',
         userid=user_id,
-        username=username,
-        full_name=user_data.get('full_name', get_text_sync(lang, 'not_specified')),
-        position=user_data.get('position', get_text_sync(lang, 'not_specified')),
-        company=user_data.get('company', get_text_sync(lang, 'not_specified')),
+        username=escape_md(username),
+        full_name=f_name,
+        position=pos,
+        company=comp,
         language='🇷🇺 Русский' if user_data.get('language') == 'ru' else '🇬🇧 English',
         registered_at=user_data.get('registered_at', '').strftime('%d.%m.%Y') if user_data.get('registered_at') else get_text_sync(lang, 'not_specified')
     )
-
-    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     builder = InlineKeyboardBuilder()
     builder.row(
@@ -500,6 +527,43 @@ async def show_profile_as_new_message(message: Message):
         reply_markup=builder.as_markup(),
         parse_mode="Markdown"
     )
+
+
+@router.callback_query(F.data == "pr_conference_bot")
+async def pr_conference_bot_handler(callback: CallbackQuery):
+    """Отправка ссылки на бота конференции"""
+    user_id = callback.from_user.id
+    username = callback.from_user.username
+
+    selected_conf = await db.get_selected_conference(user_id)
+    bot_link = None
+
+    confs = await db.get_user_active_conferences(username)
+    for c in confs:
+        if c.get('conference_name') == selected_conf:
+            bot_link = c.get('bot_link')
+            break
+
+    if not bot_link and confs:
+        bot_link = confs[0].get('bot_link')
+
+    # Создаем клавиатуру с кнопками Назад и Главное меню
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from aiogram.types import InlineKeyboardButton
+
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="menu_pr"),
+        InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")
+    )
+
+    if bot_link:
+        text = f"🤖 Бот конференции: {bot_link}"
+    else:
+        text = "К сожалению, ссылка на бота конференции не найдена."
+
+    await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    await callback.answer()
 
 
 # Обработчик отмены

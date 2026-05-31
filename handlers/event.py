@@ -493,20 +493,43 @@ async def process_event_question_too_long(message: Message):
 
 @router.callback_query(F.data == "event_booth")
 async def show_booth_info(callback: CallbackQuery):
-    """Показать информацию о стенде"""
+    """Показать информацию о стенде для конкретной компании и конференции"""
     user_id = callback.from_user.id
+    username = callback.from_user.username
+
+    # Получаем компанию пользователя
+    user_data = await db.get_user_data(user_id)
+    company = user_data.get('company')
+
+    # Получаем выбранную конференцию
+    conference = await db.get_selected_conference(user_id)
+    if not conference:
+        confs = await db.get_user_active_conferences(username)
+        if confs:
+            conference = confs[0].get('conference_name')
+
+    # Запрашиваем информацию о стенде
+    stand_info = None
+    if company and conference:
+        stand_info = await db.get_event_stand(company, conference)
+
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text=await t(user_id, 'back_to_event'), callback_data="menu_event"),
         InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")
     )
 
-    text = (
-        "ℹ️ *" + await t(user_id, 'event_booth') + "*\n\n"
-        "📍 " + await t(user_id, 'booth_location') + "\n"
-        "🕐 " + await t(user_id, 'booth_hours') + "\n"
-        "📞 " + await t(user_id, 'booth_contact') + "\n\n"
-        "_" + await t(user_id, 'booth_info_note') + "_"
-    )
+    # Используем HTML разметку вместо Markdown для защиты от спецсимволов в названиях
+    if stand_info:
+        text = (
+            f"ℹ️ <b>Информация о вашем стенде на {conference}</b>\n\n"
+            f"🏢 <b>Компания:</b> {company}\n"
+            f"🎨 <b>Стиль стенда:</b> {stand_info.get('stand_style', 'Не указан')}\n"
+            f"🔢 <b>Номер стенда:</b> {stand_info.get('stand_number', 'Не указан')}\n"
+            f"🕐 <b>Время работы:</b> {stand_info.get('working_hours', 'Не указано')}\n"
+            f"👔 <b>Дресс-код:</b> {stand_info.get('dress_code', 'Не указан')}"
+        )
+    else:
+        text = f"К сожалению, у вашей компании (<b>{company or 'не указана'}</b>) нет стенда на конференцию «<b>{conference or 'не выбрана'}</b>»."
 
-    await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+    await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
