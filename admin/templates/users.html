@@ -155,6 +155,7 @@
 
 {% block extra_js %}
 <script>
+    let currentUserFullName = null;
     let usersTable;
     let currentUserId = null;
 
@@ -202,6 +203,8 @@
         fetch(`/api/users/${userId}`)
             .then(response => response.json())
             .then(data => {
+                currentUserFullName = data.full_name || data.username;
+
                 let html = `
                     <div class="row">
                         <div class="col-md-4 text-center">
@@ -214,7 +217,17 @@
                         <div class="col-md-8">
                             <table class="table table-sm">
                                 <tr><th style="width: 40%">ID:</th><td>${data.user_id}</td></tr>
-                                <tr><th>{{ get_text('company') }}:</th><td>${data.company || '-'}</td></tr>
+                                <tr>
+                                    <th>{{ get_text('company') }}:</th>
+                                    <td>
+                                        ${data.company || '-'}
+                                        {% if session.role == 'admin' %}
+                                        <button class="btn btn-sm btn-link py-0 ms-2 text-decoration-none" onclick="editCompanyPrompt(${data.user_id}, '${data.company || ''}')" title="Изменить организацию">
+                                            <i class="bi bi-pencil-square text-primary"></i>
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
                                 <tr><th>{{ get_text('position') }}:</th><td>${data.position || '-'}</td></tr>
                                 <tr><th>{{ get_text('language') }}:</th><td>${data.language == 'ru' ? '🇷🇺 Русский' : '🇬🇧 English'}</td></tr>
                                 <tr><th>{{ get_text('registered_at') }}:</th><td>${data.registered_at || '-'}</td></tr>
@@ -251,14 +264,56 @@
             });
     }
 
-    function sendMessageToCurrentUser() {
+    function openChatWithUser() {
         if (currentUserId) {
-            window.location.href = `/broadcast?user=${currentUserId}`;
+            window.location.href = `/user_chats?user=${currentUserId}`;
         }
     }
 
     function exportUsers() {
         window.location.href = '/api/users/export';
+    }
+
+    function editCompanyPrompt(userId, currentCompany) {
+        const newCompany = prompt("Введите новую организацию:", currentCompany || '');
+        if (newCompany !== null && newCompany !== currentCompany) {
+            // Получаем свежие данные пользователя, чтобы не затереть остальные поля
+            fetch(`/api/users/${userId}`)
+            .then(r => r.json())
+            .then(user => {
+                user.company = newCompany;
+                fetch(`/api/users/${userId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(user)
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        alert("Организация успешно изменена!");
+                        location.reload(); // Перезагружаем страницу для обновления списков
+                    } else {
+                        alert("Ошибка при обновлении организации");
+                    }
+                });
+            });
+        }
+    }
+
+    function sendMessageToCurrentUser() {
+        if (currentUserId) {
+            window.location.href = `/user_chats?user=${currentUserId}`;
+        }
+    }
+
+    if (window.location.search.includes('view=')) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('view');
+        if (userId) {
+            setTimeout(() => {
+                viewUser(parseInt(userId));
+            }, 500);
+        }
     }
 </script>
 {% endblock %}

@@ -1014,6 +1014,7 @@ async def process_per_diem_consent(callback: CallbackQuery, state: FSMContext):
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=await t(user_id, 'question_button'), callback_data="travel_question")],
         [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_back_to_menu")],
         [InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")]
     ])

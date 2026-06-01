@@ -444,7 +444,8 @@ TEXTS = {
         'send_btn': 'Отправить',
         'message_sent_success': 'Сообщение успешно отправлено!',
         'error_sending_tg': 'Ошибка при отправке сообщения в Telegram.',
-        'error_user_not_found': 'Ошибка: ID пользователя не найден.'
+        'error_user_not_found': 'Ошибка: ID пользователя не найден.',
+        'user_details': 'Данные пользователя'
 
     },
     'en': {
@@ -886,6 +887,7 @@ TEXTS = {
         'message_sent_success': 'Message sent successfully!',
         'error_sending_tg': 'Error sending message to Telegram.',
         'error_user_not_found': 'Error: User ID not found.',
+        'user_details': 'User Details',
     }
 }
 

@@ -40,6 +40,99 @@
     .message.incoming .message-sender { color: #4a5568; }
     .message-time-inline { font-size: 0.65rem; opacity: 0.7; float: right; margin-left: 10px; margin-top: 5px; }
     .conversation-item .last-msg { font-size: 0.8rem; color: #6c757d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Добавить в конец блока extra_css */
+    .emoji-dropdown {
+        position: absolute;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        padding: 12px;
+        z-index: 1000;
+        max-width: 320px;
+        border: 1px solid #e2e8f0;
+        display: none;
+    }
+    .emoji-dropdown.show { display: block; }
+    .emoji-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 8px;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    .emoji-item {
+        font-size: 1.5rem;
+        cursor: pointer;
+        text-align: center;
+        padding: 6px;
+        border-radius: 12px;
+        transition: all 0.1s;
+    }
+    .emoji-item:hover { background: #f1f5f9; transform: scale(1.1); }
+    .position-relative { position: relative; }
+    .format-toolbar { position: relative; }
+    /* Карточка пользователя */
+    /* Карточка пользователя */
+    .user-info-card {
+        position: absolute;
+        top: 60px;
+        right: 20px;
+        width: 280px;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        z-index: 1000;
+        display: none;
+        border: 1px solid #e2e8f0;
+        animation: slideDown 0.2s ease;
+    }
+    .user-info-card.show { display: block; }
+    @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .user-info-card .card-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 16px;
+        border-radius: 16px 16px 0 0;
+    }
+    .user-info-card .card-body { padding: 16px; }
+    .user-info-card .info-row {
+        display: flex;
+        margin-bottom: 12px;
+        font-size: 0.9rem;
+        line-height: 1.4;
+    }
+    .user-info-card .info-label {
+        width: 85px;
+        min-width: 85px;
+        font-weight: 600;
+        color: #4a5568;
+    }
+    .user-info-card .info-value {
+        flex: 1;
+        color: #2d3748;
+        word-break: break-word;
+        padding-left: 8px;
+    }
+    .user-info-card .action-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #e2e8f0;
+    }
+    .user-info-card .card-body {
+        padding: 16px;
+    }
+    .user-info-card .info-value {
+        flex: 1;
+        color: #2d3748;
+        word-break: break-word;
+        white-space: normal;
+        overflow-wrap: break-word;
+    }
 </style>
 {% endblock %}
 
@@ -88,24 +181,94 @@
                     <div><h6 class="mb-0" id="currentUserName">{{ get_text('select_chat_to_start') }}</h6><small class="text-muted" id="currentUserInfo"></small></div>
                 </div>
             </div>
+            <div id="userInfoCard" class="user-info-card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-person-circle"></i> <span id="cardUserName">@username</span></span>
+                        <button type="button" class="btn-close btn-close-white btn-sm" onclick="closeUserCard()"></button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="info-row">
+                        <div class="info-label">{{ get_text('full_name') }}:</div>
+                        <div class="info-value" id="cardFullName">-</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">{{ get_text('company') }}:</div>
+                        <div class="info-value" id="cardCompany">-</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">{{ get_text('position') }}:</div>
+                        <div class="info-value" id="cardPosition">-</div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-label">ID:</div>
+                        <div class="info-value" id="cardUserId">-</div>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm btn-outline-primary w-100" onclick="goToUserDetails()">
+                            <i class="bi bi-info-circle"></i> {{ get_text('user_details') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             <div class="chat-messages" id="chatMessages">
                 <div class="text-center text-muted py-5"><i class="bi bi-chat-dots" style="font-size: 3rem;"></i><p class="mt-3">{{ get_text('select_chat_to_start') }}</p></div>
             </div>
 
             <div class="chat-input" id="chatInput" style="display: none;">
-                <form id="replyForm" onsubmit="sendMessage(event)">
-                    <div class="input-group">
-                        <label class="btn btn-outline-secondary" for="fileInput">
-                            <i class="bi bi-paperclip"></i>
-                            <input type="file" id="fileInput" style="display:none" onchange="updateFileLabel()">
-                        </label>
-                        <textarea class="form-control" id="replyMessage" rows="1" placeholder="{{ get_text('type_message') }}"></textarea>
-                        <button class="btn btn-primary" type="submit"><i class="bi bi-send"></i></button>
-                    </div>
-                    <small id="fileLabel" class="text-muted" style="display:none; margin-left: 45px;"></small>
-                </form>
+    <div class="format-toolbar mb-2" style="background: #f8f9fa; border-radius: 8px; padding: 6px 12px; display: inline-flex; gap: 8px; border: 1px solid #dee2e6; flex-wrap: wrap;">
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="wrapChatText('<b>', '</b>')" title="Жирный (Ctrl+B)"><i class="bi bi-type-bold"></i> Жирный</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="wrapChatText('<i>', '</i>')" title="Курсив (Ctrl+I)"><i class="bi bi-type-italic"></i> Курсив</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="wrapChatText('<code>', '</code>')" title="Код"><i class="bi bi-code-slash"></i> Код</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertChatLink()" title="Вставить ссылку"><i class="bi bi-link-45deg"></i> Ссылка</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary emoji-picker-btn" onclick="toggleChatEmojiPicker()" title="Смайлики"><i class="bi bi-emoji-smile"></i> Смайлик</button>
+        <div id="chatEmojiPicker" class="emoji-dropdown" style="position: absolute; background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); padding: 12px; z-index: 1000; max-width: 320px; border: 1px solid #e2e8f0; display: none;">
+            <div class="emoji-grid" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; max-height: 200px; overflow-y: auto;">
+                <div class="emoji-item" style="font-size: 1.5rem; cursor: pointer; text-align: center; padding: 6px; border-radius: 12px;" onclick="insertChatEmoji('👍')">👍</div>
+                <div class="emoji-item" onclick="insertChatEmoji('❤️')">❤️</div>
+                <div class="emoji-item" onclick="insertChatEmoji('🎉')">🎉</div>
+                <div class="emoji-item" onclick="insertChatEmoji('✅')">✅</div>
+                <div class="emoji-item" onclick="insertChatEmoji('❌')">❌</div>
+                <div class="emoji-item" onclick="insertChatEmoji('⚠️')">⚠️</div>
+                <div class="emoji-item" onclick="insertChatEmoji('🔥')">🔥</div>
+                <div class="emoji-item" onclick="insertChatEmoji('⭐')">⭐</div>
+                <div class="emoji-item" onclick="insertChatEmoji('🎯')">🎯</div>
+                <div class="emoji-item" onclick="insertChatEmoji('📢')">📢</div>
+                <div class="emoji-item" onclick="insertChatEmoji('📅')">📅</div>
+                <div class="emoji-item" onclick="insertChatEmoji('⏰')">⏰</div>
+                <div class="emoji-item" onclick="insertChatEmoji('📍')">📍</div>
+                <div class="emoji-item" onclick="insertChatEmoji('💰')">💰</div>
+                <div class="emoji-item" onclick="insertChatEmoji('🤝')">🤝</div>
+                <div class="emoji-item" onclick="insertChatEmoji('💡')">💡</div>
+                <div class="emoji-item" onclick="insertChatEmoji('🚀')">🚀</div>
+                <div class="emoji-item" onclick="insertChatEmoji('✨')">✨</div>
+                <div class="emoji-item" onclick="insertChatEmoji('💪')">💪</div>
+                <div class="emoji-item" onclick="insertChatEmoji('🎁')">🎁</div>
+                <div class="emoji-item" onclick="insertChatEmoji('🏆')">🏆</div>
+                <div class="emoji-item" onclick="insertChatEmoji('👋')">👋</div>
+                <div class="emoji-item" onclick="insertChatEmoji('🙏')">🙏</div>
             </div>
+        </div>
+    </div>
+    <div id="chatPreview" class="mb-2 p-2" style="display: none; background: #f8f9fa; border-left: 4px solid #667eea; border-radius: 8px; font-size: 0.9em; max-height: 120px; overflow-y: auto;"></div>
+    <form id="replyForm" onsubmit="sendMessage(event)">
+        <div class="input-group">
+            <label class="btn btn-outline-secondary" for="fileInput">
+                <i class="bi bi-paperclip"></i>
+                <input type="file" id="fileInput" style="display:none" onchange="updateFileLabel()">
+            </label>
+            <textarea class="form-control" id="replyMessage" rows="1" placeholder="{{ get_text('type_message') }}" style="border-radius: 20px;"></textarea>
+            <button class="btn btn-primary" type="submit" style="border-radius: 20px;"><i class="bi bi-send"></i></button>
+        </div>
+        <small id="fileLabel" class="text-muted" style="display:none; margin-left: 45px;"></small>
+        <div class="d-flex justify-content-between mt-1">
+            <small><span id="chatCharCounter">0 / 4000</span></small>
+            <small class="text-muted"><i class="bi bi-markdown"></i> HTML поддерживается</small>
+        </div>
+    </form>
+</div>
         </div>
     </div>
 </div>
@@ -152,8 +315,10 @@
                 <input type="hidden" id="replyQuestionId">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('btn_cancel') }}</button>
-                <button type="button" class="btn btn-primary" onclick="submitAnswer()">{{ get_text('send_answer') }}</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('close') }}</button>
+                <button type="button" class="btn btn-primary" onclick="sendMessageToCurrentUserInModal()">
+                    <i class="bi bi-chat"></i> {{ get_text('send_message') }}
+                </button>
             </div>
         </div>
     </div>
@@ -209,11 +374,207 @@
     let chatPollTimer = null;
     let sidebarPollTimer = null;
     let isScrolledToBottom = true;
+    const urlParams = new URLSearchParams(window.location.search);
+    const openUserId = urlParams.get('open');
 
     const messagesDiv = document.getElementById('chatMessages');
+    const replyMessageInput = document.getElementById('replyMessage');
+    const chatPreviewDiv = document.getElementById('chatPreview');
+
     messagesDiv.addEventListener('scroll', () => {
         isScrolledToBottom = messagesDiv.scrollHeight - messagesDiv.clientHeight <= messagesDiv.scrollTop + 50;
     });
+
+    if (openUserId) {
+        setTimeout(() => {
+            loadChat(parseInt(openUserId));
+        }, 500);
+    }
+
+    // ============================================
+    // ФУНКЦИИ ФОРМАТИРОВАНИЯ ТЕКСТА (из broadcast.html)
+    // ============================================
+    function getSelectionStart() { return replyMessageInput.selectionStart; }
+    function getSelectionEnd() { return replyMessageInput.selectionEnd; }
+    function setSelectionRange(start, end) {
+        replyMessageInput.setSelectionRange(start, end);
+        replyMessageInput.focus();
+    }
+
+    function wrapChatText(openTag, closeTag) {
+        const start = replyMessageInput.selectionStart;
+        const end = replyMessageInput.selectionEnd;
+        const text = replyMessageInput.value;
+        const selectedText = text.substring(start, end);
+
+        let newText;
+        if (selectedText) {
+            newText = text.substring(0, start) + openTag + selectedText + closeTag + text.substring(end);
+            replyMessageInput.value = newText;
+            replyMessageInput.setSelectionRange(start + openTag.length, end + openTag.length);
+        } else {
+            newText = text.substring(0, start) + openTag + closeTag + text.substring(end);
+            replyMessageInput.value = newText;
+            replyMessageInput.setSelectionRange(start + openTag.length, start + openTag.length);
+        }
+        replyMessageInput.focus();
+        updateChatPreview();
+    }
+
+    function insertChatLink() {
+        const url = prompt('Введите URL ссылки:', 'https://');
+        if (!url) return;
+        const text = prompt('Введите текст ссылки:', 'ссылка');
+        if (!text) return;
+
+        const start = replyMessageInput.selectionStart;
+        const linkText = `<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+        const newText = replyMessageInput.value.substring(0, start) + linkText + replyMessageInput.value.substring(start);
+        replyMessageInput.value = newText;
+        const newPos = start + linkText.length;
+        setSelectionRange(newPos, newPos);
+        updateChatPreview();
+    }
+
+    function insertChatEmoji(emoji) {
+        const start = replyMessageInput.selectionStart;
+        const newText = replyMessageInput.value.substring(0, start) + emoji + replyMessageInput.value.substring(start);
+        replyMessageInput.value = newText;
+        setSelectionRange(start + emoji.length, start + emoji.length);
+        updateChatPreview();
+        document.getElementById('chatEmojiPicker').classList.remove('show');
+    }
+
+    function toggleChatEmojiPicker() {
+        const picker = document.getElementById('chatEmojiPicker');
+        picker.classList.toggle('show');
+        if (picker.classList.contains('show')) {
+            setTimeout(() => {
+                document.addEventListener('click', function closePicker(e) {
+                    if (!picker.contains(e.target) && !e.target.closest('.emoji-picker-btn')) {
+                        picker.classList.remove('show');
+                        document.removeEventListener('click', closePicker);
+                    }
+                });
+            }, 100);
+        }
+    }
+
+    function updateChatPreview() {
+        const len = replyMessageInput.value.length;
+        const charCounterSpan = document.getElementById('chatCharCounter');
+        if (charCounterSpan) {
+            charCounterSpan.textContent = `${len} / 4000`;
+            if (len > 3500) charCounterSpan.classList.add('warning');
+            else charCounterSpan.classList.remove('warning');
+        }
+
+        if (replyMessageInput.value.trim().length > 0) {
+            chatPreviewDiv.style.display = 'block';
+            // Показываем реальный HTML предпросмотр (как в broadcast)
+            let html = replyMessageInput.value;
+            // Экранируем HTML, но потом обрабатываем теги форматирования
+            // Сначала экранируем всё, кроме наших тегов
+            html = html.replace(/&/g, '&amp;')
+                       .replace(/</g, '&lt;')
+                       .replace(/>/g, '&gt;');
+            // Затем восстанавливаем допустимые теги
+            html = html.replace(/&lt;b&gt;/g, '<b>')
+                       .replace(/&lt;\/b&gt;/g, '</b>')
+                       .replace(/&lt;i&gt;/g, '<i>')
+                       .replace(/&lt;\/i&gt;/g, '</i>')
+                       .replace(/&lt;code&gt;/g, '<code>')
+                       .replace(/&lt;\/code&gt;/g, '</code>')
+                       .replace(/&lt;a href=&quot;(.*?)&quot; target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;&gt;(.*?)&lt;\/a&gt;/g, '<a href="$1" target="_blank">$2</a>');
+
+            chatPreviewDiv.innerHTML = `<strong>Предпросмотр:</strong><br>${html.replace(/\n/g, '<br>')}`;
+        } else {
+            chatPreviewDiv.style.display = 'none';
+        }
+    }
+
+    // ============================================
+    // КАРТОЧКА ПОЛЬЗОВАТЕЛЯ
+    // ============================================
+
+    let currentCardUserId = null;
+    let currentCardUserData = null;
+
+    function showUserCard(userId) {
+        currentCardUserId = userId;
+        const card = document.getElementById('userInfoCard');
+
+        // Загружаем данные пользователя
+        fetch(`/api/users/${userId}`)
+            .then(response => response.json())
+            .then(data => {
+                currentCardUserData = data;
+                document.getElementById('cardUserName').textContent = `@${data.username}`;
+                document.getElementById('cardFullName').textContent = data.full_name || '-';
+                document.getElementById('cardCompany').textContent = data.company || '-';
+                document.getElementById('cardPosition').textContent = data.position || '-';
+                document.getElementById('cardUserId').textContent = data.user_id;
+                card.classList.add('show');
+            })
+            .catch(err => {
+                console.error('Error loading user data:', err);
+            });
+    }
+
+    function closeUserCard() {
+        document.getElementById('userInfoCard').classList.remove('show');
+        currentCardUserId = null;
+        currentCardUserData = null;
+    }
+
+
+    function goToUserDetails() {
+        if (currentCardUserId) {
+            window.location.href = `/users?view=${currentCardUserId}`;
+        }
+    }
+
+    // Клик по аватару или имени в шапке чата для открытия карточки
+    function initUserCardTrigger() {
+        const header = document.querySelector('.chat-header');
+        if (header) {
+            header.style.cursor = 'pointer';
+            header.addEventListener('click', function(e) {
+                if (currentUserId && !document.getElementById('userInfoCard').contains(e.target)) {
+                    showUserCard(currentUserId);
+                }
+            });
+        }
+    }
+
+    // Закрываем карточку при клике вне её
+    document.addEventListener('click', function(e) {
+        const card = document.getElementById('userInfoCard');
+        const header = document.querySelector('.chat-header');
+        if (card && card.classList.contains('show') && !card.contains(e.target) && !header?.contains(e.target)) {
+            closeUserCard();
+        }
+    });
+
+    // Обработчик ввода текста для предпросмотра
+    if (replyMessageInput) {
+        replyMessageInput.addEventListener('input', updateChatPreview);
+
+        // Горячие клавиши
+        replyMessageInput.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'b') {
+                e.preventDefault();
+                wrapChatText('<b>', '</b>');
+            } else if (e.ctrlKey && e.key === 'i') {
+                e.preventDefault();
+                wrapChatText('<i>', '</i>');
+            }
+        });
+    }
+
+    // ============================================
+    // ОСТАЛЬНЫЕ ФУНКЦИИ ЧАТА
+    // ============================================
 
     async function loadChat(userId, isPollingReq = false) {
         if (!isPollingReq) {
@@ -245,6 +606,7 @@
                 const userFullName = data.full_name || '';
                 const headerName = userFullName ? `${userFullName} (@${data.username || userId})` : `@${data.username || userId}`;
                 document.getElementById('currentUserName').textContent = headerName;
+                initUserCardTrigger();
                 document.getElementById('currentUserInfo').textContent = `ID: ${userId}`;
                 document.getElementById('chatInput').style.display = 'block';
             }
@@ -292,7 +654,8 @@
                         }
 
                         if (msg.message_text) {
-                            content += `<div>${escapeHtml(msg.message_text).replace(/\n/g, '<br>')}</div>`;
+                            // Поддерживаем HTML в сообщениях (безопасно)
+                            content += `<div>${msg.message_text}</div>`;
                         }
                     }
 
@@ -341,7 +704,7 @@
 
         const formData = new FormData();
         formData.append('user_id', currentUserId);
-        formData.append('message', msgInput.value);
+        formData.append('message', msgInput.value); // Отправляем HTML как есть
         if (fileInput.files[0]) formData.append('file', fileInput.files[0]);
 
         try {
@@ -352,6 +715,7 @@
                 msgInput.value = '';
                 fileInput.value = '';
                 updateFileLabel();
+                updateChatPreview(); // Сбросить предпросмотр
                 loadChat(currentUserId, true);
             } else {
                 showToast(locales.errorSending, 'danger');
@@ -577,7 +941,7 @@
 
         const formData = new FormData();
         formData.append('user_id', userId);
-        formData.append('message', `<b>${locales.yourQuestionPrefix}</b>\n<i>${questionText}</i>\n\n<b>${locales.managerAnswerPrefix}</b>\n${answer}`);
+        formData.append('message', `<b>${locales.yourQuestionPrefix}</b><br><i>${escapeHtml(questionText)}</i><br><br><b>${locales.managerAnswerPrefix}</b><br>${escapeHtml(answer)}`);
 
         try {
             const resp = await fetch('/api/send_message', { method: 'POST', body: formData });
@@ -600,6 +964,23 @@
         }
     }
 
+    if (window.location.search.includes('user=')) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('user');
+        if (userId) {
+            // Перенаправляем на страницу чатов с открытым нужным чатом
+            window.location.href = `/user_chats?open=${userId}`;
+        }
+    }
+
+    function sendMessageToCurrentUserInModal() {
+        const userId = document.getElementById('replyUserId').value;
+        if (userId) {
+            window.location.href = `/user_chats?user=${userId}`;
+        }
+    }
+
+    // Инициализация
     loadAllQuestions();
     updateSidebar();
 </script>
