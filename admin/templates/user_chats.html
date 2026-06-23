@@ -133,6 +133,9 @@
         white-space: normal;
         overflow-wrap: break-word;
     }
+    .chat-messages div, .message-content {
+        white-space: pre-wrap !important;
+    }
 </style>
 {% endblock %}
 
@@ -166,7 +169,7 @@
                                 {% if conv.unread_count > 0 %}<span class="unread-badge">{{ conv.unread_count }}</span>{% endif %}
                             </div>
                             <small class="text-muted d-block text-truncate" style="max-width: 180px;">{{ (conv.last_message or '...')|truncate(40) }}</small>
-                            <small class="text-muted">{{ conv.last_message_time.strftime('%d.%m %H:%M') if conv.last_message_time else '' }}</small>
+                            <small class="text-muted d-block text-truncate" style="max-width: 180px;">{{ (conv.last_message or '...') | striptags | truncate(40) }}</small>
                         </div>
                     </div>
                 </div>
@@ -624,14 +627,14 @@
                         ? (msg.sender_username || locales.roleManager)
                         : (data.full_name || data.username || locales.roleUser);
 
-                    const time = new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    const time = new Date(msg.created_at).toLocaleString([], {day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute:'2-digit'});
 
                     let content = `<div class="message-bubble">`;
                     content += `<div class="message-sender">${escapeHtml(senderDisplay)}</div>`;
 
                     if (msg.source_type && msg.source_type.includes('_question')) {
                         const dept = msg.source_type.replace('_question', '').toUpperCase();
-                        content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">[${locales.questionFrom} ${dept}]</small><br>${escapeHtml(msg.message_text)}`;
+                        content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">[${locales.questionFrom} ${dept}]</small><br>${msg.message_text}`;
                     } else {
                         if (msg.file_id) {
                             const isIncoming = msg.direction === 'incoming';
@@ -740,10 +743,11 @@
             conversations.forEach(conv => {
                 const isActive = conv.user_id == currentUserId ? 'active' : '';
                 const displayName = conv.full_name ? `${conv.username} (${conv.full_name})` : `@${conv.username}`;
-                const time = conv.last_message_time ? new Date(conv.last_message_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+               const time = conv.last_message_time ? new Date(conv.last_message_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
 
-                let previewMsg = escapeHtml(conv.last_message) || '...';
-                previewMsg = previewMsg.replace(/<br\s*\/?>/gi, ' ');
+                let rawMsg = conv.last_message || '...';
+                let cleanMsg = rawMsg.replace(/<\/?[^>]+(>|$)/g, ""); // Срезает любые <i>, <b> и т.д.
+                let previewMsg = escapeHtml(cleanMsg).replace(/<br\s*\/?>/gi, ' ');
 
                 html += `
                 <div class="conversation-item ${isActive}" data-user-id="${conv.user_id}" data-search="${displayName}" onclick="loadChat(${conv.user_id})">
@@ -866,7 +870,7 @@
                     </div>
                     <small class="text-muted">${time}</small>
                 </div>
-                <div class="question-text">${escapeHtml(q.question)}</div>
+                <div class="question-text">${q.question}</div>
                 <div class="text-end mt-2">
                     <button class="btn btn-sm btn-outline-secondary me-2" onclick="openForwardModal(${q.id}, '${q.department}')">
                         <i class="bi bi-share"></i> ${locales.forwardBtnShort}
@@ -941,7 +945,7 @@
 
         const formData = new FormData();
         formData.append('user_id', userId);
-        formData.append('message', `<b>${locales.yourQuestionPrefix}</b><br><i>${escapeHtml(questionText)}</i><br><br><b>${locales.managerAnswerPrefix}</b><br>${escapeHtml(answer)}`);
+        formData.append('message', `<b>${locales.yourQuestionPrefix}</b><br><i>${questionText}</i><br><br><b>${locales.managerAnswerPrefix}</b><br>${answer}`);
 
         try {
             const resp = await fetch('/api/send_message', { method: 'POST', body: formData });

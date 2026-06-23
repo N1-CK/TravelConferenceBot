@@ -3254,65 +3254,86 @@ class Database:
         """Получить список всех активных чатов (включая вопросы)"""
         try:
             async with self.pool.acquire() as conn:
-                # ИСПРАВЛЕНИЕ 2 и 4: Джоиним профили пользователей, чтобы получать реальные Имя и Ник
+
+                # Получаем последнее сообщение из чатов
                 messages = await conn.fetch(f"""
                     SELECT 
                         m.user_id,
-                        MAX(COALESCE(p.username, m.username)) as username,
-                        MAX(p.full_name) as full_name,
-                        MAX(m.created_at) as last_message_time,
-                        STRING_AGG(m.message_text, ' ') as all_messages,
-                        COUNT(*) FILTER (WHERE m.direction = 'incoming' AND m.read_at IS NULL) as unread_count
-                    FROM {self.db_schema}.user_messages m
+                        COALESCE(p.username, m.username) as username,
+                        p.full_name as full_name,
+                        m.created_at as last_message_time,
+                        m.message_text as last_message,
+                        (SELECT COUNT(*) FROM {self.db_schema}.user_messages WHERE user_id = m.user_id AND direction = 'incoming' AND read_at IS NULL) as unread_count
+                    FROM (
+                        SELECT DISTINCT ON (user_id) user_id, username, created_at, message_text
+                        FROM {self.db_schema}.user_messages
+                        ORDER BY user_id, created_at DESC
+                    ) m
                     LEFT JOIN {self.db_schema_config}.user_profiles p ON m.user_id = p.user_id
-                    GROUP BY m.user_id
                 """)
 
+                # Получаем последний вопрос PR
                 pr_questions = await conn.fetch(f"""
                     SELECT 
                         q.user_id,
-                        MAX(COALESCE(p.username, q.username)) as username,
-                        MAX(p.full_name) as full_name,
-                        MAX(q.created_at) as last_message_time,
-                        STRING_AGG(q.question, ' ') as all_messages,
+                        COALESCE(p.username, q.username) as username,
+                        p.full_name as full_name,
+                        q.created_at as last_message_time,
+                        q.question as last_message,
                         0 as unread_count
-                    FROM {self.db_schema_pr}.pr_questions q
+                    FROM (
+                        SELECT DISTINCT ON (user_id) user_id, username, created_at, question
+                        FROM {self.db_schema_pr}.pr_questions
+                        ORDER BY user_id, created_at DESC
+                    ) q
                     LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
-                    GROUP BY q.user_id
                 """)
 
+                # Получаем последний вопрос EVENT
                 event_questions = await conn.fetch(f"""
                     SELECT 
                         q.user_id,
-                        MAX(COALESCE(p.username, q.username)) as username,
-                        MAX(p.full_name) as full_name,
-                        MAX(q.created_at) as last_message_time,
-                        STRING_AGG(q.question, ' ') as all_messages,
+                        COALESCE(p.username, q.username) as username,
+                        p.full_name as full_name,
+                        q.created_at as last_message_time,
+                        q.question as last_message,
                         0 as unread_count
-                    FROM {self.db_schema_event}.event_questions q
+                    FROM (
+                        SELECT DISTINCT ON (user_id) user_id, username, created_at, question
+                        FROM {self.db_schema_event}.event_questions
+                        ORDER BY user_id, created_at DESC
+                    ) q
                     LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
-                    GROUP BY q.user_id
                 """)
 
+                # Получаем последний вопрос TRAVEL
                 travel_questions = await conn.fetch(f"""
                     SELECT 
                         q.user_id,
-                        MAX(COALESCE(p.username, q.username)) as username,
-                        MAX(p.full_name) as full_name,
-                        MAX(q.created_at) as last_message_time,
-                        STRING_AGG(q.question, ' ') as all_messages,
+                        COALESCE(p.username, q.username) as username,
+                        p.full_name as full_name,
+                        q.created_at as last_message_time,
+                        q.question as last_message,
                         0 as unread_count
-                    FROM {self.db_schema_travel}.travel_questions q
+                    FROM (
+                        SELECT DISTINCT ON (user_id) user_id, username, created_at, question
+                        FROM {self.db_schema_travel}.travel_questions
+                        ORDER BY user_id, created_at DESC
+                    ) q
                     LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
-                    GROUP BY q.user_id
                 """)
 
                 all_users = {}
 
                 def update_user_dict(row, prefix=""):
                     user_id = row['user_id']
-                    msg_preview = f"{prefix} {row['all_messages'][:80]}" if prefix and row['all_messages'] else (
-                        row['all_messages'][:100] if row['all_messages'] else '')
+
+                    # Берем именно последнее сообщение (а не склейку всех)
+                    msg_text = row['last_message'] or ''
+
+                    # Отрезаем до 80 символов для превью
+                    msg_preview = f"{prefix} {msg_text[:80]}" if prefix and msg_text else (
+                        msg_text[:100] if msg_text else '')
 
                     if user_id not in all_users:
                         all_users[user_id] = {
