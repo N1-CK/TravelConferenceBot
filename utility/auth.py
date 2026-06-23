@@ -1,4 +1,3 @@
-# utility/auth.py
 from database import db
 import logging
 

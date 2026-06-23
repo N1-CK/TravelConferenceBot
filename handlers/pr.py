@@ -284,7 +284,7 @@ async def process_language(callback: CallbackQuery, state: FSMContext):
     ])
 
     await callback.message.edit_text(
-        await t(user_id, 'banner_step6'),  # Текст шага с комментариями
+        await t(user_id, 'pr_banner_step6'),  # Текст шага с комментариями
         reply_markup=keyboard
     )
     await callback.answer()

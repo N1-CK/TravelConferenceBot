@@ -70,9 +70,7 @@ class GoogleSheetsSync:
             if not await self.connect_to_postgres(db_config):
                 return False
 
-            # Save to DB
             async with self.pg_pool.acquire() as conn:
-                # Create temp table
                 await conn.execute(f"""
                     CREATE TEMP TABLE temp_restaurants (
                         city TEXT,

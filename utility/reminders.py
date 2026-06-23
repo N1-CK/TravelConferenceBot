@@ -12,7 +12,6 @@ class DeadlineReminder:
         while True:
             await asyncio.sleep(86400)  # 24 часа
 
-            # Найти пользователей с незаполненными формами
             incomplete_users = await self.db.get_incomplete_forms()
 
             for user in incomplete_users:

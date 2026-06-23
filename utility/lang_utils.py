@@ -1,4 +1,3 @@
-# utility/lang_utils.py
 from typing import Optional
 import logging
 

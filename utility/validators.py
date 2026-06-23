@@ -13,7 +13,8 @@ class FormValidators:
             return False, "Имя должно содержать минимум 2 символа"
         if len(name) > 100:
             return False, "Имя слишком длинное (макс. 100 символов)"
-        # Проверяем на наличие недопустимых символов
+
+        # Проверка на наличие недопустимых символов
         if re.search(r'[0-9@#$%^&*()_+=<>?/\\|]', name):
             return False, "Имя содержит недопустимые символы"
         return True, ""
@@ -82,6 +83,7 @@ class FormValidators:
         """Валидация IBAN"""
         if not iban:
             return False, "IBAN не может быть пустым"
+
         # Базовая проверка формата
         iban_clean = iban.replace(' ', '').upper()
         if len(iban_clean) < 15 or len(iban_clean) > 34:
@@ -99,7 +101,7 @@ class FormValidators:
         if len(digits) < 16 or len(digits) > 19:
             return False, "Неверная длина номера карты"
 
-        # Алгоритм Луна для проверки валидности карты
+
         def luhn_check(card_num):
             sum = 0
             num_digits = len(card_num)

@@ -31,7 +31,6 @@ from aiogram import Bot
 import threading
 import concurrent.futures
 
-# Загружаем переменные окружения
 load_dotenv()
 
 app = Flask(__name__)
@@ -57,7 +56,6 @@ def _run_bg_loop(loop):
     asyncio.set_event_loop(loop)
     loop.run_forever()
 
-# Запускаем цикл навсегда в отдельном фоновом (daemon) потоке
 _bg_thread = threading.Thread(target=_run_bg_loop, args=(_bg_loop,), daemon=True)
 _bg_thread.start()
 
@@ -88,10 +86,8 @@ def init_db():
         try:
             run_async(db.create_pool())
 
-            # КРИТИЧЕСКИ ВАЖНО: создаем таблицы для групп и функций
             # run_async(db.create_groups_tables())
 
-            # СОЗДАЕМ ТАБЛИЦЫ ДЛЯ МЕНЕДЖЕРОВ
             run_async(db.create_managers_tables())
 
             _db_initialized = True
@@ -102,10 +98,8 @@ def init_db():
             print(f"❌ Database connection failed: {e}")
             raise
 
-# Инициализируем БД сразу при старте
 init_db()
 
-# Конфигурация
 DB_CONFIG = {
     'user': os.getenv('DB_USER'),
     'password': os.getenv('DB_PASSWORD'),
@@ -139,7 +133,7 @@ def group_required(allowed_groups=None):
             if 'logged_in' not in session:
                 return redirect(url_for('login'))
 
-            # Админ имеет доступ ко всему
+            # Права админа включают в себя весь функционал
             if session.get('role') == 'admin':
                 return f(*args, **kwargs)
 
@@ -149,7 +143,7 @@ def group_required(allowed_groups=None):
             if allowed_groups is None:
                 return f(*args, **kwargs)
 
-            # Проверяем, есть ли у менеджера нужная группа
+            # Проверка, есть ли у менеджера нужная группа
             if any(group in user_groups for group in allowed_groups):
                 return f(*args, **kwargs)
 
@@ -245,14 +239,13 @@ class TelegramBot:
 
                 async with aiohttp.ClientSession() as session:
                     if files and len(files) > 0:
-                        # Отправляем файлы
+
                         for idx, file_path in enumerate(files):
                             if os.path.exists(file_path):
                                 url = f"{self.api_url}/sendDocument"
                                 form_data = aiohttp.FormData()
                                 form_data.add_field('chat_id', str(user_id))
 
-                                # ОПТИМИЗАЦИЯ: Если файл уже в ТГ, просто отдаем его file_id
                                 if file_path in file_ids_map:
                                     form_data.add_field('document', file_ids_map[file_path])
 

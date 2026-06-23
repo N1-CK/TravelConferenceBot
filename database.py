@@ -4,6 +4,7 @@ from typing import List, Dict
 
 import asyncpg
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -1403,11 +1404,10 @@ class Database:
                 query = f"""
                         SELECT *
                         FROM travel_bot.flights
-                        WHERE telegram_name like '%{username}%' \
-                          AND conference like '%{conference}%'
+                        WHERE telegram_name ILIKE $1 AND conference ILIKE $2
                         ORDER BY departure_date, departure_time \
                         """
-                result = await conn.fetch(query)
+                result = await conn.fetch(query, f"%{username}%", f"%{conference}%")
                 return [dict(row) for row in result]
         except Exception as e:
             logger.error(f"Error getting flight details from travel_bot: {e}")

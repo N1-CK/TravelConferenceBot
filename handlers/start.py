@@ -139,72 +139,36 @@ async def process_company(message: Message, state: FSMContext):
         await message.answer(await t(message.from_user.id, 'error_invalid_company'))
         return
 
-    # Ищем компании по префиксу
-    matches = await db.search_companies_by_prefix(company_input)
-
-    if len(matches) == 1:
-        await complete_registration(message, state, matches[0])
-
-    elif len(matches) > 1:
-        builder = InlineKeyboardBuilder()
-        for comp in matches:
-            builder.row(InlineKeyboardButton(text=comp, callback_data=f"reg_company_{comp}"))
-
-        await state.update_data(manual_company=company_input)
-        await message.answer(
-            await t(message.from_user.id, 'multiple_companies_found'),  # ← локализовано
-            reply_markup=builder.as_markup()
-        )
-    else:
-        builder = InlineKeyboardBuilder()
-        builder.row(InlineKeyboardButton(
-            text=await t(message.from_user.id, 'confirm_company', company=company_input),  # ← локализовано
-            callback_data=f"reg_company_confirm_{company_input}"
-        ))
-        builder.row(InlineKeyboardButton(
-            text=await t(message.from_user.id, 'retry_input'),  # ← локализовано
-            callback_data="reg_company_retry"
-        ))
-
-        await state.update_data(manual_company=company_input)
-        await message.answer(
-            await t(message.from_user.id, 'company_not_found', company=company_input),  # ← локализовано
-            reply_markup=builder.as_markup()
-        )
-
-@router.message(RegistrationStates.waiting_for_company)
-async def process_company(message: Message, state: FSMContext):
-    company_input = message.text.strip()
-
-    if len(company_input) < 2:
-        await message.answer(await t(message.from_user.id, 'error_invalid_company'))
-        return
-
     matches = await db.search_companies_by_prefix(company_input)
     await state.update_data(manual_company=company_input)
+
 
     if matches:
         builder = InlineKeyboardBuilder()
         for comp in matches[:10]:
             builder.row(InlineKeyboardButton(text=comp, callback_data=f"reg_company_{comp}"))
         builder.row(InlineKeyboardButton(
-            text=await t(message.from_user.id, 'confirm_company', company=company_input),  # ← локализовано
+            text=await t(message.from_user.id, 'confirm_company', company=company_input),
             callback_data=f"reg_company_confirm_{company_input}"
         ))
 
         await message.answer(
-            await t(message.from_user.id, 'multiple_companies_with_input', company_input=company_input),  # ← локализовано
+            await t(message.from_user.id, 'multiple_companies_with_input', company_input=company_input),
             reply_markup=builder.as_markup()
         )
     else:
         builder = InlineKeyboardBuilder()
         builder.row(InlineKeyboardButton(
-            text=await t(message.from_user.id, 'confirm_company', company=company_input),  # ← локализовано
+            text=await t(message.from_user.id, 'confirm_company', company=company_input),
             callback_data=f"reg_company_confirm_{company_input}"
+        ))
+        builder.row(InlineKeyboardButton(
+            text=await t(message.from_user.id, 'retry_input'),
+            callback_data="reg_company_retry"
         ))
 
         await message.answer(
-            await t(message.from_user.id, 'company_not_found_simple', company=company_input),  # ← локализовано
+            await t(message.from_user.id, 'company_not_found_simple', company=company_input),
             reply_markup=builder.as_markup()
         )
 

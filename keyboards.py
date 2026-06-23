@@ -202,12 +202,8 @@ def get_form_navigation_keyboard(back_to: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-# Добавить в файл keyboards.py:
-
 def get_profile_edit_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура для редактирования профиля"""
-    from aiogram.types import InlineKeyboardButton
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     builder = InlineKeyboardBuilder()
     builder.row(
@@ -225,8 +221,6 @@ def get_profile_edit_keyboard() -> InlineKeyboardMarkup:
 
 def get_language_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура выбора языка"""
-    from aiogram.types import InlineKeyboardButton
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     builder = InlineKeyboardBuilder()
     builder.row(
