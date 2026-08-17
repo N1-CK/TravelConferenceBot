@@ -372,6 +372,7 @@
     };
 
     let currentUserId = null;
+    let renderedMessageUids = new Set();
     let lastMessageId = 0;
     let isPolling = false;
     let chatPollTimer = null;
@@ -580,117 +581,117 @@
     // ============================================
 
     async function loadChat(userId, isPollingReq = false) {
-        if (!isPollingReq) {
-            currentUserId = userId;
-            lastMessageId = 0;
-            isPolling = true;
-            clearTimeout(chatPollTimer);
+    if (!isPollingReq) {
+        currentUserId = userId;
+        renderedMessageUids.clear(); // Сбрасываем список отрисованных при открытии нового чата
+        isPolling = true;
+        clearTimeout(chatPollTimer);
 
-            messagesDiv.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-arrow-repeat spin"></i> ${locales.loadingMessages}</div>`;
+        messagesDiv.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-arrow-repeat spin"></i> ${locales.loadingMessages}</div>`;
 
-            document.querySelectorAll('.conversation-item').forEach(item => {
-                item.classList.remove('active');
-                if (item.dataset.userId == userId) item.classList.add('active');
-            });
-        }
-
-        try {
-            const resp = await fetch(`/api/user_messages/${userId}`);
-            if (!resp.ok) throw new Error('Network error');
-            const data = await resp.json();
-
-            if (!isPollingReq) messagesDiv.innerHTML = '';
-
-            let hasNewIncoming = false;
-            let hasAnyNew = false;
-            const messages = (data.messages || []).reverse();
-
-            if (!isPollingReq) {
-                const userFullName = data.full_name || '';
-                const headerName = userFullName ? `${userFullName} (@${data.username || userId})` : `@${data.username || userId}`;
-                document.getElementById('currentUserName').textContent = headerName;
-                initUserCardTrigger();
-                document.getElementById('currentUserInfo').textContent = `ID: ${userId}`;
-                document.getElementById('chatInput').style.display = 'block';
-            }
-
-            for (const msg of messages) {
-                if (msg.id > lastMessageId) {
-                    hasAnyNew = true;
-                    if (msg.direction === 'incoming') hasNewIncoming = true;
-                    lastMessageId = msg.id;
-
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = `message ${msg.direction === 'incoming' ? 'incoming' : 'outgoing'}`;
-
-                    const senderDisplay = msg.direction === 'outgoing'
-                        ? (msg.sender_username || locales.roleManager)
-                        : (data.full_name || data.username || locales.roleUser);
-
-                    const time = new Date(msg.created_at).toLocaleString([], {day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute:'2-digit'});
-
-                    let content = `<div class="message-bubble">`;
-                    content += `<div class="message-sender">${escapeHtml(senderDisplay)}</div>`;
-
-                    if (msg.source_type && msg.source_type.includes('_question')) {
-                        const dept = msg.source_type.replace('_question', '').toUpperCase();
-                        content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">[${locales.questionFrom} ${dept}]</small><br>${msg.message_text}`;
-                    } else {
-                        if (msg.file_id) {
-                            const isIncoming = msg.direction === 'incoming';
-                            const fileBg = isIncoming ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.15)';
-                            const fileColor = isIncoming ? '#2d3748' : '#ffffff';
-                            const iconBg = isIncoming ? 'rgba(102,126,234,0.1)' : 'rgba(255,255,255,0.2)';
-                            const iconColor = isIncoming ? '#667eea' : '#ffffff';
-                            const borderColor = isIncoming ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.2)';
-
-                            content += `
-                            <a href="/api/file/${msg.file_id}" target="_blank" class="d-flex align-items-center p-2 mb-2 rounded text-decoration-none" style="background: ${fileBg}; color: ${fileColor}; border: 1px solid ${borderColor}; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
-                                <div class="me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border-radius: 10px; background: ${iconBg}; color: ${iconColor};">
-                                    <i class="bi bi-file-earmark-arrow-down-fill fs-5"></i>
-                                </div>
-                                <div class="text-truncate flex-grow-1" style="max-width: 160px;">
-                                    <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0px;">${locales.attachedFile}</div>
-                                    <span style="font-size: 0.75rem; opacity: 0.85;">${locales.downloadView}</span>
-                                </div>
-                            </a>`;
-                        }
-
-                        if (msg.message_text) {
-                            // Поддерживаем HTML в сообщениях (безопасно)
-                            content += `<div>${msg.message_text}</div>`;
-                        }
-                    }
-
-                    content += `<span class="message-time-inline">${time}</span></div>`;
-                    messageDiv.innerHTML = content;
-                    messagesDiv.appendChild(messageDiv);
-                }
-            }
-
-            if (!isPollingReq) {
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                if (messages.length > 0) fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
-            } else if (hasAnyNew) {
-                if (isScrolledToBottom) messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
-                if (hasNewIncoming) {
-                    fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
-                    const convItem = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
-                    if (convItem) {
-                        const badge = convItem.querySelector('.unread-badge');
-                        if (badge) badge.remove();
-                    }
-                }
-            }
-
-        } catch (e) {
-            console.error(e);
-        }
-
-        if (isPolling && currentUserId === userId) {
-            chatPollTimer = setTimeout(() => loadChat(userId, true), 2500);
-        }
+        document.querySelectorAll('.conversation-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.dataset.userId == userId) item.classList.add('active');
+        });
     }
+
+    try {
+        const resp = await fetch(`/api/user_messages/${userId}`);
+        if (!resp.ok) throw new Error('Network error');
+        const data = await resp.json();
+
+        if (!isPollingReq) messagesDiv.innerHTML = '';
+
+        let hasNewIncoming = false;
+        let hasAnyNew = false;
+        const messages = (data.messages || []).reverse();
+
+        if (!isPollingReq) {
+            const userFullName = data.full_name || '';
+            const headerName = userFullName ? `${userFullName} (@${data.username || userId})` : `@${data.username || userId}`;
+            document.getElementById('currentUserName').textContent = headerName;
+            initUserCardTrigger();
+            document.getElementById('currentUserInfo').textContent = `ID: ${userId}`;
+            document.getElementById('chatInput').style.display = 'block';
+        }
+
+        for (const msg of messages) {
+            const msgUid = msg.uid || `${msg.source_type}_${msg.id}`;
+            if (!renderedMessageUids.has(msgUid)) {
+                renderedMessageUids.add(msgUid);
+                hasAnyNew = true;
+                if (msg.direction === 'incoming') hasNewIncoming = true;
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${msg.direction === 'incoming' ? 'incoming' : 'outgoing'}`;
+
+                const senderDisplay = msg.direction === 'outgoing'
+                    ? (msg.sender_username || locales.roleManager)
+                    : (data.full_name || data.username || locales.roleUser);
+
+                const time = new Date(msg.created_at).toLocaleString([], {day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute:'2-digit'});
+
+                let content = `<div class="message-bubble">`;
+                content += `<div class="message-sender">${escapeHtml(senderDisplay)}</div>`;
+
+                if (msg.source_type && msg.source_type.includes('_question')) {
+                    const dept = msg.source_type.replace('_question', '').toUpperCase();
+                    content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">[${locales.questionFrom} ${dept}]</small><br>${msg.message_text}`;
+                } else {
+                    if (msg.file_id) {
+                        const isIncoming = msg.direction === 'incoming';
+                        const fileBg = isIncoming ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.15)';
+                        const fileColor = isIncoming ? '#2d3748' : '#ffffff';
+                        const iconBg = isIncoming ? 'rgba(102,126,234,0.1)' : 'rgba(255,255,255,0.2)';
+                        const iconColor = isIncoming ? '#667eea' : '#ffffff';
+                        const borderColor = isIncoming ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.2)';
+
+                        content += `
+                        <a href="/api/file/${msg.file_id}" target="_blank" class="d-flex align-items-center p-2 mb-2 rounded text-decoration-none" style="background: ${fileBg}; color: ${fileColor}; border: 1px solid ${borderColor}; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+                            <div class="me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border-radius: 10px; background: ${iconBg}; color: ${iconColor};">
+                                <i class="bi bi-file-earmark-arrow-down-fill fs-5"></i>
+                            </div>
+                            <div class="text-truncate flex-grow-1" style="max-width: 160px;">
+                                <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0px;">${locales.attachedFile}</div>
+                                <span style="font-size: 0.75rem; opacity: 0.85;">${locales.downloadView}</span>
+                            </div>
+                        </a>`;
+                    }
+
+                    if (msg.message_text) {
+                        content += `<div>${msg.message_text}</div>`;
+                    }
+                }
+
+                content += `<span class="message-time-inline">${time}</span></div>`;
+                messageDiv.innerHTML = content;
+                messagesDiv.appendChild(messageDiv);
+            }
+        }
+
+        if (!isPollingReq) {
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            if (messages.length > 0) fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
+        } else if (hasAnyNew) {
+            if (isScrolledToBottom) messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+            if (hasNewIncoming) {
+                fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
+                const convItem = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
+                if (convItem) {
+                    const badge = convItem.querySelector('.unread-badge');
+                    if (badge) badge.remove();
+                }
+            }
+        }
+
+    } catch (e) {
+        console.error(e);
+    }
+
+    if (isPolling && currentUserId === userId) {
+        chatPollTimer = setTimeout(() => loadChat(userId, true), 2500);
+    }
+}
 
     async function sendMessage(event) {
         event.preventDefault();

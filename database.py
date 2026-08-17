@@ -492,15 +492,17 @@ class Database:
 
     async def add_affiliate_user(self, username: str, company: str) -> bool:
         """Добавление пользователя Affiliate Bot"""
+        if not username:
+            return False
+        clean_username = username.lstrip('@').strip()
         try:
             async with self.pool.acquire() as conn:
-                # Добавляем в whitelist
                 await conn.execute(f"""
                     INSERT INTO {self.db_schema_config}.whitelist (username, is_active)
                     VALUES ($1, TRUE)
                     ON CONFLICT (username) DO UPDATE
                     SET is_active = TRUE
-                """, username)
+                """, clean_username)
 
                 return True
         except Exception as e:
@@ -1331,20 +1333,23 @@ class Database:
 
 
     async def check_whitelist(self, username: str) -> bool:
-        """Проверка пользователя в whitelist"""
+        """Проверка пользователя в whitelist (без учета наличия @ и регистра)"""
+        if not username:
+            return False
+        clean_username = username.lstrip('@').strip()
         try:
             async with self.pool.acquire() as conn:
                 result = await conn.fetchval(
                     f"""
                     SELECT is_active 
                     FROM {self.db_schema_config}.whitelist 
-                    WHERE username = $1
+                    WHERE LOWER(username) = LOWER($1)
                     """,
-                    username
+                    clean_username
                 )
                 return bool(result)
         except Exception as e:
-            logger.error(f"Error checking whitelist for {username}: {e}")
+            logger.error(f"Error checking whitelist for {clean_username}: {e}")
             return False
 
     async def get_selected_conference(self, user_id: int) -> str:
@@ -1788,8 +1793,12 @@ class Database:
 
                     # Обрабатываем пользователей
                     for record in records:
-                        username = record.get('TG_username', '').strip()
-                        if not username or username.lower() == 'tg_username':
+                        raw_username = record.get('TG_username', '').strip()
+                        if not raw_username or raw_username.lower() == 'tg_username':
+                            continue
+
+                        username = raw_username.lstrip('@').strip()
+                        if not username:
                             continue
 
                         # Сохраняем в whitelist (только username и is_active)
@@ -1851,15 +1860,18 @@ class Database:
 
     async def get_user_conferences(self, username: str) -> List[Dict]:
         """Получить все конференции пользователя"""
+        if not username:
+            return []
+        clean_username = username.lstrip('@').strip()
         try:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
                     SELECT conference_name, trip_start_date, trip_end_date,
                            conference_start_date, conference_end_date, city
                     FROM {self.db_schema}.user_conferences
-                    WHERE username = $1
+                    WHERE LOWER(username) = LOWER($1)
                     ORDER BY conference_start_date
-                """, username)
+                """, clean_username)
                 return [dict(row) for row in rows] if rows else []
         except Exception as e:
             logger.error(f"Error getting user conferences: {e}")
@@ -1867,6 +1879,9 @@ class Database:
 
     async def get_user_active_conferences(self, username: str) -> List[Dict]:
         """Получить список активных конференций пользователя"""
+        if not username:
+            return []
+        clean_username = username.lstrip('@').strip()
         try:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
@@ -1880,9 +1895,9 @@ class Database:
                         bot_link,
                         additional_info
                     FROM {self.db_schema}.user_conferences
-                    WHERE username = $1
+                    WHERE LOWER(username) = LOWER($1)
                     ORDER BY conference_start_date
-                """, username)
+                """, clean_username)
 
                 if rows:
                     result = []
@@ -1899,20 +1914,20 @@ class Database:
 
 
     async def check_user_conference_access(self, username: str, conference: str) -> bool:
-        """
-        Проверить, имеет ли пользователь доступ к конкретной конференции
-        """
+        """Проверить, имеет ли пользователь доступ к конкретной конференции"""
+        if not username:
+            return False
+        clean_username = username.lstrip('@').strip()
         try:
             async with self.pool.acquire() as conn:
                 result = await conn.fetchval(f"""
                     SELECT 1 FROM {self.db_schema}.user_conferences
-                    WHERE username = $1 AND conference_name = $2
-                """, username, conference)
+                    WHERE LOWER(username) = LOWER($1) AND conference_name = $2
+                """, clean_username, conference)
                 return bool(result)
         except Exception as e:
             logger.error(f"Error checking conference access: {e}")
-            # Fallback to whitelist check
-            return await self.check_whitelist(username)
+            return await self.check_whitelist(clean_username)
 
     async def get_travel_request_status(self, username: str, request_type: str) -> dict:
         """Получить статус travel-заявки пользователя"""
@@ -2386,6 +2401,8 @@ class Database:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
                     SELECT 
+                        id,
+                        username,
                         details->>'type' as broadcast_type,
                         details->>'company' as company,
                         (details->>'success')::int as success_count,
@@ -2400,6 +2417,47 @@ class Database:
         except Exception as e:
             logger.error(f"Error getting broadcasts: {e}")
             return []
+
+    async def get_broadcast_details_by_id(self, log_id: int) -> dict:
+        """Получить полные детали рассылки по ID лога"""
+        try:
+            import json
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(f"""
+                    SELECT 
+                        id,
+                        username,
+                        details,
+                        timestamp
+                    FROM {self.db_schema}.user_logs
+                    WHERE id = $1 AND action = 'broadcast_sent'
+                """, log_id)
+
+                if not row:
+                    return None
+
+                data = dict(row)
+                details = data.get('details')
+                if isinstance(details, str):
+                    details = json.loads(details)
+                elif not details:
+                    details = {}
+
+                return {
+                    'id': data['id'],
+                    'sender': data['username'],
+                    'timestamp': data['timestamp'].strftime('%d.%m.%Y %H:%M:%S') if data.get('timestamp') else '',
+                    'broadcast_type': details.get('type', 'all'),
+                    'company': details.get('company', ''),
+                    'success_count': details.get('success', 0),
+                    'failed_count': details.get('failed', 0),
+                    'file_count': details.get('file_count', 0),
+                    'success_users': details.get('success_users', []),
+                    'failed_users': details.get('failed_users', [])
+                }
+        except Exception as e:
+            logger.error(f"Error getting broadcast details: {e}")
+            return None
 
     async def get_stats(self) -> dict:
         """Получить статистику"""
@@ -2456,8 +2514,9 @@ class Database:
             return {}
 
     async def log_broadcast(self, username: str, broadcast_type: str, company: str,
-                            success: int, failed: int, message_length: int, file_count: int = 0) -> bool:
-        """Логировать рассылку"""
+                            success: int, failed: int, message_length: int, file_count: int = 0,
+                            success_users: list = None, failed_users: list = None) -> bool:
+        """Логировать рассылку с деталями по пользователям"""
         try:
             import json
             async with self.pool.acquire() as conn:
@@ -2467,7 +2526,9 @@ class Database:
                     'success': success,
                     'failed': failed,
                     'message_length': message_length,
-                    'file_count': file_count
+                    'file_count': file_count,
+                    'success_users': success_users or [],
+                    'failed_users': failed_users or []
                 }
                 details_json = json.dumps(details, default=str)
 

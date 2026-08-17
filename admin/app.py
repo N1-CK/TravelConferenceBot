@@ -220,26 +220,42 @@ class TelegramBot:
                     return result.get('ok', False)
 
     async def broadcast_to_users(self, users, message, files=None):
-        """Массовая рассылка пользователям с файлами (с оптимизацией отправки по file_id)"""
-        results = {'success': 0, 'failed': 0, 'file_ids': []}
+        """Массовая рассылка пользователям с файлами и детальной статистикой"""
+        results = {
+            'success': 0,
+            'failed': 0,
+            'file_ids': [],
+            'success_users': [],
+            'failed_users': []
+        }
         file_count = len(files) if files else 0
-
-        # Кеш: загружаем файл в ТГ один раз, сохраняем его ID, дальше шлем всем мгновенно по ID
         file_ids_map = {}
 
         for user in users:
             user_id = user.get('user_id')
+            username = user.get('username') or 'unknown'
+            full_name = user.get('full_name') or ''
+
+            user_info = {
+                'user_id': user_id,
+                'username': username,
+                'full_name': full_name
+            }
+
             if not user_id:
                 results['failed'] += 1
+                user_info['reason'] = 'Отсутствует Telegram ID'
+                results['failed_users'].append(user_info)
                 continue
 
             success = False
+            error_reason = 'Неизвестная ошибка'
+
             try:
                 html_message = message if message else ""
 
                 async with aiohttp.ClientSession() as session:
                     if files and len(files) > 0:
-
                         for idx, file_path in enumerate(files):
                             if os.path.exists(file_path):
                                 url = f"{self.api_url}/sendDocument"
@@ -248,37 +264,37 @@ class TelegramBot:
 
                                 if file_path in file_ids_map:
                                     form_data.add_field('document', file_ids_map[file_path])
-
                                     if idx == 0 and html_message:
                                         form_data.add_field('caption', html_message)
                                         form_data.add_field('parse_mode', 'HTML')
 
                                     async with session.post(url, data=form_data) as resp:
-                                        result = await resp.json()
-                                        if result.get('ok'): success = True
+                                        res_json = await resp.json()
+                                        if res_json.get('ok'):
+                                            success = True
+                                        else:
+                                            error_reason = res_json.get('description', 'Telegram error')
                                 else:
-                                    # ИНАЧЕ: Физически грузим файл (произойдет только для 1-го юзера)
                                     with open(file_path, 'rb') as f:
                                         form_data.add_field('document', f, filename=os.path.basename(file_path))
-
                                         if idx == 0 and html_message:
                                             form_data.add_field('caption', html_message)
                                             form_data.add_field('parse_mode', 'HTML')
 
                                         async with session.post(url, data=form_data) as resp:
-                                            result = await resp.json()
-                                            if result.get('ok'):
+                                            res_json = await resp.json()
+                                            if res_json.get('ok'):
                                                 success = True
-                                                # Ловим настоящий Telegram file_id и сохраняем!
-                                                doc = result.get('result', {}).get('document', {})
+                                                doc = res_json.get('result', {}).get('document', {})
                                                 if 'file_id' in doc:
                                                     file_ids_map[file_path] = doc['file_id']
+                                            else:
+                                                error_reason = res_json.get('description', 'Telegram error')
 
                                 await asyncio.sleep(0.05)
-                        if files and len(files) > 0:
+                        if files and len(files) > 0 and success:
                             success = True
                     else:
-                        # Отправка только текста
                         url = f"{self.api_url}/sendMessage"
                         payload = {
                             'chat_id': user_id,
@@ -286,20 +302,26 @@ class TelegramBot:
                             'parse_mode': 'HTML'
                         }
                         async with session.post(url, json=payload) as resp:
-                            result = await resp.json()
-                            success = result.get('ok', False)
+                            res_json = await resp.json()
+                            success = res_json.get('ok', False)
+                            if not success:
+                                error_reason = res_json.get('description', 'Telegram error')
 
             except Exception as e:
                 logger.error(f"Error sending to {user_id}: {e}")
+                error_reason = str(e)
                 success = False
 
             if success:
                 results['success'] += 1
+                results['success_users'].append(user_info)
             else:
                 results['failed'] += 1
+                user_info['reason'] = error_reason
+                results['failed_users'].append(user_info)
 
         results['file_count'] = file_count
-        results['file_ids'] = list(file_ids_map.values())  # Передаем полученные ID в роут
+        results['file_ids'] = list(file_ids_map.values())
         return results
 
 
@@ -501,7 +523,6 @@ def broadcast():
             except:
                 pass
 
-        # Логируем рассылку
         company_info = ', '.join(request.form.getlist('companies')) if target_type == 'company' else target_type
         run_async(db.log_broadcast(
             username=session.get('username', 'admin'),
@@ -510,7 +531,9 @@ def broadcast():
             success=results['success'],
             failed=results['failed'],
             message_length=len(message) if message else 0,
-            file_count=results.get('file_count', 0)
+            file_count=results.get('file_count', 0),
+            success_users=results.get('success_users', []),
+            failed_users=results.get('failed_users', [])
         ))
 
         flash(
@@ -588,6 +611,15 @@ def api_get_user(user_id):
     if user:
         return jsonify(user)
     return jsonify({'error': 'User not found'}), 404
+
+@app.route('/api/broadcast/<int:broadcast_id>')
+@login_required
+def api_get_broadcast_details(broadcast_id):
+    """Получить детальную информацию о рассылке"""
+    details = run_async(db.get_broadcast_details_by_id(broadcast_id))
+    if details:
+        return jsonify(details)
+    return jsonify({'error': 'Broadcast not found'}), 404
 
 
 @app.route('/api/users/<int:user_id>', methods=['PUT'])
@@ -1174,7 +1206,7 @@ def get_conference_details(conference_name):
     # Декодируем URL-encoded строку (преобразуем %20 обратно в пробелы)
     decoded_name = unquote(conference_name)
 
-    print(f"DEBUG: Looking for conference: '{decoded_name}'")  # Для отладки
+    # print(f"DEBUG: Looking for conference: '{decoded_name}'")  # Для отладки
 
     try:
         def _get_details():
@@ -1495,6 +1527,8 @@ def api_get_user_messages(user_id):
     for msg in messages:
         formatted_messages.append({
             'id': msg['id'],
+            'uid': f"{msg.get('source_type', 'msg')}_{msg['id']}",
+            'source_type': msg.get('source_type', 'message'),
             'direction': msg['direction'],
             'message_text': msg['message_text'],
             'sender_username': msg.get('username', ''),
