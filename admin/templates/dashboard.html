@@ -28,6 +28,10 @@
         background-color: #fef2f2;
         border: 1px solid #fecaca;
     }
+    .modal-scroll-area {
+        max-height: 60vh;
+        overflow-y: auto;
+    }
 </style>
 {% endblock %}
 
@@ -101,12 +105,12 @@
         </div>
     </div>
 
-    <!-- Таблица рассылок с поддержкой клика -->
+    <!-- Таблица последних рассылок -->
     <div class="col-md-6 mb-3">
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-clock-history me-2"></i> {{ get_text('recent_broadcasts') }}</span>
-                <small class="text-muted"><i class="bi bi-info-circle"></i> Нажмите для деталей</small>
+                <small class="text-muted"><i class="bi bi-info-circle"></i> {{ get_text('click_to_view_details') }}</small>
             </div>
             <div class="card-body">
                 {% if broadcasts %}
@@ -121,7 +125,7 @@
                         </thead>
                         <tbody>
                             {% for broadcast in broadcasts[:5] %}
-                            <tr class="broadcast-row" onclick="openBroadcastModal({{ broadcast.id }})">
+                            <tr class="broadcast-row" onclick="openBroadcastModal({{ broadcast.id }}, false)">
                                 <td><small>{{ broadcast.timestamp.strftime('%d.%m.%Y %H:%M') if broadcast.timestamp else '-' }}</small></td>
                                 <td>
                                     {% if broadcast.broadcast_type == 'all' %}
@@ -151,7 +155,11 @@
                     <p class="mt-2">{{ get_text('no_data') }}</p>
                 </div>
                 {% endif %}
-                <div class="text-center mt-3">
+
+                <div class="d-flex justify-content-center gap-2 mt-3">
+                    <button type="button" class="btn btn-outline-secondary" onclick="openAllBroadcastsModal()">
+                        <i class="bi bi-list-ul"></i> {{ get_text('all_broadcasts') }}
+                    </button>
                     <a href="/broadcast" class="btn btn-primary">
                         <i class="bi bi-plus-circle"></i> {{ get_text('new_broadcast') }}
                     </a>
@@ -238,22 +246,77 @@
     </div>
 </div>
 
-<!-- Модальное окно деталей рассылки -->
+<!-- ============================================ -->
+<!-- МОДАЛЬНОЕ ОКНО 1: ВСЕ РАССЫЛКИ (СО СКРОЛЛОМ) -->
+<!-- ============================================ -->
+<div class="modal fade" id="allBroadcastsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius: 20px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; border-radius: 20px 20px 0 0;">
+                <h5 class="modal-title"><i class="bi bi-clock-history me-2"></i> {{ get_text('broadcast_history_title') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="input-group" style="max-width: 380px;">
+                        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                        <input type="text" id="broadcastSearchInput" class="form-control" placeholder="{{ get_text('search_broadcasts_placeholder') }}" onkeyup="filterBroadcastsTable()">
+                    </div>
+                    <small class="text-muted"><i class="bi bi-info-circle"></i> {{ get_text('click_to_view_details') }}</small>
+                </div>
+
+                <div class="table-responsive modal-scroll-area">
+                    <table class="table table-hover align-middle mb-0" id="allBroadcastsTable">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>ID</th>
+                                <th>{{ get_text('time') }}</th>
+                                <th>{{ get_text('sender') }}</th>
+                                <th>{{ get_text('broadcast_type') }}</th>
+                                <th>{{ get_text('parameters') }}</th>
+                                <th>{{ get_text('successful') }}</th>
+                                <th>{{ get_text('errors') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allBroadcastsTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center py-5">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                    <div class="mt-2 text-muted">{{ get_text('loading_broadcasts') }}</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">{{ get_text('close') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- МОДАЛЬНОЕ ОКНО 2: ДЕТАЛИ РАССЫЛКИ -->
+<!-- ============================================ -->
 <div class="modal fade" id="broadcastDetailsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content" style="border-radius: 20px;">
             <div class="modal-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px 20px 0 0;">
-                <h5 class="modal-title"><i class="bi bi-info-circle me-2"></i> Детали рассылки</h5>
+                <h5 class="modal-title"><i class="bi bi-info-circle me-2"></i> {{ get_text('broadcast_details') }}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="broadcastModalContent">
                 <div class="text-center py-5">
                     <div class="spinner-border text-primary" role="status"></div>
-                    <div class="mt-2 text-muted">Загрузка данных...</div>
+                    <div class="mt-2 text-muted">{{ get_text('loading') }}</div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Закрыть</button>
+            <div class="modal-footer d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary rounded-pill" id="backToAllBtn" style="display: none;" onclick="returnToAllBroadcasts()">
+                    <i class="bi bi-arrow-left me-1"></i> {{ get_text('back_to_all_broadcasts') }}
+                </button>
+                <button type="button" class="btn btn-secondary rounded-pill px-4 ms-auto" data-bs-dismiss="modal">{{ get_text('close') }}</button>
             </div>
         </div>
     </div>
@@ -262,21 +325,123 @@
 
 {% block extra_js %}
 <script>
-    async function openBroadcastModal(broadcastId) {
-        const modal = new bootstrap.Modal(document.getElementById('broadcastDetailsModal'));
-        const contentDiv = document.getElementById('broadcastModalContent');
+    let openedFromAllModal = false;
+    let allBroadcastsCache = [];
+
+    const i18n = {
+        broadcast_all: '{{ get_text("broadcast_all") }}',
+        broadcast_by_company: '{{ get_text("broadcast_by_company") }}',
+        conferences_for_broadcast: '{{ get_text("conferences_for_broadcast") }}',
+        broadcast_selected: '{{ get_text("broadcast_selected") }}',
+        sender: '{{ get_text("sender") }}',
+        broadcast_time: '{{ get_text("broadcast_time") }}',
+        successful: '{{ get_text("successful") }}',
+        errors: '{{ get_text("errors") }}',
+        files_count: '{{ get_text("files_count") }}',
+        not_delivered: '{{ get_text("not_delivered") }}',
+        delivered: '{{ get_text("delivered") }}',
+        no_delivery_errors: '{{ get_text("no_delivery_errors") }}',
+        no_delivery_data: '{{ get_text("no_delivery_data") }}',
+        no_broadcasts_found: '{{ get_text("no_broadcasts_found") }}',
+        error_loading_broadcasts: '{{ get_text("error_loading_broadcasts") }}',
+        error_loading_data: '{{ get_text("error_loading_data") }}',
+        loading_broadcasts: '{{ get_text("loading_broadcasts") }}',
+        loading: '{{ get_text("loading") }}'
+    };
+
+    async function openAllBroadcastsModal() {
+        const modal = new bootstrap.Modal(document.getElementById('allBroadcastsModal'));
         modal.show();
+
+        const tbody = document.getElementById('allBroadcastsTableBody');
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <div class="mt-2 text-muted">${i18n.loading_broadcasts}</div>
+                </td>
+            </tr>
+        `;
+
+        try {
+            const resp = await fetch('/api/broadcasts/all');
+            if (!resp.ok) throw new Error(i18n.error_loading_broadcasts);
+            allBroadcastsCache = await resp.json();
+            renderAllBroadcastsTable(allBroadcastsCache);
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4"><i class="bi bi-exclamation-triangle fs-3 d-block"></i> ${e.message}</td></tr>`;
+        }
+    }
+
+    function renderAllBroadcastsTable(items) {
+        const tbody = document.getElementById('allBroadcastsTableBody');
+        if (!items || items.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">${i18n.no_broadcasts_found}</td></tr>`;
+            return;
+        }
+
+        const typeLabels = {
+            'all': `<span class="badge bg-info">${i18n.broadcast_all}</span>`,
+            'company': `<span class="badge bg-warning">${i18n.broadcast_by_company}</span>`,
+            'conference': `<span class="badge bg-primary">${i18n.conferences_for_broadcast}</span>`,
+            'specific': `<span class="badge bg-secondary">${i18n.broadcast_selected}</span>`,
+            'custom': `<span class="badge bg-secondary">${i18n.broadcast_selected}</span>`
+        };
+
+        tbody.innerHTML = items.map(b => `
+            <tr class="broadcast-row" onclick="openBroadcastModal(${b.id}, true)">
+                <td><strong>#${b.id}</strong></td>
+                <td><small>${b.formatted_time || b.timestamp || '-'}</small></td>
+                <td>@${b.username || 'admin'}</td>
+                <td>${typeLabels[b.broadcast_type] || `<span class="badge bg-secondary">${b.broadcast_type || '-'}</span>`}</td>
+                <td>${b.company ? `<span class="badge bg-light text-dark border">${b.company}</span>` : '-'}</td>
+                <td><span class="badge bg-success">${b.success_count || 0} ✓</span></td>
+                <td>${(b.failed_count > 0) ? `<span class="badge bg-danger">${b.failed_count} ✗</span>` : '<span class="text-muted">0</span>'}</td>
+            </tr>
+        `).join('');
+    }
+
+    function filterBroadcastsTable() {
+        const query = document.getElementById('broadcastSearchInput').value.toLowerCase();
+        const filtered = allBroadcastsCache.filter(b =>
+            (b.username && b.username.toLowerCase().includes(query)) ||
+            (b.broadcast_type && b.broadcast_type.toLowerCase().includes(query)) ||
+            (b.company && b.company.toLowerCase().includes(query)) ||
+            (String(b.id).includes(query))
+        );
+        renderAllBroadcastsTable(filtered);
+    }
+
+    async function openBroadcastModal(broadcastId, fromAllModal = false) {
+        openedFromAllModal = fromAllModal;
+
+        if (openedFromAllModal) {
+            const allModalEl = document.getElementById('allBroadcastsModal');
+            const allModalInstance = bootstrap.Modal.getInstance(allModalEl);
+            if (allModalInstance) allModalInstance.hide();
+        }
+
+        const detailsModalEl = document.getElementById('broadcastDetailsModal');
+        const detailsModal = new bootstrap.Modal(detailsModalEl);
+        const contentDiv = document.getElementById('broadcastModalContent');
+        const backBtn = document.getElementById('backToAllBtn');
+
+        if (backBtn) {
+            backBtn.style.display = openedFromAllModal ? 'inline-block' : 'none';
+        }
+
+        detailsModal.show();
 
         contentDiv.innerHTML = `
             <div class="text-center py-5">
                 <div class="spinner-border text-primary" role="status"></div>
-                <div class="mt-2 text-muted">Загрузка данных...</div>
+                <div class="mt-2 text-muted">${i18n.loading}</div>
             </div>
         `;
 
         try {
             const resp = await fetch(`/api/broadcast/${broadcastId}`);
-            if (!resp.ok) throw new Error('Ошибка загрузки данных');
+            if (!resp.ok) throw new Error(i18n.error_loading_data);
             const data = await resp.json();
 
             const failedList = data.failed_users || [];
@@ -284,7 +449,7 @@
 
             let failedHtml = '';
             if (failedList.length === 0) {
-                failedHtml = '<div class="text-muted text-center py-3">Ошибок нет 🎉 Все сообщения доставлены</div>';
+                failedHtml = `<div class="text-muted text-center py-3">${i18n.no_delivery_errors}</div>`;
             } else {
                 failedList.forEach(u => {
                     const name = u.full_name ? `${u.full_name} (@${u.username})` : `@${u.username}`;
@@ -295,7 +460,7 @@
                                 ${u.user_id ? `<small class="text-muted ms-1">(ID: ${u.user_id})</small>` : ''}
                             </div>
                             <span class="badge bg-danger text-wrap" style="max-width: 50%; font-weight: normal;">
-                                <i class="bi bi-exclamation-triangle"></i> ${u.reason || 'Ошибка'}
+                                <i class="bi bi-exclamation-triangle"></i> ${u.reason || 'Error'}
                             </span>
                         </div>
                     `;
@@ -304,7 +469,7 @@
 
             let successHtml = '';
             if (successList.length === 0) {
-                successHtml = '<div class="text-muted text-center py-3">Нет данных об успешных доставках (старая запись рассылки)</div>';
+                successHtml = `<div class="text-muted text-center py-3">${i18n.no_delivery_data}</div>`;
             } else {
                 successList.forEach(u => {
                     const name = u.full_name ? `${u.full_name} (@${u.username})` : `@${u.username}`;
@@ -314,7 +479,7 @@
                                 <strong>${name}</strong>
                                 ${u.user_id ? `<small class="text-muted ms-1">(ID: ${u.user_id})</small>` : ''}
                             </div>
-                            <span class="badge bg-success">Доставлено ✓</span>
+                            <span class="badge bg-success">${i18n.delivered} ✓</span>
                         </div>
                     `;
                 });
@@ -324,33 +489,33 @@
                 <div class="row g-3 mb-4">
                     <div class="col-sm-6">
                         <div class="p-3 bg-light rounded-3">
-                            <div class="text-muted small">Время рассылки</div>
+                            <div class="text-muted small">${i18n.broadcast_time}</div>
                             <div class="fw-bold">${data.timestamp || '-'}</div>
                         </div>
                     </div>
                     <div class="col-sm-6">
                         <div class="p-3 bg-light rounded-3">
-                            <div class="text-muted small">Отправитель</div>
+                            <div class="text-muted small">${i18n.sender}</div>
                             <div class="fw-bold">@${data.sender || 'admin'}</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="d-flex gap-2 mb-3">
-                    <span class="badge bg-success fs-6 p-2"><i class="bi bi-check-circle me-1"></i> Успешно: ${data.success_count}</span>
-                    <span class="badge bg-danger fs-6 p-2"><i class="bi bi-x-circle me-1"></i> Ошибок: ${data.failed_count}</span>
-                    ${data.file_count > 0 ? `<span class="badge bg-info fs-6 p-2"><i class="bi bi-paperclip me-1"></i> Файлов: ${data.file_count}</span>` : ''}
+                    <span class="badge bg-success fs-6 p-2"><i class="bi bi-check-circle me-1"></i> ${i18n.successful}: ${data.success_count}</span>
+                    <span class="badge bg-danger fs-6 p-2"><i class="bi bi-x-circle me-1"></i> ${i18n.errors}: ${data.failed_count}</span>
+                    ${data.file_count > 0 ? `<span class="badge bg-info fs-6 p-2"><i class="bi bi-paperclip me-1"></i> ${i18n.files_count}: ${data.file_count}</span>` : ''}
                 </div>
 
                 <ul class="nav nav-pills mb-3" id="broadcastPills" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active btn-sm" id="failed-tab" data-bs-toggle="pill" data-bs-target="#failed-pane" type="button" role="tab">
-                            ❌ Не доставлено (${failedList.length})
+                            ❌ ${i18n.not_delivered} (${failedList.length})
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link btn-sm" id="success-tab" data-bs-toggle="pill" data-bs-target="#success-pane" type="button" role="tab">
-                            ✅ Доставлено (${successList.length})
+                            ✅ ${i18n.delivered} (${successList.length})
                         </button>
                     </li>
                 </ul>
@@ -367,6 +532,16 @@
         } catch (e) {
             contentDiv.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ${e.message}</div>`;
         }
+    }
+
+    function returnToAllBroadcasts() {
+        const detailsModalEl = document.getElementById('broadcastDetailsModal');
+        const detailsModal = bootstrap.Modal.getInstance(detailsModalEl);
+        if (detailsModal) detailsModal.hide();
+
+        const allModalEl = document.getElementById('allBroadcastsModal');
+        const allModal = new bootstrap.Modal(allModalEl);
+        allModal.show();
     }
 </script>
 {% endblock %}

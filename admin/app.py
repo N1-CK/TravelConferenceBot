@@ -622,6 +622,20 @@ def api_get_broadcast_details(broadcast_id):
     return jsonify({'error': 'Broadcast not found'}), 404
 
 
+@app.route('/api/broadcasts/all')
+@login_required
+def get_all_broadcasts_api():
+    # Используем run_async, как и во всех остальных маршрутах
+    broadcasts = run_async(db.get_recent_broadcasts(limit=500)) or []
+    result = []
+    for b in broadcasts:
+        b_dict = dict(b)
+        if b_dict.get('timestamp'):
+            b_dict['formatted_time'] = b_dict['timestamp'].strftime('%d.%m.%Y %H:%M')
+        result.append(b_dict)
+    return jsonify(result)
+
+
 @app.route('/api/users/<int:user_id>', methods=['PUT'])
 @login_required
 def api_update_user(user_id):
