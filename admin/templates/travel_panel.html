@@ -153,9 +153,9 @@
                                 <tr data-visa-status="{{ req.visa_request_status }}" data-flight-status="{{ req.flight_request_status }}">
                                     <td>{{ req.id }}</td>
                                     <td><strong>@{{ req.username }}</strong></td>
-                                    <td>{{ req.first_name or '' }} {{ req.last_name or '' }}</td>
-                                    <td>{{ req.departure_from or '-' }}</td>
-                                    <td>{{ req.return_to or '-' }}</td>
+                                    <td>{{ req.first_name or '' }}</td>
+                                    <td>{{ req.city_from or '-' }}</td>
+                                    <td>{{ req.city_to or '-' }}</td>
                                     <td>
                                         {% if req.visa_status == 'have' %}
                                             <span class="badge bg-success">{{ get_text('visa_have') }}</span>
@@ -481,12 +481,12 @@
                     <tr><th>User ID</th><td>${escapeHtml(String(data.user_id))}</td></tr>
 
                     <tr class="table-secondary"><th colspan="2">${getText('personal_info')}</th></tr>
-                    <tr><th>${getText('full_name')}</th><td>${escapeHtml(data.first_name || '')} ${escapeHtml(data.last_name || '')}</td></tr>
+                    <tr><th>${getText('full_name')}</th><td>${escapeHtml(data.first_name || '')}</td></tr>
                     <tr><th>${getText('phone')}</th><td>${escapeHtml(data.phone || '-')}</td></tr>
 
                     <tr class="table-secondary"><th colspan="2">${getText('route_info')}</th></tr>
-                    <tr><th>${getText('departure_from')}</th><td>${escapeHtml(data.departure_from || '-')}</td></tr>
-                    <tr><th>${getText('return_to')}</th><td>${escapeHtml(data.return_to || '-')}</td></tr>
+                    <tr><th>${getText('departure_from')}</th><td>${escapeHtml(data.city_from || '-')}</td></tr>
+                    <tr><th>${getText('return_to')}</th><td>${escapeHtml(data.city_to || '-')}</td></tr>
                     <tr><th>${getText('needs_baggage')}</th><td>${data.needs_baggage ? '✅ Да' : '❌ Нет'}</td></tr>
                     <tr><th>${getText('hotel_needed')}</th><td>${data.hotel_needed ? '✅ Да' : '❌ Нет'}</td>
                     </tr>

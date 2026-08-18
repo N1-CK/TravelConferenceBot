@@ -384,6 +384,7 @@ TEXTS = {
         'flights_purchased': 'Билеты куплены',
         'visa_status_changed': 'Статус визы изменен на',
         'flight_status_changed': 'Статус билета изменен на',
+        'visa_status': 'Статус визы',
         'payment_type': 'Тип оплаты',
         'payment_details': 'Платежные данные',
         'consent_given': 'Согласие на обработку',
@@ -444,7 +445,8 @@ TEXTS = {
         'message_sent_success': 'Сообщение успешно отправлено!',
         'error_sending_tg': 'Ошибка при отправке сообщения в Telegram.',
         'error_user_not_found': 'Ошибка: ID пользователя не найден.',
-        'user_details': 'Данные пользователя'
+        'user_details': 'Данные пользователя',
+        'additional_info': 'Дополнительная информация'
 
     },
     'en': {
@@ -826,6 +828,7 @@ TEXTS = {
         'flights_purchased': 'Flights Purchased',
         'visa_status_changed': 'Visa status changed to',
         'flight_status_changed': 'Flight status changed to',
+        'visa_status': 'Visa status',
         'payment_type': 'Payment Type',
         'payment_details': 'Payment Details',
         'consent_given': 'Consent Given',
@@ -887,6 +890,7 @@ TEXTS = {
         'error_sending_tg': 'Error sending message to Telegram.',
         'error_user_not_found': 'Error: User ID not found.',
         'user_details': 'User Details',
+        'additional_info': 'Additional information'
     }
 }
 

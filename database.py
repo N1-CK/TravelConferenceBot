@@ -6,6 +6,8 @@ import asyncpg
 from dotenv import load_dotenv
 from datetime import datetime
 
+import re
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,36 @@ class Database:
             self.db_schema_pr = os.getenv('DB_SCHEMA_PR', 'travelconference_pr')
             self.db_schema_event = os.getenv('DB_SCHEMA_EVENT', 'travelconference_event')
             self.db_schema_admin = os.getenv('DB_SCHEMA_ADMIN', 'travelconference_admin')
+
+    def parse_passport_data(self, row_dict: dict) -> dict:
+        raw = row_dict.get('passport_data') or ''
+
+        # Парсим поля из текста passport_data, если в строке БД они пустые
+        if not row_dict.get('first_name'):
+            m = re.search(r'First Name:\s*(.+)', raw, re.IGNORECASE)
+            if m:
+                row_dict['first_name'] = m.group(1).strip()
+
+        if not row_dict.get('last_name'):
+            m = re.search(r'Last Name:\s*(.+)', raw, re.IGNORECASE)
+            if m:
+                row_dict['last_name'] = m.group(1).strip()
+
+        if not row_dict.get('phone'):
+            m = re.search(r'Phone:\s*(.+)', raw, re.IGNORECASE)
+            if m:
+                row_dict['phone'] = m.group(1).strip()
+
+        # Алиасы для городов (чтобы гарантированно отдавались под обоими именами)
+        city_from = row_dict.get('city_from') or row_dict.get('departure_from') or '-'
+        city_to = row_dict.get('city_to') or row_dict.get('return_to') or '-'
+
+        row_dict['city_from'] = city_from
+        row_dict['departure_from'] = city_from
+        row_dict['city_to'] = city_to
+        row_dict['return_to'] = city_to
+
+        return row_dict
 
     async def create_pool(self):
         """Создание пула подключений"""
@@ -909,7 +941,6 @@ class Database:
             logger.error(f"Error updating per diem status: {e}")
             return False
 
-    # database.py - Добавьте эти методы в класс Database
 
     async def get_all_travel_flight_requests(self) -> list:
         """Получить все заявки на билеты из travel_flight_request"""
@@ -960,7 +991,7 @@ class Database:
                     SELECT * FROM {self.db_schema_travel}.travel_flight_request 
                     ORDER BY created_at DESC
                 """)
-                return [dict(row) for row in rows]
+                return [self.parse_passport_data(dict(row)) for row in rows]
         except Exception as e:
             logger.error(f"Error getting travel flight requests: {e}")
             return []
@@ -973,7 +1004,7 @@ class Database:
                     SELECT * FROM {self.db_schema_travel}.travel_flight_request 
                     WHERE id = $1
                 """, request_id)
-                return dict(row) if row else {}
+                return self.parse_passport_data(dict(row)) if row else {}
         except Exception as e:
             logger.error(f"Error getting travel flight request {request_id}: {e}")
             return {}
