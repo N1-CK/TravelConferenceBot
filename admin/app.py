@@ -774,16 +774,11 @@ def event_panel():
 @group_required(['travel', 'admin'])
 def travel_panel():
     """Панель Travel-менеджера"""
-    # Получаем статистику
     stats = run_async(db.get_travel_stats())
-
-    # Получаем заявки на билеты и суточные
     requests = run_async(db.get_all_travel_flight_requests())
-    per_diem_requests = run_async(db.get_all_per_diem_requests())
 
     return render_template('travel_panel.html',
                            requests=requests,
-                           per_diem_requests=per_diem_requests,
                            stats=stats,
                            username=session.get('username'))
 

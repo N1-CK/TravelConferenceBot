@@ -943,53 +943,25 @@ class Database:
 
 
     async def get_all_travel_flight_requests(self) -> list:
-        """Получить все заявки на билеты из travel_flight_request"""
+        """Получить все заявки на билеты вместе с данными суточных"""
         try:
             async with self.pool.acquire() as conn:
-                # Убедимся, что нужные колонки существуют
-                try:
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
-                        ADD COLUMN IF NOT EXISTS visa_request_status TEXT DEFAULT 'pending'
-                    """)
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
-                        ADD COLUMN IF NOT EXISTS flight_request_status TEXT DEFAULT 'pending'
-                    """)
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
-                        ADD COLUMN IF NOT EXISTS first_name TEXT
-                    """)
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
-                        ADD COLUMN IF NOT EXISTS last_name TEXT
-                    """)
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
-                        ADD COLUMN IF NOT EXISTS phone TEXT
-                    """)
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
-                        ADD COLUMN IF NOT EXISTS departure_from TEXT
-                    """)
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
-                        ADD COLUMN IF NOT EXISTS return_to TEXT
-                    """)
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
-                        ADD COLUMN IF NOT EXISTS hotel_needed BOOLEAN DEFAULT FALSE
-                    """)
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
-                        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()
-                    """)
-                except Exception as e:
-                    logger.warning(f"Error adding columns: {e}")
-
                 rows = await conn.fetch(f"""
-                    SELECT * FROM {self.db_schema_travel}.travel_flight_request 
-                    ORDER BY created_at DESC
+                    SELECT 
+                        tfr.*,
+                        pdr.id as per_diem_id,
+                        pdr.payment_type,
+                        pdr.payment_details,
+                        COALESCE(pdr.status, 'pending') as per_diem_status
+                    FROM {self.db_schema_travel}.travel_flight_request tfr
+                    LEFT JOIN LATERAL (
+                        SELECT id, payment_type, payment_details, status
+                        FROM {self.db_schema_travel}.travel_per_diem_requests
+                        WHERE user_id = tfr.user_id
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    ) pdr ON true
+                    ORDER BY tfr.created_at DESC
                 """)
                 return [self.parse_passport_data(dict(row)) for row in rows]
         except Exception as e:
@@ -997,12 +969,25 @@ class Database:
             return []
 
     async def get_travel_flight_request_by_id(self, request_id: int) -> dict:
-        """Получить заявку на билет по ID"""
+        """Получить заявку на билет по ID вместе с данными суточных"""
         try:
             async with self.pool.acquire() as conn:
                 row = await conn.fetchrow(f"""
-                    SELECT * FROM {self.db_schema_travel}.travel_flight_request 
-                    WHERE id = $1
+                    SELECT 
+                        tfr.*,
+                        pdr.id as per_diem_id,
+                        pdr.payment_type,
+                        pdr.payment_details,
+                        COALESCE(pdr.status, 'pending') as per_diem_status
+                    FROM {self.db_schema_travel}.travel_flight_request tfr
+                    LEFT JOIN LATERAL (
+                        SELECT id, payment_type, payment_details, status
+                        FROM {self.db_schema_travel}.travel_per_diem_requests
+                        WHERE user_id = tfr.user_id
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    ) pdr ON true
+                    WHERE tfr.id = $1
                 """, request_id)
                 return self.parse_passport_data(dict(row)) if row else {}
         except Exception as e:
