@@ -13,6 +13,7 @@ import csv
 from werkzeug.utils import secure_filename
 from urllib.parse import unquote
 import requests
+import mimetypes
 
 
 import sys
@@ -1774,12 +1775,11 @@ def api_send_message():
 @app.route('/api/file/<file_id>')
 @login_required
 def api_get_file(file_id):
-    """Маршрут для скачивания файлов из Telegram"""
+    """Маршрут для отдачи файлов/картинок из Telegram"""
     bot_token = os.getenv('TG_BOT_TOKEN')
     if not bot_token or not file_id:
         return "Ошибка конфигурации", 500
 
-    # Если это просто имя файла (старые записи или ошибка), скачать не выйдет
     if len(file_id) < 20:
         return "Этот файл был удален с сервера и не имеет ID в Telegram", 404
 
@@ -1791,16 +1791,35 @@ def api_get_file(file_id):
 
         file_path = file_info['result']['file_path']
         download_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
+        filename = file_path.split('/')[-1]
 
-        # 2. Скачиваем и отдаем пользователю
+        # Определяем MIME-тип файла
+        mime_type, _ = mimetypes.guess_type(filename)
+        if not mime_type:
+            ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+            if ext in {'jpg', 'jpeg', 'png', 'webp', 'gif'}:
+                mime_type = f'image/{ext if ext != "jpg" else "jpeg"}'
+            else:
+                mime_type = 'application/octet-stream'
+
+        # 2. Скачиваем файл из Telegram
         file_data = requests.get(download_url)
-        return send_file(
+
+        # Если передан параметр ?download=1, то скачиваем как файл, иначе отображаем встроенно (inline)
+        force_download = request.args.get('download') == '1'
+
+        response = send_file(
             io.BytesIO(file_data.content),
-            download_name=file_path.split('/')[-1],
-            as_attachment=True
+            mimetype=mime_type,
+            as_attachment=force_download,
+            download_name=filename
         )
+        # Кэшируем медиа в браузере на 24 часа для мгновенной отрисовки без лагов
+        response.headers['Cache-Control'] = 'public, max-age=86400'
+        return response
+
     except Exception as e:
-        logger.error(f"Download error: {e}")
+        logger.error(f"Download/View error: {e}")
         return "Ошибка при загрузке файла", 500
 
 

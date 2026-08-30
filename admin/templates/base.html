@@ -18,12 +18,22 @@
         }
 
         .sidebar {
-            min-height: 100vh;
+            height: 100vh;
+            position: sticky;
+            top: 0;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             color: #e0e0e0;
             transition: all 0.3s;
             display: flex;
             flex-direction: column;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                height: auto;
+                position: relative;
+            }
         }
 
         .sidebar .nav-link {
@@ -472,14 +482,43 @@
         }
     </script>
     <script>
-        // Глобальная система уведомлений о новых сообщениях
         let globalPreviousConversations = {};
+        let isInitialNotificationsLoad = true;
 
-        // === ДОБАВЛЯЕМ ЗВУК ===
-        // Я указал ссылку на бесплатный короткий звук уведомления.
-        // Если захотите свой — скачайте mp3, положите в папку static и поменяйте ссылку на '/static/ваш_звук.mp3'
-        const notificationSound = new Audio('./static/notification_sound.wav');
-        notificationSound.volume = 0.5; // Громкость от 0.0 до 1.0
+        // Генератор приятного Telegram-подобного звука через Web Audio API
+        function playNotificationBeep() {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContext) return;
+                const ctx = new AudioContext();
+
+                // Первый тон (800 Hz)
+                const osc1 = ctx.createOscillator();
+                const gain1 = ctx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+                gain1.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start(ctx.currentTime);
+                osc1.stop(ctx.currentTime + 0.15);
+
+                // Второй тон (1200 Hz) через 80мс
+                const osc2 = ctx.createOscillator();
+                const gain2 = ctx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.08); // A5
+                gain2.gain.setValueAtTime(0.15, ctx.currentTime + 0.08);
+                gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.start(ctx.currentTime + 0.08);
+                osc2.stop(ctx.currentTime + 0.3);
+            } catch (e) {
+                console.warn('AudioContext notification sound error:', e);
+            }
+        }
 
         async function checkGlobalNotifications() {
             try {
@@ -489,39 +528,52 @@
 
                 conversations.forEach(conv => {
                     const prev = globalPreviousConversations[conv.user_id];
+                    const prevCount = prev ? prev.unread_count : 0;
 
-                    if (prev && conv.unread_count > prev.unread_count) {
-                        // Проверяем, не открыт ли в данный момент чат именно с этим пользователем
+                    // Если счетчик вырос (или при первой загрузке обнаружены непрочитанные)
+                    if (!isInitialNotificationsLoad && conv.unread_count > prevCount) {
                         const isCurrentlyChatting = (typeof currentUserId !== 'undefined' && currentUserId === conv.user_id && !document.hidden);
 
                         if (!isCurrentlyChatting) {
                             showToast(`Новое сообщение от @${conv.username}`, 'info');
-
-                            // === ВОСПРОИЗВОДИМ ЗВУК ===
-                            // catch нужен, потому что браузеры блокируют звук, если пользователь еще ни разу не кликнул по странице
-                            notificationSound.play().catch(e => console.log('Звук заблокирован политикой браузера', e));
+                            playNotificationBeep();
 
                             if ("Notification" in window && Notification.permission === "granted") {
-                                new Notification("Новое сообщение", { body: `От: @${conv.username}` });
+                                new Notification("Новое сообщение", {
+                                    body: `От: @${conv.username}\n${conv.last_message ? conv.last_message.replace(/<[^>]*>/g, '') : ''}`,
+                                    icon: '/static/img/favicon.png'
+                                });
                             }
                         }
                     }
                     globalPreviousConversations[conv.user_id] = { unread_count: conv.unread_count };
                 });
+
+                isInitialNotificationsLoad = false;
             } catch (e) {
                 console.error('Ошибка проверки уведомлений:', e);
             }
 
-            setTimeout(checkGlobalNotifications, 5000);
+            setTimeout(checkGlobalNotifications, 4000);
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Запрашиваем права на пуши от браузера
             if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
                 Notification.requestPermission();
             }
 
-            // Запускаем глобальную проверку только если менеджер авторизован
+            // Разблокировка AudioContext при первом же клике пользователя по странице
+            document.addEventListener('click', function unlockAudio() {
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        const ctx = new AudioContext();
+                        ctx.resume();
+                    }
+                } catch(e) {}
+                document.removeEventListener('click', unlockAudio);
+            }, { once: true });
+
             {% if session.logged_in %}
             checkGlobalNotifications();
             {% endif %}

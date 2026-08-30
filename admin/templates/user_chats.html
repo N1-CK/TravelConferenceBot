@@ -10,6 +10,7 @@
     .chat-header { padding: 15px 20px; border-bottom: 1px solid #dee2e6; background: white; }
     .chat-messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px; background: #f8f9fa; }
 
+
     /* Улучшенный футер чата */
     .chat-input { padding: 14px 20px; border-top: 1px solid #dee2e6; background: #ffffff; }
     .chat-input-wrapper {
@@ -213,16 +214,19 @@
     .tg-files-container {
         display: flex;
         flex-direction: column;
-        gap: 6px;
-        margin-bottom: 8px;
+        gap: 4px;
+        margin-bottom: 4px;
     }
     .tg-file-card {
         display: flex;
         align-items: center;
-        padding: 8px 12px;
-        border-radius: 12px;
+        padding: 6px 10px;
+        border-radius: 10px;
         text-decoration: none;
-        transition: all 0.2s ease;
+        transition: all 0.15s ease;
+        margin: 0;
+        width: 100%;
+        box-sizing: border-box;
     }
     .message.incoming .tg-file-card {
         background: #f1f5f9;
@@ -241,15 +245,15 @@
         background: rgba(255, 255, 255, 0.28);
     }
     .tg-file-icon {
-        width: 38px;
-        height: 38px;
-        min-width: 38px;
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-right: 10px;
-        font-size: 1.2rem;
+        margin-right: 8px;
+        font-size: 1rem;
     }
     .message.incoming .tg-file-icon {
         background: #667eea;
@@ -260,15 +264,68 @@
         color: #ffffff;
     }
     .tg-file-badge {
-        font-size: 0.68rem;
-        padding: 2px 6px;
-        border-radius: 6px;
+        font-size: 0.65rem;
+        padding: 1px 5px;
+        border-radius: 4px;
         background: rgba(0,0,0,0.06);
         display: inline-block;
-        margin-top: 2px;
+        margin-top: 1px;
     }
     .message.outgoing .tg-file-badge {
         background: rgba(255,255,255,0.2);
+    }
+
+    /* Компактная Telegram-сетка изображений */
+    .tg-images-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-bottom: 4px;
+        max-width: 340px;
+    }
+    .tg-img-wrapper {
+        position: relative;
+        overflow: hidden;
+        border-radius: 10px;
+        margin: 0;
+        padding: 0;
+    }
+    .tg-images-grid.single .tg-img-wrapper {
+        width: 100%;
+        max-width: 320px;
+    }
+    .tg-images-grid.multi .tg-img-wrapper {
+        width: calc(50% - 2px);
+        height: 125px;
+    }
+    .tg-chat-image {
+        width: 100%;
+        height: 100%;
+        max-height: 250px;
+        object-fit: cover;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: transform 0.15s ease, opacity 0.15s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        display: block;
+    }
+    .tg-chat-image:hover {
+        transform: scale(1.02);
+        opacity: 0.95;
+    }
+
+    /* Кастомный аудиоплеер для голосовых */
+    .tg-voice-player {
+        display: flex;
+        align-items: center;
+        width: 250px;
+        height: 38px;
+        border-radius: 20px;
+        outline: none;
+        margin-bottom: 4px;
+    }
+    .message.outgoing .tg-voice-player {
+        filter: invert(1) hue-rotate(180deg);
     }
 
     /* Чипы прикрепленных файлов с крестиком */
@@ -303,6 +360,7 @@
         background: #dc2626;
         color: #ffffff;
     }
+
 </style>
 {% endblock %}
 
@@ -663,6 +721,14 @@
         });
     }
 
+    function openImageModal(fileId) {
+        const modalImg = document.getElementById('imageModalSrc');
+        const downloadBtn = document.getElementById('imageModalDownload');
+        modalImg.src = `/api/file/${fileId}`;
+        downloadBtn.href = `/api/file/${fileId}?download=1`;
+        new bootstrap.Modal(document.getElementById('imageModal')).show();
+    }
+
     function getSelectionStart() { return replyMessageInput.selectionStart; }
     function getSelectionEnd() { return replyMessageInput.selectionEnd; }
     function setSelectionRange(start, end) {
@@ -703,6 +769,38 @@
         const newPos = start + linkText.length;
         setSelectionRange(newPos, newPos);
         updateChatPreview();
+    }
+
+    // === СИСТЕМА ЧЕРНОВИКОВ (DRAFTS) ===
+    function saveDraft(userId) {
+        if (!userId) return;
+        const text = replyMessageInput.value;
+        if (text && text.trim().length > 0) {
+            localStorage.setItem(`chat_draft_${userId}`, text);
+        } else {
+            localStorage.removeItem(`chat_draft_${userId}`);
+        }
+    }
+
+    function restoreDraft(userId) {
+        if (!userId) return;
+        const draft = localStorage.getItem(`chat_draft_${userId}`) || '';
+        replyMessageInput.value = draft;
+        autoResizeTextarea(replyMessageInput);
+        updateChatPreview();
+    }
+
+    function clearDraft(userId) {
+        if (!userId) return;
+        localStorage.removeItem(`chat_draft_${userId}`);
+    }
+
+    // Сохраняем черновик при каждом вводе
+    if (replyMessageInput) {
+        replyMessageInput.addEventListener('input', () => {
+            if (currentUserId) saveDraft(currentUserId);
+            updateChatPreview();
+        });
     }
 
     function insertChatEmoji(emoji) {
@@ -834,6 +932,28 @@
         }
     }
 
+    function checkAudioOrDoc(fileId) {
+        const wrap = document.getElementById(`media_wrap_${fileId}`);
+        const audio = document.getElementById(`audio_${fileId}`);
+        const doc = document.getElementById(`doc_${fileId}`);
+        if (!wrap) return;
+
+        wrap.style.display = 'flex';
+
+        fetch(`/api/file/${fileId}`, { method: 'HEAD' })
+            .then(res => {
+                const ct = res.headers.get('Content-Type') || '';
+                if (ct.startsWith('audio/') || ct.includes('ogg') || ct.includes('opus')) {
+                    audio.style.display = 'block';
+                } else {
+                    doc.style.display = 'flex';
+                }
+            })
+            .catch(() => {
+                doc.style.display = 'flex';
+            });
+    }
+
     function initUserCardTrigger() {
         const header = document.querySelector('.chat-header');
         if (header) {
@@ -877,6 +997,11 @@
         }
 
         if (!isPollingReq) {
+            // Сохраняем черновик предыдущего диалога перед переходом
+            if (currentUserId && currentUserId !== userId) {
+                saveDraft(currentUserId);
+            }
+
             currentUserId = userId;
             renderedMessageUids.clear();
             isPolling = true;
@@ -888,6 +1013,9 @@
                 item.classList.remove('active');
                 if (item.dataset.userId == userId) item.classList.add('active');
             });
+
+            // Восстанавливаем черновик для выбранного чата
+            restoreDraft(userId);
         }
 
         try {
@@ -957,25 +1085,57 @@
                         const dept = msg.source_type.replace('_question', '').toUpperCase();
                         content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">[${locales.questionFrom} ${dept}]</small><br>${msg.message_text}`;
                     } else {
+                        // Отрисовка вложений: Картинки, Голосовые/Аудио, Документы
                         if (msg.files && msg.files.length > 0) {
+                            const isSingle = msg.files.length === 1;
+
+                            content += `<div class="tg-files-wrapper mb-1">`;
+
+                            // Сетка изображений
+                            content += `<div class="tg-images-grid ${isSingle ? 'single' : 'multi'}">`;
+                            msg.files.forEach((fId) => {
+                                content += `
+                                <div class="tg-img-wrapper" id="img_wrap_${fId}">
+                                    <img src="/api/file/${fId}"
+                                         loading="lazy"
+                                         class="tg-chat-image"
+                                         alt="Image"
+                                         onclick="openImageModal('${fId}')"
+                                         onerror="this.closest('.tg-img-wrapper').remove(); checkAudioOrDoc('${fId}');" />
+                                </div>`;
+                            });
+                            content += `</div>`;
+
+                            // Список для голосовых и документов
                             content += `<div class="tg-files-container">`;
                             msg.files.forEach((fId, index) => {
                                 content += `
-                                <a href="/api/file/${fId}" target="_blank" class="tg-file-card">
-                                    <div class="tg-file-icon">
-                                        <i class="bi bi-file-earmark-text-fill"></i>
-                                    </div>
-                                    <div class="text-truncate flex-grow-1" style="max-width: 200px;">
-                                        <div style="font-size: 0.85rem; font-weight: 600;">${locales.attachedFile} ${msg.files.length > 1 ? '#' + (index + 1) : ''}</div>
-                                        <span class="tg-file-badge">${locales.downloadView}</span>
-                                    </div>
-                                </a>`;
+                                <div id="media_wrap_${fId}" style="display:none; flex-direction:column; gap:4px;">
+                                    <!-- Аудиоплеер для голосовых -->
+                                    <audio controls class="tg-voice-player" id="audio_${fId}" preload="none" style="display:none;">
+                                        <source src="/api/file/${fId}" type="audio/ogg">
+                                        <source src="/api/file/${fId}" type="audio/mp4">
+                                        <source src="/api/file/${fId}" type="audio/mpeg">
+                                    </audio>
+
+                                    <!-- Карточка для файлов и логов -->
+                                    <a href="/api/file/${fId}?download=1" target="_blank" id="doc_${fId}" class="tg-file-card" style="display: none;">
+                                        <div class="tg-file-icon">
+                                            <i class="bi bi-file-earmark-text-fill"></i>
+                                        </div>
+                                        <div class="text-truncate flex-grow-1" style="max-width: 200px;">
+                                            <div style="font-size: 0.82rem; font-weight: 600; line-height: 1.2;">${locales.attachedFile} ${msg.files.length > 1 ? '#' + (index + 1) : ''}</div>
+                                            <span class="tg-file-badge">${locales.downloadView}</span>
+                                        </div>
+                                    </a>
+                                </div>`;
                             });
+                            content += `</div>`;
                             content += `</div>`;
                         }
 
                         if (msg.message_text) {
-                            content += `<div>${msg.message_text}</div>`;
+                            content += `<div style="margin-top: ${msg.files && msg.files.length > 0 ? '4px' : '0'};">${msg.message_text}</div>`;
                         }
                     }
 
@@ -1120,10 +1280,18 @@
                 try {
                     const data = JSON.parse(xhr.responseText);
                     if (data.success) {
+                        // 1. Очищаем сохраненный черновик для текущего пользователя
+                        clearDraft(currentUserId);
+
+                        // 2. Сбрасываем значение поля ввода и высоту textarea
                         msgInput.value = '';
                         autoResizeTextarea(msgInput);
-                        selectedFilesQueue = []; // Очищаем очередь файлов
+
+                        // 3. Очищаем очередь прикрепленных файлов
+                        selectedFilesQueue = [];
                         renderFileList();
+
+                        // 4. Обновляем предпросмотр и подгружаем сообщения
                         updateChatPreview();
                         loadChat(currentUserId, false);
                     } else {
@@ -1401,4 +1569,19 @@
     loadAllQuestions();
     updateSidebar();
 </script>
+<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true" style="background: rgba(0,0,0,0.85);">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content" style="background: transparent; border: none;">
+            <div class="modal-header border-0 pb-0">
+                <a id="imageModalDownload" href="#" class="btn btn-sm btn-light rounded-pill px-3 me-2" target="_blank">
+                    <i class="bi bi-download me-1"></i> {{ get_text('btn_download') }}
+                </a>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-2">
+                <img id="imageModalSrc" src="" class="img-fluid rounded-3" style="max-height: 82vh; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
