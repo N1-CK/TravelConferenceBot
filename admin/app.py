@@ -38,10 +38,16 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 app.config['UPLOAD_FOLDER'] = '/tmp'
 
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv'}
+# Запрещаем только опасные исполняемые файлы и системные скрипты
+FORBIDDEN_EXTENSIONS = {
+    'exe', 'bat', 'cmd', 'sh', 'bash', 'bin', 'msi', 'vbs', 'ps1', 'jar', 'apk', 'com', 'scr'
+}
 
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    if '.' not in filename:
+        return True
+    ext = filename.rsplit('.', 1)[1].lower()
+    return ext not in FORBIDDEN_EXTENSIONS
 
 
 # ============================================
@@ -194,30 +200,114 @@ class TelegramBot:
         self.api_url = f"https://api.telegram.org/bot{bot_token}"
 
     async def send_message(self, chat_id, text, file=None):
-        """Отправить сообщение через Telegram API"""
+        """Отправить одиночное сообщение, документ, фото или голосовое"""
         import aiohttp
-        import os
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=300, connect=20, sock_read=300)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             if file:
-                url = f"{self.api_url}/sendDocument"
+                ext = file.rsplit('.', 1)[-1].lower() if '.' in file else ''
+
+                # Если это голосовое сообщение
+                if ext in {'ogg', 'oga', 'opus'}:
+                    url = f"{self.api_url}/sendVoice"
+                    field_name = 'voice'
+                # Если это музыка
+                elif ext in {'mp3', 'm4a', 'wav', 'flac'}:
+                    url = f"{self.api_url}/sendAudio"
+                    field_name = 'audio'
+                # Если это картинка
+                elif ext in {'jpg', 'jpeg', 'png', 'webp'}:
+                    url = f"{self.api_url}/sendPhoto"
+                    field_name = 'photo'
+                else:
+                    url = f"{self.api_url}/sendDocument"
+                    field_name = 'document'
+
                 form_data = aiohttp.FormData()
                 form_data.add_field('chat_id', str(chat_id))
-                form_data.add_field('document', open(file, 'rb'), filename=os.path.basename(file))
-                if text:
-                    form_data.add_field('caption', text)
-                    form_data.add_field('parse_mode', 'HTML')
-                async with session.post(url, data=form_data) as resp:
-                    result = await resp.json()
-                    if result.get('ok'):
-                        # ВОЗВРАЩАЕМ file_id, чтобы сохранить его в БД
-                        return result.get('result', {}).get('document', {}).get('file_id')
-                    return False
+                with open(file, 'rb') as f:
+                    form_data.add_field(field_name, f, filename=os.path.basename(file))
+                    if text:
+                        form_data.add_field('caption', text)
+                        form_data.add_field('parse_mode', 'HTML')
+                    async with session.post(url, data=form_data) as resp:
+                        result = await resp.json()
+                        if result.get('ok'):
+                            res = result.get('result', {})
+                            doc = res.get('document') or res.get('voice') or res.get('audio') or (
+                                res.get('photo', [{}])[-1] if 'photo' in res else {})
+                            return doc.get('file_id') or True
+                        else:
+                            logger.error(f"Telegram API send error: {result}")
+                            return False
             else:
                 url = f"{self.api_url}/sendMessage"
                 payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
                 async with session.post(url, json=payload) as resp:
                     result = await resp.json()
                     return result.get('ok', False)
+
+    async def send_documents(self, chat_id, text, files=None):
+        """Отправка группы файлов/документов/логов/аудио через sendMediaGroup"""
+        import aiohttp
+        import json
+
+        if not files:
+            await self.send_message(chat_id, text)
+            return []
+
+        if len(files) == 1:
+            file_id = await self.send_message(chat_id, text, files[0])
+            return [file_id] if isinstance(file_id, str) else []
+
+        timeout = aiohttp.ClientTimeout(total=300, connect=30, sock_read=300)
+        form_data = aiohttp.FormData()
+        form_data.add_field('chat_id', str(chat_id))
+
+        media_group = []
+        opened_files = []
+        try:
+            for idx, file_path in enumerate(files):
+                attach_name = f"file_{idx}"
+                f = open(file_path, 'rb')
+                opened_files.append(f)
+                form_data.add_field(attach_name, f, filename=os.path.basename(file_path))
+
+                # Определяем тип медиа для Telegram
+                ext = file_path.rsplit('.', 1)[-1].lower() if '.' in file_path else ''
+                if ext in {'jpg', 'jpeg', 'png'}:
+                    media_type = 'photo'
+                elif ext in {'mp3', 'm4a', 'wav', 'flac'}:
+                    media_type = 'audio'
+                else:
+                    media_type = 'document'
+
+                item = {'type': media_type, 'media': f'attach://{attach_name}'}
+                if idx == 0 and text:
+                    item['caption'] = text
+                    item['parse_mode'] = 'HTML'
+                media_group.append(item)
+
+            form_data.add_field('media', json.dumps(media_group))
+
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                url = f"{self.api_url}/sendMediaGroup"
+                async with session.post(url, data=form_data) as resp:
+                    res_json = await resp.json()
+                    file_ids = []
+                    if res_json.get('ok'):
+                        for msg in res_json.get('result', []):
+                            doc = msg.get('document') or msg.get('voice') or msg.get('audio') or (
+                                msg.get('photo', [{}])[-1] if 'photo' in msg else {})
+                            if 'file_id' in doc:
+                                file_ids.append(doc['file_id'])
+                        return file_ids
+                    else:
+                        logger.error(f"Telegram error sendMediaGroup: {res_json}")
+                        return []
+        finally:
+            for f in opened_files:
+                f.close()
 
     async def broadcast_to_users(self, users, message, files=None):
         """Массовая рассылка пользователям с файлами и детальной статистикой"""
@@ -1618,55 +1708,67 @@ def send_message_to_user():
 @app.route('/api/send_message', methods=['POST'])
 @login_required
 def api_send_message():
-    """Отправка сообщения с сохранением реального Telegram file_id"""
-    user_id = request.form.get('user_id', type=int)
-    message = request.form.get('message')
-    file = request.files.get('file')
+    """Отправка сообщения и группы файлов пользователю в чат"""
+    user_id = request.form.get('user_id')
+    message = request.form.get('message', '')
 
-    if not user_id: return jsonify({'error': 'User ID required'}), 400
+    if not user_id:
+        return jsonify({'success': False, 'error': 'User ID required'}), 400
 
-    manager_display_name = f"{session.get('full_name', '')} (@{session.get('username', '')})"
+    files = request.files.getlist('files')
+    if not files and 'file' in request.files:
+        files = [request.files['file']]
 
-    filepath = None
-    if file:
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
+    if len(files) > 10:
+        return jsonify({'success': False, 'error': 'Максимум 10 файлов за раз'}), 400
 
-    # 1. Сначала отправляем в Telegram, чтобы получить настоящий file_id
-    telegram_file_id = None
+    saved_files = []
+    for file in files:
+        if file and file.filename:
+            if not allowed_file(file.filename):
+                return jsonify({'success': False, 'error': f'Запрещенный формат: {file.filename}'}), 400
+
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            saved_files.append(filepath)
+
     try:
-        bot_token = os.getenv('TG_BOT_TOKEN')
+        sender_name = session.get('full_name') or session.get('username') or 'Менеджер'
 
-        async def send_to_tg():
-            async with Bot(token=bot_token) as bot_obj:
-                if filepath:
-                    from aiogram.types import FSInputFile
-                    res = await bot_obj.send_document(user_id, FSInputFile(filepath), caption=message,
-                                                      parse_mode="HTML")
-                    return res.document.file_id
-                else:
-                    await bot_obj.send_message(user_id, message, parse_mode="HTML")
-                    return None
+        if saved_files:
+            tg_file_ids = run_async(bot.send_documents(user_id, message, saved_files), timeout=300)
 
-        telegram_file_id = run_async(send_to_tg())
+            messages_to_insert = []
+            if tg_file_ids:
+                for idx, tg_file_id in enumerate(tg_file_ids):
+                    text_to_save = message if idx == 0 else ""
+                    messages_to_insert.append(
+                        (int(user_id), sender_name, 'outgoing', text_to_save, None, tg_file_id)
+                    )
+            if messages_to_insert:
+                run_async(db.save_user_messages_bulk(messages_to_insert), timeout=60)
+        else:
+            res = run_async(bot.send_message(user_id, message), timeout=60)
+            if res:
+                run_async(db.save_user_messages_bulk([
+                    (int(user_id), sender_name, 'outgoing', message, None, None)
+                ]), timeout=60)
+            else:
+                return jsonify({'success': False, 'error': 'Не удалось отправить сообщение'}), 500
+
+        return jsonify({'success': True})
+
     except Exception as e:
-        logger.error(f"TG Send error: {e}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error sending message in chat: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
     finally:
-        if filepath and os.path.exists(filepath): os.remove(filepath)
-
-    # 2. Теперь сохраняем в базу уже с ПРАВИЛЬНЫМ file_id
-    msg_id = run_async(db.save_user_message(
-        user_id=user_id,
-        username=manager_display_name,
-        message_text=message,
-        file_type=file.content_type if file else None,
-        file_id=telegram_file_id,  # Сохраняем ID от Telegram!
-        direction='outgoing'
-    ))
-
-    return jsonify({'success': True, 'message_id': msg_id})
+        for fp in saved_files:
+            try:
+                if os.path.exists(fp):
+                    os.remove(fp)
+            except Exception:
+                pass
 
 
 @app.route('/api/file/<file_id>')

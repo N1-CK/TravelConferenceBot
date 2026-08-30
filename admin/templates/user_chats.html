@@ -9,7 +9,71 @@
     .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden;}
     .chat-header { padding: 15px 20px; border-bottom: 1px solid #dee2e6; background: white; }
     .chat-messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px; background: #f8f9fa; }
-    .chat-input { padding: 15px 20px; border-top: 1px solid #dee2e6; background: white; }
+
+    /* Улучшенный футер чата */
+    .chat-input { padding: 14px 20px; border-top: 1px solid #dee2e6; background: #ffffff; }
+    .chat-input-wrapper {
+        display: flex;
+        align-items: flex-end;
+        background: #f8f9fa;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 24px;
+        padding: 6px 12px 6px 14px;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .chat-input-wrapper:focus-within {
+        border-color: #667eea;
+        background: #ffffff;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+    }
+    .chat-textarea {
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        resize: none;
+        padding: 6px 8px;
+        max-height: 120px;
+        font-size: 0.95rem;
+        line-height: 1.4;
+    }
+    .chat-textarea:focus { outline: none !important; }
+
+    .btn-attach {
+        color: #64748b;
+        background: transparent;
+        border: none;
+        padding: 6px 8px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 1.25rem;
+    }
+    .btn-attach:hover { color: #667eea; background: rgba(102, 126, 234, 0.1); }
+
+    .btn-send-tg {
+        width: 38px;
+        height: 38px;
+        min-width: 38px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.15s, box-shadow 0.2s;
+        box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+    }
+    .btn-send-tg:hover:not(:disabled) {
+        transform: scale(1.06);
+        box-shadow: 0 4px 10px rgba(102, 126, 234, 0.5);
+    }
+    .btn-send-tg:disabled { opacity: 0.6; cursor: not-allowed; }
+
     .conversation-item { padding: 15px; border-bottom: 1px solid #dee2e6; cursor: pointer; transition: background 0.2s; }
     .conversation-item:hover { background: #e9ecef; }
     .conversation-item.active { background: #e7f1ff; border-left: 3px solid #667eea; }
@@ -40,7 +104,7 @@
     .message.incoming .message-sender { color: #4a5568; }
     .message-time-inline { font-size: 0.65rem; opacity: 0.7; float: right; margin-left: 10px; margin-top: 5px; }
     .conversation-item .last-msg { font-size: 0.8rem; color: #6c757d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    /* Добавить в конец блока extra_css */
+
     .emoji-dropdown {
         position: absolute;
         background: white;
@@ -71,20 +135,22 @@
     .emoji-item:hover { background: #f1f5f9; transform: scale(1.1); }
     .position-relative { position: relative; }
     .format-toolbar { position: relative; }
-    /* Карточка пользователя */
+
     /* Карточка пользователя */
     .user-info-card {
         position: absolute;
         top: 60px;
         right: 20px;
-        width: 280px;
+        width: 360px;
+        max-height: calc(100vh - 180px);
         background: white;
         border-radius: 16px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        box-shadow: 0 10px 40px rgba(0,0,0,0.18);
         z-index: 1000;
         display: none;
         border: 1px solid #e2e8f0;
         animation: slideDown 0.2s ease;
+        overflow-y: auto;
     }
     .user-info-card.show { display: block; }
     @keyframes slideDown {
@@ -96,25 +162,41 @@
         color: white;
         padding: 12px 16px;
         border-radius: 16px 16px 0 0;
+        position: sticky;
+        top: 0;
+        z-index: 10;
     }
     .user-info-card .card-body { padding: 16px; }
     .user-info-card .info-row {
         display: flex;
-        margin-bottom: 12px;
-        font-size: 0.9rem;
+        margin-bottom: 10px;
+        font-size: 0.85rem;
         line-height: 1.4;
     }
     .user-info-card .info-label {
-        width: 85px;
-        min-width: 85px;
+        width: 120px;
+        min-width: 120px;
         font-weight: 600;
-        color: #4a5568;
+        color: #64748b;
     }
     .user-info-card .info-value {
         flex: 1;
-        color: #2d3748;
+        color: #1e293b;
         word-break: break-word;
-        padding-left: 8px;
+        padding-left: 6px;
+        white-space: normal;
+        overflow-wrap: break-word;
+    }
+    .user-info-card .section-divider {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #667eea;
+        background: #f1f5f9;
+        padding: 4px 8px;
+        border-radius: 6px;
+        margin: 12px 0 8px 0;
     }
     .user-info-card .action-buttons {
         display: flex;
@@ -123,18 +205,103 @@
         padding-top: 12px;
         border-top: 1px solid #e2e8f0;
     }
-    .user-info-card .card-body {
-        padding: 16px;
-    }
-    .user-info-card .info-value {
-        flex: 1;
-        color: #2d3748;
-        word-break: break-word;
-        white-space: normal;
-        overflow-wrap: break-word;
-    }
     .chat-messages div, .message-content {
         white-space: pre-wrap !important;
+    }
+
+    /* Карточки файлов в стиле Telegram */
+    .tg-files-container {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+    .tg-file-card {
+        display: flex;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 12px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+    .message.incoming .tg-file-card {
+        background: #f1f5f9;
+        color: #1e293b;
+        border: 1px solid #e2e8f0;
+    }
+    .message.incoming .tg-file-card:hover {
+        background: #e2e8f0;
+    }
+    .message.outgoing .tg-file-card {
+        background: rgba(255, 255, 255, 0.18);
+        color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+    .message.outgoing .tg-file-card:hover {
+        background: rgba(255, 255, 255, 0.28);
+    }
+    .tg-file-icon {
+        width: 38px;
+        height: 38px;
+        min-width: 38px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 10px;
+        font-size: 1.2rem;
+    }
+    .message.incoming .tg-file-icon {
+        background: #667eea;
+        color: #ffffff;
+    }
+    .message.outgoing .tg-file-icon {
+        background: rgba(255, 255, 255, 0.3);
+        color: #ffffff;
+    }
+    .tg-file-badge {
+        font-size: 0.68rem;
+        padding: 2px 6px;
+        border-radius: 6px;
+        background: rgba(0,0,0,0.06);
+        display: inline-block;
+        margin-top: 2px;
+    }
+    .message.outgoing .tg-file-badge {
+        background: rgba(255,255,255,0.2);
+    }
+
+    /* Чипы прикрепленных файлов с крестиком */
+    .file-chip {
+        display: inline-flex;
+        align-items: center;
+        background: #eef2ff;
+        border: 1px solid #c7d2fe;
+        color: #4338ca;
+        padding: 4px 10px;
+        border-radius: 16px;
+        font-size: 0.8rem;
+        margin: 3px 6px 3px 0;
+        transition: all 0.2s;
+    }
+    .file-chip:hover {
+        background: #e0e7ff;
+    }
+    .file-chip-remove {
+        cursor: pointer;
+        margin-left: 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        color: #6366f1;
+        transition: all 0.15s;
+    }
+    .file-chip-remove:hover {
+        background: #dc2626;
+        color: #ffffff;
     }
 </style>
 {% endblock %}
@@ -168,7 +335,6 @@
                                 <strong>{{ conv.username }}</strong>
                                 {% if conv.unread_count > 0 %}<span class="unread-badge">{{ conv.unread_count }}</span>{% endif %}
                             </div>
-                            <small class="text-muted d-block text-truncate" style="max-width: 180px;">{{ (conv.last_message or '...')|truncate(40) }}</small>
                             <small class="text-muted d-block text-truncate" style="max-width: 180px;">{{ (conv.last_message or '...') | striptags | truncate(40) }}</small>
                         </div>
                     </div>
@@ -194,7 +360,7 @@
                 <div class="card-body">
                     <div class="info-row">
                         <div class="info-label">{{ get_text('full_name') }}:</div>
-                        <div class="info-value" id="cardFullName">-</div>
+                        <div class="info-value fw-bold" id="cardFullName">-</div>
                     </div>
                     <div class="info-row">
                         <div class="info-label">{{ get_text('company') }}:</div>
@@ -206,8 +372,27 @@
                     </div>
                     <div class="info-row">
                         <div class="info-label">ID:</div>
-                        <div class="info-value" id="cardUserId">-</div>
+                        <div class="info-value text-muted" id="cardUserId">-</div>
                     </div>
+
+                    <div class="section-divider">{{ get_text('passport_section_title') }}</div>
+                    <div class="info-row"><div class="info-label">{{ get_text('first_name') }}:</div><div class="info-value" id="cardPassFirstName">-</div></div>
+                    <div class="info-row"><div class="info-label">{{ get_text('last_name') }}:</div><div class="info-value" id="cardPassLastName">-</div></div>
+                    <div class="info-row"><div class="info-label">{{ get_text('phone') }}:</div><div class="info-value fw-bold" id="cardPhone">-</div></div>
+                    <div class="info-row"><div class="info-label">{{ get_text('passport_number') }}:</div><div class="info-value fw-bold" id="cardPassNumber">-</div></div>
+                    <div class="info-row"><div class="info-label">{{ get_text('birth_date') }}:</div><div class="info-value" id="cardPassBirthDate">-</div></div>
+                    <div class="info-row"><div class="info-label">{{ get_text('passport_country') }}:</div><div class="info-value" id="cardPassCountry">-</div></div>
+                    <div class="info-row"><div class="info-label">{{ get_text('issue_date') }}:</div><div class="info-value" id="cardPassIssueDate">-</div></div>
+                    <div class="info-row"><div class="info-label">{{ get_text('expiry_date') }}:</div><div class="info-value" id="cardPassExpiryDate">-</div></div>
+
+                    <div class="section-divider">{{ get_text('flight_section_title') }}</div>
+                    <div class="info-row"><div class="info-label">{{ get_text('route') }}:</div><div class="info-value" id="cardRoute">-</div></div>
+                    <div class="info-row"><div class="info-label">{{ get_text('tickets') }}:</div><div class="info-value" id="cardFlightStatus">-</div></div>
+
+                    <div class="section-divider">{{ get_text('per_diem_section_title') }}</div>
+                    <div class="info-row"><div class="info-label">{{ get_text('status') }}:</div><div class="info-value" id="cardPerDiemStatus">-</div></div>
+                    <div class="info-row"><div class="info-label">{{ get_text('per_diem_details') }}:</div><div class="info-value" id="cardPerDiemDetails">-</div></div>
+
                     <div class="action-buttons">
                         <button class="btn btn-sm btn-outline-primary w-100" onclick="goToUserDetails()">
                             <i class="bi bi-info-circle"></i> {{ get_text('user_details') }}
@@ -221,57 +406,68 @@
             </div>
 
             <div class="chat-input" id="chatInput" style="display: none;">
-    <div class="format-toolbar mb-2" style="background: #f8f9fa; border-radius: 8px; padding: 6px 12px; display: inline-flex; gap: 8px; border: 1px solid #dee2e6; flex-wrap: wrap;">
-        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="wrapChatText('<b>', '</b>')" title="Жирный (Ctrl+B)"><i class="bi bi-type-bold"></i> Жирный</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="wrapChatText('<i>', '</i>')" title="Курсив (Ctrl+I)"><i class="bi bi-type-italic"></i> Курсив</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="wrapChatText('<code>', '</code>')" title="Код"><i class="bi bi-code-slash"></i> Код</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertChatLink()" title="Вставить ссылку"><i class="bi bi-link-45deg"></i> Ссылка</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary emoji-picker-btn" onclick="toggleChatEmojiPicker()" title="Смайлики"><i class="bi bi-emoji-smile"></i> Смайлик</button>
-        <div id="chatEmojiPicker" class="emoji-dropdown" style="position: absolute; background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); padding: 12px; z-index: 1000; max-width: 320px; border: 1px solid #e2e8f0; display: none;">
-            <div class="emoji-grid" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; max-height: 200px; overflow-y: auto;">
-                <div class="emoji-item" style="font-size: 1.5rem; cursor: pointer; text-align: center; padding: 6px; border-radius: 12px;" onclick="insertChatEmoji('👍')">👍</div>
-                <div class="emoji-item" onclick="insertChatEmoji('❤️')">❤️</div>
-                <div class="emoji-item" onclick="insertChatEmoji('🎉')">🎉</div>
-                <div class="emoji-item" onclick="insertChatEmoji('✅')">✅</div>
-                <div class="emoji-item" onclick="insertChatEmoji('❌')">❌</div>
-                <div class="emoji-item" onclick="insertChatEmoji('⚠️')">⚠️</div>
-                <div class="emoji-item" onclick="insertChatEmoji('🔥')">🔥</div>
-                <div class="emoji-item" onclick="insertChatEmoji('⭐')">⭐</div>
-                <div class="emoji-item" onclick="insertChatEmoji('🎯')">🎯</div>
-                <div class="emoji-item" onclick="insertChatEmoji('📢')">📢</div>
-                <div class="emoji-item" onclick="insertChatEmoji('📅')">📅</div>
-                <div class="emoji-item" onclick="insertChatEmoji('⏰')">⏰</div>
-                <div class="emoji-item" onclick="insertChatEmoji('📍')">📍</div>
-                <div class="emoji-item" onclick="insertChatEmoji('💰')">💰</div>
-                <div class="emoji-item" onclick="insertChatEmoji('🤝')">🤝</div>
-                <div class="emoji-item" onclick="insertChatEmoji('💡')">💡</div>
-                <div class="emoji-item" onclick="insertChatEmoji('🚀')">🚀</div>
-                <div class="emoji-item" onclick="insertChatEmoji('✨')">✨</div>
-                <div class="emoji-item" onclick="insertChatEmoji('💪')">💪</div>
-                <div class="emoji-item" onclick="insertChatEmoji('🎁')">🎁</div>
-                <div class="emoji-item" onclick="insertChatEmoji('🏆')">🏆</div>
-                <div class="emoji-item" onclick="insertChatEmoji('👋')">👋</div>
-                <div class="emoji-item" onclick="insertChatEmoji('🙏')">🙏</div>
+                <div class="format-toolbar mb-2" style="background: #f8f9fa; border-radius: 8px; padding: 4px 10px; display: inline-flex; gap: 6px; border: 1px solid #dee2e6; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="wrapChatText('<b>', '</b>')" title="{{ get_text('formatting_bold') }} (Ctrl+B)"><i class="bi bi-type-bold"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="wrapChatText('<i>', '</i>')" title="{{ get_text('formatting_italic') }} (Ctrl+I)"><i class="bi bi-type-italic"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="wrapChatText('<code>', '</code>')" title="{{ get_text('formatting_code') }}"><i class="bi bi-code-slash"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertChatLink()" title="{{ get_text('formatting_link') }}"><i class="bi bi-link-45deg"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary emoji-picker-btn" onclick="toggleChatEmojiPicker()" title="{{ get_text('formatting_emoji') }}"><i class="bi bi-emoji-smile"></i></button>
+
+                    <div id="chatEmojiPicker" class="emoji-dropdown">
+                        <div class="emoji-grid">
+                            <div class="emoji-item" onclick="insertChatEmoji('👍')">👍</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('❤️')">❤️</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('🎉')">🎉</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('✅')">✅</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('❌')">❌</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('⚠️')">⚠️</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('🔥')">🔥</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('⭐')">⭐</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('🎯')">🎯</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('📢')">📢</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('📅')">📅</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('⏰')">⏰</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('📍')">📍</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('💰')">💰</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('🤝')">🤝</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('💡')">💡</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('🚀')">🚀</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('✨')">✨</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('💪')">💪</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('🎁')">🎁</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('🏆')">🏆</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('👋')">👋</div>
+                            <div class="emoji-item" onclick="insertChatEmoji('🙏')">🙏</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="chatPreview" class="mb-2 p-2" style="display: none; background: #f8f9fa; border-left: 4px solid #667eea; border-radius: 8px; font-size: 0.9em; max-height: 120px; overflow-y: auto;"></div>
+
+                <div id="uploadProgressContainer" class="progress mb-2" style="display: none; height: 16px; border-radius: 10px;">
+                    <div id="uploadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 0%; font-size: 0.72rem;">0%</div>
+                </div>
+
+                <div id="fileList" class="d-flex flex-wrap align-items-center mb-2"></div>
+
+                <!-- Красивая строка ввода -->
+                <form id="replyForm" onsubmit="sendMessage(event)">
+                    <div class="chat-input-wrapper">
+                        <label class="btn-attach" for="fileInput" title="{{ get_text('attach_file') }}">
+                            <i class="bi bi-paperclip"></i>
+                            <input type="file" id="fileInput" multiple style="display:none" onchange="handleFileSelection(event)">
+                        </label>
+                        <textarea class="form-control chat-textarea" id="replyMessage" rows="1" placeholder="{{ get_text('type_message') }}" oninput="autoResizeTextarea(this)"></textarea>
+                        <button class="btn-send-tg" type="submit" title="{{ get_text('send_message') }}">
+                            <i class="bi bi-send-fill" style="margin-left: 2px;"></i>
+                        </button>
+                    </div>
+                    <div class="d-flex justify-content-between px-2 mt-1">
+                        <small class="text-muted"><span id="chatCharCounter">0 / 4000</span></small>
+                        <small class="text-muted"><i class="bi bi-code-slash"></i> {{ get_text('html_supported') }}</small>
+                    </div>
+                </form>
             </div>
-        </div>
-    </div>
-    <div id="chatPreview" class="mb-2 p-2" style="display: none; background: #f8f9fa; border-left: 4px solid #667eea; border-radius: 8px; font-size: 0.9em; max-height: 120px; overflow-y: auto;"></div>
-    <form id="replyForm" onsubmit="sendMessage(event)">
-        <div class="input-group">
-            <label class="btn btn-outline-secondary" for="fileInput">
-                <i class="bi bi-paperclip"></i>
-                <input type="file" id="fileInput" style="display:none" onchange="updateFileLabel()">
-            </label>
-            <textarea class="form-control" id="replyMessage" rows="1" placeholder="{{ get_text('type_message') }}" style="border-radius: 20px;"></textarea>
-            <button class="btn btn-primary" type="submit" style="border-radius: 20px;"><i class="bi bi-send"></i></button>
-        </div>
-        <small id="fileLabel" class="text-muted" style="display:none; margin-left: 45px;"></small>
-        <div class="d-flex justify-content-between mt-1">
-            <small><span id="chatCharCounter">0 / 4000</span></small>
-            <small class="text-muted"><i class="bi bi-markdown"></i> HTML поддерживается</small>
-        </div>
-    </form>
-</div>
         </div>
     </div>
 </div>
@@ -351,7 +547,6 @@
 
 {% block extra_js %}
 <script>
-    // Передаем локализованные строки из Jinja в JavaScript
     const locales = {
         roleManager: "{{ get_text('role_manager') }}",
         roleUser: "{{ get_text('role_user') }}",
@@ -368,16 +563,37 @@
         answerSent: "{{ get_text('answer_sent') }}",
         questionForwarded: "{{ get_text('question_forwarded') }}",
         managerAnswerPrefix: "{{ get_text('manager_answer_prefix') }}",
-        yourQuestionPrefix: "{{ get_text('your_question_prefix') }}"
+        yourQuestionPrefix: "{{ get_text('your_question_prefix') }}",
+        previewLabel: "{{ get_text('preview_label') }}",
+        promptLinkUrl: "{{ get_text('prompt_link_url') }}",
+        promptLinkText: "{{ get_text('prompt_link_text') }}",
+        promptLinkDefaultText: "{{ get_text('prompt_link_default_text') }}",
+        filesLimitWarning: "{{ get_text('files_limit_warning') }}",
+        preparingFiles: "{{ get_text('preparing_files') }}",
+        uploadingPercent: "{{ get_text('uploading_percent') }}",
+        notFilled: "{{ get_text('not_filled') }}",
+        notSpecified: "{{ get_text('not_specified') }}",
+        statusPending: "{{ get_text('status_pending') }}",
+        statusInProgress: "{{ get_text('status_in_progress') }}",
+        statusReady: "{{ get_text('status_ready') }}",
+        statusCompleted: "{{ get_text('status_completed') }}",
+        statusPaid: "{{ get_text('status_paid') }}",
+        flightsPurchased: "{{ get_text('flights_purchased') }}",
+        perDiemCard: "{{ get_text('per_diem_card') }}",
+        perDiemCrypto: "{{ get_text('per_diem_crypto') }}"
     };
 
     let currentUserId = null;
     let renderedMessageUids = new Set();
-    let lastMessageId = 0;
     let isPolling = false;
     let chatPollTimer = null;
     let sidebarPollTimer = null;
     let isScrolledToBottom = true;
+    let isUploadingFile = false;
+
+    // Массив для накопительного выбора файлов из разных папок
+    let selectedFilesQueue = [];
+
     const urlParams = new URLSearchParams(window.location.search);
     const openUserId = urlParams.get('open');
 
@@ -395,9 +611,58 @@
         }, 500);
     }
 
-    // ============================================
-    // ФУНКЦИИ ФОРМАТИРОВАНИЯ ТЕКСТА (из broadcast.html)
-    // ============================================
+    function autoResizeTextarea(el) {
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    }
+
+    function handleFileSelection(event) {
+        const inputFiles = Array.from(event.target.files);
+        if (!inputFiles.length) return;
+
+        // Добавляем новые файлы к уже имеющимся в очереди
+        for (const file of inputFiles) {
+            if (selectedFilesQueue.length >= 10) {
+                showToast(locales.filesLimitWarning, 'warning');
+                break;
+            }
+            // Исключаем полный дубликат по имени, размеру и времени
+            const isDuplicate = selectedFilesQueue.some(f =>
+                f.name === file.name && f.size === file.size && f.lastModified === file.lastModified
+            );
+            if (!isDuplicate) {
+                selectedFilesQueue.push(file);
+            }
+        }
+
+        // Сбрасываем значение input[type=file], чтобы можно было повторно выбрать тот же файл из другой/этой же папки
+        event.target.value = '';
+        renderFileList();
+    }
+
+    function removeFile(index) {
+        selectedFilesQueue.splice(index, 1);
+        renderFileList();
+    }
+
+    function renderFileList() {
+        const fileListDiv = document.getElementById('fileList');
+        fileListDiv.innerHTML = '';
+
+        selectedFilesQueue.forEach((file, index) => {
+            const chip = document.createElement('div');
+            chip.className = 'file-chip';
+            chip.innerHTML = `
+                <i class="bi bi-file-earmark me-1"></i>
+                <span class="text-truncate" style="max-width: 180px;">${escapeHtml(file.name)}</span>
+                <span class="file-chip-remove" onclick="removeFile(${index})" title="Удалить">
+                    <i class="bi bi-x"></i>
+                </span>
+            `;
+            fileListDiv.appendChild(chip);
+        });
+    }
+
     function getSelectionStart() { return replyMessageInput.selectionStart; }
     function getSelectionEnd() { return replyMessageInput.selectionEnd; }
     function setSelectionRange(start, end) {
@@ -426,9 +691,9 @@
     }
 
     function insertChatLink() {
-        const url = prompt('Введите URL ссылки:', 'https://');
+        const url = prompt(locales.promptLinkUrl, 'https://');
         if (!url) return;
-        const text = prompt('Введите текст ссылки:', 'ссылка');
+        const text = prompt(locales.promptLinkText, locales.promptLinkDefaultText);
         if (!text) return;
 
         const start = replyMessageInput.selectionStart;
@@ -475,14 +740,10 @@
 
         if (replyMessageInput.value.trim().length > 0) {
             chatPreviewDiv.style.display = 'block';
-            // Показываем реальный HTML предпросмотр (как в broadcast)
             let html = replyMessageInput.value;
-            // Экранируем HTML, но потом обрабатываем теги форматирования
-            // Сначала экранируем всё, кроме наших тегов
             html = html.replace(/&/g, '&amp;')
                        .replace(/</g, '&lt;')
                        .replace(/>/g, '&gt;');
-            // Затем восстанавливаем допустимые теги
             html = html.replace(/&lt;b&gt;/g, '<b>')
                        .replace(/&lt;\/b&gt;/g, '</b>')
                        .replace(/&lt;i&gt;/g, '<i>')
@@ -491,15 +752,11 @@
                        .replace(/&lt;\/code&gt;/g, '</code>')
                        .replace(/&lt;a href=&quot;(.*?)&quot; target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;&gt;(.*?)&lt;\/a&gt;/g, '<a href="$1" target="_blank">$2</a>');
 
-            chatPreviewDiv.innerHTML = `<strong>Предпросмотр:</strong><br>${html.replace(/\n/g, '<br>')}`;
+            chatPreviewDiv.innerHTML = `<strong>${locales.previewLabel}</strong><br>${html.replace(/\n/g, '<br>')}`;
         } else {
             chatPreviewDiv.style.display = 'none';
         }
     }
-
-    // ============================================
-    // КАРТОЧКА ПОЛЬЗОВАТЕЛЯ
-    // ============================================
 
     let currentCardUserId = null;
     let currentCardUserData = null;
@@ -508,16 +765,56 @@
         currentCardUserId = userId;
         const card = document.getElementById('userInfoCard');
 
-        // Загружаем данные пользователя
         fetch(`/api/users/${userId}`)
             .then(response => response.json())
             .then(data => {
                 currentCardUserData = data;
+
                 document.getElementById('cardUserName').textContent = `@${data.username}`;
                 document.getElementById('cardFullName').textContent = data.full_name || '-';
                 document.getElementById('cardCompany').textContent = data.company || '-';
                 document.getElementById('cardPosition').textContent = data.position || '-';
                 document.getElementById('cardUserId').textContent = data.user_id;
+
+                const travel = data.travel || {};
+
+                document.getElementById('cardPassFirstName').textContent = travel.first_name || '-';
+                document.getElementById('cardPassLastName').textContent = travel.last_name || '-';
+                document.getElementById('cardPhone').textContent = travel.phone || '-';
+                document.getElementById('cardPassNumber').textContent = travel.passport_number || '-';
+                document.getElementById('cardPassBirthDate').textContent = travel.birth_date || '-';
+                document.getElementById('cardPassCountry').textContent = travel.passport_country || '-';
+                document.getElementById('cardPassIssueDate').textContent = travel.issue_date || '-';
+                document.getElementById('cardPassExpiryDate').textContent = travel.expiry_date || '-';
+
+                if (travel.city_from || travel.city_to) {
+                    document.getElementById('cardRoute').textContent = `${travel.city_from || '?'} ➔ ${travel.city_to || '?'}`;
+                } else {
+                    document.getElementById('cardRoute').textContent = '-';
+                }
+
+                const flightStatusMap = {
+                    'pending': `<span class="badge bg-warning text-dark">${locales.statusPending}</span>`,
+                    'in_progress': `<span class="badge bg-info text-dark">${locales.statusInProgress}</span>`,
+                    'purchased': `<span class="badge bg-success">🎫 ${locales.flightsPurchased}</span>`
+                };
+                document.getElementById('cardFlightStatus').innerHTML = flightStatusMap[travel.flight_request_status] || '-';
+
+                const perDiemStatusMap = {
+                    'pending': `<span class="badge bg-warning text-dark">${locales.statusPending}</span>`,
+                    'in_progress': `<span class="badge bg-info text-dark">${locales.statusInProgress}</span>`,
+                    'completed': `<span class="badge bg-success">${locales.statusPaid}</span>`,
+                    'ready': `<span class="badge bg-success">${locales.statusPaid}</span>`
+                };
+                document.getElementById('cardPerDiemStatus').innerHTML = perDiemStatusMap[travel.per_diem_status] || '-';
+
+                if (travel.payment_details) {
+                    const pType = travel.payment_type === 'crypto' ? locales.perDiemCrypto : locales.perDiemCard;
+                    document.getElementById('cardPerDiemDetails').innerHTML = `<small class="text-muted d-block">${pType}</small><code style="font-size: 0.75rem; word-break: break-all;">${escapeHtml(travel.payment_details)}</code>`;
+                } else {
+                    document.getElementById('cardPerDiemDetails').textContent = locales.notSpecified;
+                }
+
                 card.classList.add('show');
             })
             .catch(err => {
@@ -531,14 +828,12 @@
         currentCardUserData = null;
     }
 
-
     function goToUserDetails() {
         if (currentCardUserId) {
             window.location.href = `/users?view=${currentCardUserId}`;
         }
     }
 
-    // Клик по аватару или имени в шапке чата для открытия карточки
     function initUserCardTrigger() {
         const header = document.querySelector('.chat-header');
         if (header) {
@@ -551,7 +846,6 @@
         }
     }
 
-    // Закрываем карточку при клике вне её
     document.addEventListener('click', function(e) {
         const card = document.getElementById('userInfoCard');
         const header = document.querySelector('.chat-header');
@@ -560,11 +854,8 @@
         }
     });
 
-    // Обработчик ввода текста для предпросмотра
     if (replyMessageInput) {
         replyMessageInput.addEventListener('input', updateChatPreview);
-
-        // Горячие клавиши
         replyMessageInput.addEventListener('keydown', function(e) {
             if (e.ctrlKey && e.key === 'b') {
                 e.preventDefault();
@@ -572,135 +863,217 @@
             } else if (e.ctrlKey && e.key === 'i') {
                 e.preventDefault();
                 wrapChatText('<i>', '</i>');
+            } else if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                document.getElementById('replyForm').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
             }
         });
     }
-
-    // ============================================
-    // ОСТАЛЬНЫЕ ФУНКЦИИ ЧАТА
-    // ============================================
 
     async function loadChat(userId, isPollingReq = false) {
-    if (!isPollingReq) {
-        currentUserId = userId;
-        renderedMessageUids.clear(); // Сбрасываем список отрисованных при открытии нового чата
-        isPolling = true;
-        clearTimeout(chatPollTimer);
+        if (isPollingReq && isUploadingFile) {
+            chatPollTimer = setTimeout(() => loadChat(userId, true), 2500);
+            return;
+        }
 
-        messagesDiv.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-arrow-repeat spin"></i> ${locales.loadingMessages}</div>`;
+        if (!isPollingReq) {
+            currentUserId = userId;
+            renderedMessageUids.clear();
+            isPolling = true;
+            clearTimeout(chatPollTimer);
 
-        document.querySelectorAll('.conversation-item').forEach(item => {
-            item.classList.remove('active');
-            if (item.dataset.userId == userId) item.classList.add('active');
+            messagesDiv.innerHTML = `<div class="text-center text-muted py-5"><i class="bi bi-arrow-repeat spin"></i> ${locales.loadingMessages}</div>`;
+
+            document.querySelectorAll('.conversation-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.userId == userId) item.classList.add('active');
+            });
+        }
+
+        try {
+            const resp = await fetch(`/api/user_messages/${userId}`);
+            if (!resp.ok) throw new Error('Network error');
+            const data = await resp.json();
+
+            if (!isPollingReq) messagesDiv.innerHTML = '';
+
+            let hasNewIncoming = false;
+            let hasAnyNew = false;
+            const messages = (data.messages || []).reverse();
+
+            if (!isPollingReq) {
+                const userFullName = data.full_name || '';
+                const headerName = userFullName ? `${userFullName} (@${data.username || userId})` : `@${data.username || userId}`;
+                document.getElementById('currentUserName').textContent = headerName;
+                initUserCardTrigger();
+                document.getElementById('currentUserInfo').textContent = `ID: ${userId}`;
+                document.getElementById('chatInput').style.display = 'block';
+            }
+
+            const groupedMessages = [];
+            for (let i = 0; i < messages.length; i++) {
+                const m = messages[i];
+                const prev = groupedMessages[groupedMessages.length - 1];
+
+                const isMediaGroupPart = prev &&
+                    prev.direction === m.direction &&
+                    prev.sender_username === m.sender_username &&
+                    Math.abs(new Date(prev.created_at) - new Date(m.created_at)) < 4000 &&
+                    (m.file_id || prev.files.length > 0);
+
+                if (isMediaGroupPart && m.file_id) {
+                    prev.files.push(m.file_id);
+                    if (!prev.message_text && m.message_text) {
+                        prev.message_text = m.message_text;
+                    }
+                } else {
+                    groupedMessages.push({
+                        ...m,
+                        files: m.file_id ? [m.file_id] : []
+                    });
+                }
+            }
+
+            for (const msg of groupedMessages) {
+                const msgUid = msg.uid || `${msg.source_type}_${msg.id}`;
+                if (!renderedMessageUids.has(msgUid)) {
+                    renderedMessageUids.add(msgUid);
+                    hasAnyNew = true;
+                    if (msg.direction === 'incoming') hasNewIncoming = true;
+
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = `message ${msg.direction === 'incoming' ? 'incoming' : 'outgoing'}`;
+
+                    const senderDisplay = msg.direction === 'outgoing'
+                        ? (msg.sender_username || locales.roleManager)
+                        : (data.full_name || data.username || locales.roleUser);
+
+                    const time = new Date(msg.created_at).toLocaleString([], {day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute:'2-digit'});
+
+                    let content = `<div class="message-bubble">`;
+                    content += `<div class="message-sender">${escapeHtml(senderDisplay)}</div>`;
+
+                    if (msg.source_type && msg.source_type.includes('_question')) {
+                        const dept = msg.source_type.replace('_question', '').toUpperCase();
+                        content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">[${locales.questionFrom} ${dept}]</small><br>${msg.message_text}`;
+                    } else {
+                        if (msg.files && msg.files.length > 0) {
+                            content += `<div class="tg-files-container">`;
+                            msg.files.forEach((fId, index) => {
+                                content += `
+                                <a href="/api/file/${fId}" target="_blank" class="tg-file-card">
+                                    <div class="tg-file-icon">
+                                        <i class="bi bi-file-earmark-text-fill"></i>
+                                    </div>
+                                    <div class="text-truncate flex-grow-1" style="max-width: 200px;">
+                                        <div style="font-size: 0.85rem; font-weight: 600;">${locales.attachedFile} ${msg.files.length > 1 ? '#' + (index + 1) : ''}</div>
+                                        <span class="tg-file-badge">${locales.downloadView}</span>
+                                    </div>
+                                </a>`;
+                            });
+                            content += `</div>`;
+                        }
+
+                        if (msg.message_text) {
+                            content += `<div>${msg.message_text}</div>`;
+                        }
+                    }
+
+                    content += `<span class="message-time-inline">${time}</span></div>`;
+                    messageDiv.innerHTML = content;
+                    messagesDiv.appendChild(messageDiv);
+                }
+            }
+
+            if (!isPollingReq) {
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                if (messages.length > 0) fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
+            } else if (hasAnyNew) {
+                if (isScrolledToBottom) messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+                if (hasNewIncoming) {
+                    fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
+                    const convItem = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
+                    if (convItem) {
+                        const badge = convItem.querySelector('.unread-badge');
+                        if (badge) badge.remove();
+                    }
+                }
+            }
+
+        } catch (e) {
+            console.error(e);
+        }
+
+        if (isPolling && currentUserId === userId) {
+            chatPollTimer = setTimeout(() => loadChat(userId, true), 2500);
+        }
+    }
+
+    async function compressImageIfNeeded(file) {
+        if (!file.type.startsWith('image/') || file.type === 'image/gif') {
+            return file;
+        }
+
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const maxDim = 1920;
+
+                    if (width > maxDim || height > maxDim) {
+                        if (width > height) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                        } else {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob((blob) => {
+                        if (!blob || blob.size >= file.size) {
+                            resolve(file);
+                        } else {
+                            const compressedFile = new File([blob], file.name, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now()
+                            });
+                            resolve(compressedFile);
+                        }
+                    }, 'image/jpeg', 0.82);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         });
     }
-
-    try {
-        const resp = await fetch(`/api/user_messages/${userId}`);
-        if (!resp.ok) throw new Error('Network error');
-        const data = await resp.json();
-
-        if (!isPollingReq) messagesDiv.innerHTML = '';
-
-        let hasNewIncoming = false;
-        let hasAnyNew = false;
-        const messages = (data.messages || []).reverse();
-
-        if (!isPollingReq) {
-            const userFullName = data.full_name || '';
-            const headerName = userFullName ? `${userFullName} (@${data.username || userId})` : `@${data.username || userId}`;
-            document.getElementById('currentUserName').textContent = headerName;
-            initUserCardTrigger();
-            document.getElementById('currentUserInfo').textContent = `ID: ${userId}`;
-            document.getElementById('chatInput').style.display = 'block';
-        }
-
-        for (const msg of messages) {
-            const msgUid = msg.uid || `${msg.source_type}_${msg.id}`;
-            if (!renderedMessageUids.has(msgUid)) {
-                renderedMessageUids.add(msgUid);
-                hasAnyNew = true;
-                if (msg.direction === 'incoming') hasNewIncoming = true;
-
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `message ${msg.direction === 'incoming' ? 'incoming' : 'outgoing'}`;
-
-                const senderDisplay = msg.direction === 'outgoing'
-                    ? (msg.sender_username || locales.roleManager)
-                    : (data.full_name || data.username || locales.roleUser);
-
-                const time = new Date(msg.created_at).toLocaleString([], {day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute:'2-digit'});
-
-                let content = `<div class="message-bubble">`;
-                content += `<div class="message-sender">${escapeHtml(senderDisplay)}</div>`;
-
-                if (msg.source_type && msg.source_type.includes('_question')) {
-                    const dept = msg.source_type.replace('_question', '').toUpperCase();
-                    content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">[${locales.questionFrom} ${dept}]</small><br>${msg.message_text}`;
-                } else {
-                    if (msg.file_id) {
-                        const isIncoming = msg.direction === 'incoming';
-                        const fileBg = isIncoming ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.15)';
-                        const fileColor = isIncoming ? '#2d3748' : '#ffffff';
-                        const iconBg = isIncoming ? 'rgba(102,126,234,0.1)' : 'rgba(255,255,255,0.2)';
-                        const iconColor = isIncoming ? '#667eea' : '#ffffff';
-                        const borderColor = isIncoming ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.2)';
-
-                        content += `
-                        <a href="/api/file/${msg.file_id}" target="_blank" class="d-flex align-items-center p-2 mb-2 rounded text-decoration-none" style="background: ${fileBg}; color: ${fileColor}; border: 1px solid ${borderColor}; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
-                            <div class="me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border-radius: 10px; background: ${iconBg}; color: ${iconColor};">
-                                <i class="bi bi-file-earmark-arrow-down-fill fs-5"></i>
-                            </div>
-                            <div class="text-truncate flex-grow-1" style="max-width: 160px;">
-                                <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0px;">${locales.attachedFile}</div>
-                                <span style="font-size: 0.75rem; opacity: 0.85;">${locales.downloadView}</span>
-                            </div>
-                        </a>`;
-                    }
-
-                    if (msg.message_text) {
-                        content += `<div>${msg.message_text}</div>`;
-                    }
-                }
-
-                content += `<span class="message-time-inline">${time}</span></div>`;
-                messageDiv.innerHTML = content;
-                messagesDiv.appendChild(messageDiv);
-            }
-        }
-
-        if (!isPollingReq) {
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            if (messages.length > 0) fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
-        } else if (hasAnyNew) {
-            if (isScrolledToBottom) messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
-            if (hasNewIncoming) {
-                fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
-                const convItem = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
-                if (convItem) {
-                    const badge = convItem.querySelector('.unread-badge');
-                    if (badge) badge.remove();
-                }
-            }
-        }
-
-    } catch (e) {
-        console.error(e);
-    }
-
-    if (isPolling && currentUserId === userId) {
-        chatPollTimer = setTimeout(() => loadChat(userId, true), 2500);
-    }
-}
 
     async function sendMessage(event) {
         event.preventDefault();
+        if (isUploadingFile) return;
+
         const msgInput = document.getElementById('replyMessage');
-        const fileInput = document.getElementById('fileInput');
-        const submitBtn = event.target.querySelector('button[type="submit"]');
+        const submitBtn = event.target.querySelector('.btn-send-tg');
+        const progContainer = document.getElementById('uploadProgressContainer');
+        const progBar = document.getElementById('uploadProgressBar');
 
-        if (!msgInput.value.trim() && !fileInput.files[0]) return;
+        if (!msgInput.value.trim() && selectedFilesQueue.length === 0) return;
 
+        if (selectedFilesQueue.length > 10) {
+            showToast(locales.filesLimitWarning, 'danger');
+            return;
+        }
+
+        isUploadingFile = true;
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
@@ -708,33 +1081,81 @@
 
         const formData = new FormData();
         formData.append('user_id', currentUserId);
-        formData.append('message', msgInput.value); // Отправляем HTML как есть
-        if (fileInput.files[0]) formData.append('file', fileInput.files[0]);
+        formData.append('message', msgInput.value);
 
-        try {
-            const resp = await fetch('/api/send_message', { method: 'POST', body: formData });
-            const data = await resp.json();
+        if (selectedFilesQueue.length > 0) {
+            progContainer.style.display = 'flex';
+            progBar.style.width = '10%';
+            progBar.textContent = locales.preparingFiles;
 
-            if (data.success) {
-                msgInput.value = '';
-                fileInput.value = '';
-                updateFileLabel();
-                updateChatPreview(); // Сбросить предпросмотр
-                loadChat(currentUserId, true);
+            for (let i = 0; i < selectedFilesQueue.length; i++) {
+                const originalFile = selectedFilesQueue[i];
+                const fileToSend = await compressImageIfNeeded(originalFile);
+                formData.append('files', fileToSend);
+            }
+        }
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/send_message', true);
+
+        xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+                const percentComplete = Math.round((e.loaded / e.total) * 90);
+                progBar.style.width = percentComplete + '%';
+                progBar.textContent = locales.uploadingPercent.replace('{}', percentComplete);
+            }
+        };
+
+        xhr.onload = function() {
+            isUploadingFile = false;
+            progContainer.style.display = 'none';
+            progBar.style.width = '0%';
+
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-send-fill" style="margin-left: 2px;"></i>';
+            }
+
+            if (xhr.status === 200) {
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.success) {
+                        msgInput.value = '';
+                        autoResizeTextarea(msgInput);
+                        selectedFilesQueue = []; // Очищаем очередь файлов
+                        renderFileList();
+                        updateChatPreview();
+                        loadChat(currentUserId, false);
+                    } else {
+                        showToast(data.error || locales.errorSending, 'danger');
+                    }
+                } catch (e) {
+                    showToast(locales.errorSending, 'danger');
+                }
             } else {
                 showToast(locales.errorSending, 'danger');
             }
-        } catch (e) {
-            showToast(locales.networkError, 'danger');
-        } finally {
+        };
+
+        xhr.onerror = function() {
+            isUploadingFile = false;
+            progContainer.style.display = 'none';
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="bi bi-send"></i>';
+                submitBtn.innerHTML = '<i class="bi bi-send-fill" style="margin-left: 2px;"></i>';
             }
-        }
+            showToast(locales.networkError, 'danger');
+        };
+
+        xhr.send(formData);
     }
 
     async function updateSidebar() {
+        if (isUploadingFile) {
+            setTimeout(updateSidebar, 5000);
+            return;
+        }
+
         try {
             const resp = await fetch('/api/conversations');
             const conversations = await resp.json();
@@ -744,10 +1165,10 @@
             conversations.forEach(conv => {
                 const isActive = conv.user_id == currentUserId ? 'active' : '';
                 const displayName = conv.full_name ? `${conv.username} (${conv.full_name})` : `@${conv.username}`;
-               const time = conv.last_message_time ? new Date(conv.last_message_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+                const time = conv.last_message_time ? new Date(conv.last_message_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
 
                 let rawMsg = conv.last_message || '...';
-                let cleanMsg = rawMsg.replace(/<\/?[^>]+(>|$)/g, ""); // Срезает любые <i>, <b> и т.д.
+                let cleanMsg = rawMsg.replace(/<\/?[^>]+(>|$)/g, "");
                 let previewMsg = escapeHtml(cleanMsg).replace(/<br\s*\/?>/gi, ' ');
 
                 html += `
@@ -799,22 +1220,15 @@
         if (tab === 'questions') loadAllQuestions();
     }
 
-    function updateFileLabel() {
-        const file = document.getElementById('fileInput').files[0];
-        const label = document.getElementById('fileLabel');
-        if (file) {
-            label.textContent = "📎 " + file.name;
-            label.style.display = "block";
-        } else {
-            label.style.display = "none";
-        }
-    }
-
     function showToast(message, type) {
         const toastContainer = document.querySelector('.toast-container');
         if (!toastContainer) return;
 
-        const typeMap = { success: 'check-circle-fill text-success', danger: 'exclamation-triangle-fill text-danger' };
+        const typeMap = {
+            success: 'check-circle-fill text-success',
+            danger: 'exclamation-triangle-fill text-danger',
+            warning: 'exclamation-circle-fill text-warning'
+        };
 
         const toastHtml = `
             <div class="toast show" role="alert" data-bs-autohide="true" data-bs-delay="5000">
@@ -973,7 +1387,6 @@
         const urlParams = new URLSearchParams(window.location.search);
         const userId = urlParams.get('user');
         if (userId) {
-            // Перенаправляем на страницу чатов с открытым нужным чатом
             window.location.href = `/user_chats?open=${userId}`;
         }
     }
@@ -985,7 +1398,6 @@
         }
     }
 
-    // Инициализация
     loadAllQuestions();
     updateSidebar();
 </script>

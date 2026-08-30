@@ -33,23 +33,25 @@ class Database:
     def parse_passport_data(self, row_dict: dict) -> dict:
         raw = row_dict.get('passport_data') or ''
 
-        # Парсим поля из текста passport_data, если в строке БД они пустые
-        if not row_dict.get('first_name'):
-            m = re.search(r'First Name:\s*(.+)', raw, re.IGNORECASE)
-            if m:
-                row_dict['first_name'] = m.group(1).strip()
+        # Регулярные выражения для построчного парсинга всех полей
+        fields_map = {
+            'first_name': r'First Name:\s*([^\n\r]+)',
+            'last_name': r'Last Name:\s*([^\n\r]+)',
+            'phone': r'Phone:\s*([^\n\r]+)',
+            'passport_number': r'Passport Number:\s*([^\n\r]+)',
+            'birth_date': r'Birth Date:\s*([^\n\r]+)',
+            'passport_country': r'Passport Country:\s*([^\n\r]+)',
+            'issue_date': r'Issue Date:\s*([^\n\r]+)',
+            'expiry_date': r'Expiry Date:\s*([^\n\r]+)'
+        }
 
-        if not row_dict.get('last_name'):
-            m = re.search(r'Last Name:\s*(.+)', raw, re.IGNORECASE)
-            if m:
-                row_dict['last_name'] = m.group(1).strip()
+        for key, pattern in fields_map.items():
+            if not row_dict.get(key):
+                m = re.search(pattern, raw, re.IGNORECASE)
+                if m:
+                    row_dict[key] = m.group(1).strip()
 
-        if not row_dict.get('phone'):
-            m = re.search(r'Phone:\s*(.+)', raw, re.IGNORECASE)
-            if m:
-                row_dict['phone'] = m.group(1).strip()
-
-        # Алиасы для городов (чтобы гарантированно отдавались под обоими именами)
+        # Алиасы для городов
         city_from = row_dict.get('city_from') or row_dict.get('departure_from') or '-'
         city_to = row_dict.get('city_to') or row_dict.get('return_to') or '-'
 
@@ -2872,7 +2874,7 @@ class Database:
             return {}
 
     async def get_user_details_by_id(self, user_id: int) -> dict:
-        """Получить детальную информацию о пользователе"""
+        """Получить детальную информацию о пользователе, включая Travel данные"""
         try:
             async with self.pool.acquire() as conn:
                 user = await conn.fetchrow(f"""
@@ -2888,6 +2890,7 @@ class Database:
 
                 result = dict(user)
 
+                # Конференции пользователя
                 confs = await conn.fetch(f"""
                     SELECT conference_name
                     FROM {self.db_schema}.user_conferences
@@ -2895,6 +2898,7 @@ class Database:
                 """, result['username'])
                 result['conferences'] = [c['conference_name'] for c in confs]
 
+                # Заявки на баннеры, визитки и визы
                 result['requests'] = []
                 request_tables = [
                     ('pr_banner_requests', 'Баннер'),
@@ -2918,7 +2922,7 @@ class Database:
                                 WHERE username = $1
                                 ORDER BY created_at DESC
                                 LIMIT 5
-                        """, result['username'])
+                            """, result['username'])
                         for row in rows:
                             result['requests'].append({
                                 'type': type_name,
@@ -2928,12 +2932,57 @@ class Database:
                     except:
                         pass
 
+                # Подтягиваем полную Travel-информацию пользователя
+                travel_row = await conn.fetchrow(f"""
+                    SELECT 
+                        tfr.*,
+                        pdr.payment_type,
+                        pdr.payment_details,
+                        COALESCE(pdr.status, 'pending') as per_diem_status
+                    FROM {self.db_schema_travel}.travel_flight_request tfr
+                    LEFT JOIN LATERAL (
+                        SELECT payment_type, payment_details, status
+                        FROM {self.db_schema_travel}.travel_per_diem_requests
+                        WHERE user_id = tfr.user_id
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    ) pdr ON true
+                    WHERE tfr.user_id = $1
+                    ORDER BY tfr.created_at DESC
+                    LIMIT 1
+                """, user_id)
+
+                if travel_row:
+                    parsed_travel = self.parse_passport_data(dict(travel_row))
+                    result['travel'] = parsed_travel
+                else:
+                    passport_data = await self.get_stored_passport_data(user_id)
+                    per_diem = await conn.fetchrow(f"""
+                                        SELECT payment_type, payment_details, status
+                                        FROM {self.db_schema_travel}.travel_per_diem_requests
+                                        WHERE user_id = $1
+                                        ORDER BY created_at DESC
+                                        LIMIT 1
+                                    """, user_id)
+
+                    result['travel'] = {
+                        'first_name': passport_data.get('first_name'),
+                        'last_name': passport_data.get('last_name'),
+                        'phone': passport_data.get('phone'),
+                        'passport_number': passport_data.get('passport_number'),
+                        'birth_date': passport_data.get('birth_date'),
+                        'passport_country': passport_data.get('passport_country'),
+                        'issue_date': passport_data.get('issue_date'),
+                        'expiry_date': passport_data.get('expiry_date'),
+                        'payment_type': per_diem.get('payment_type') if per_diem else None,
+                        'payment_details': per_diem.get('payment_details') if per_diem else None,
+                        'per_diem_status': per_diem.get('status') if per_diem else None
+                    }
+
                 return result
         except Exception as e:
             logger.error(f"Error getting user details: {e}")
             return None
-
-    # database.py - добавьте эти методы в класс Database
 
     async def create_managers_tables(self):
         """Создание таблиц для менеджеров и групп"""
