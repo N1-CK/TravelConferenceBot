@@ -2,7 +2,7 @@
 <html lang="{{ session.get('lang', 'ru') }}">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{% block title %}{{ get_text('title_dashboard') }}{% endblock %} | Travel Conference Bot</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
@@ -15,6 +15,21 @@
         body {
             background: #f0f2f5;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Верхняя мобильная плашка */
+        .mobile-header {
+            display: none;
+            background: #1a1a2e;
+            color: white;
+            padding: 12px 18px;
+            position: sticky;
+            top: 0;
+            z-index: 1030;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
         }
 
         .sidebar {
@@ -23,16 +38,52 @@
             top: 0;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             color: #e0e0e0;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
             display: flex;
             flex-direction: column;
             overflow-y: auto;
+            z-index: 1040;
         }
 
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.45);
+            backdrop-filter: blur(2px);
+            z-index: 1035;
+        }
+
+        /* Выдвижной сайдбар на мобилках */
         @media (max-width: 768px) {
+            .mobile-header {
+                display: flex;
+            }
             .sidebar {
-                height: auto;
-                position: relative;
+                position: fixed;
+                top: 0;
+                left: -280px;
+                width: 280px;
+                height: 100vh;
+                box-shadow: 5px 0 25px rgba(0,0,0,0.3);
+            }
+            .sidebar.active {
+                left: 0;
+            }
+            .sidebar-backdrop.active {
+                display: block;
+            }
+            .main-content {
+                padding: 14px 10px !important;
+                min-height: calc(100vh - 56px);
+            }
+            .toast-container {
+                top: 70px !important;
+                right: 15px !important;
+                left: 15px !important;
             }
         }
 
@@ -190,38 +241,6 @@
             font-size: 1rem;
         }
 
-        .user-avatar-large {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            font-weight: bold;
-        }
-
-        .conference-tag {
-            background: #e9ecef;
-            border-radius: 20px;
-            padding: 3px 12px;
-            font-size: 0.75rem;
-            display: inline-block;
-            margin-right: 5px;
-            margin-bottom: 5px;
-        }
-
-        @media (max-width: 768px) {
-            .sidebar {
-                min-height: auto;
-            }
-            .main-content {
-                padding: 20px;
-            }
-        }
-
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -229,21 +248,6 @@
 
         .fade-in {
             animation: fadeIn 0.3s ease-out;
-        }
-
-        .loading-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
 
         .toast-container {
@@ -278,23 +282,6 @@
             background: #555;
         }
 
-        .activity-badge {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 5px;
-        }
-
-        .activity-online {
-            background: #28a745;
-            box-shadow: 0 0 5px #28a745;
-        }
-
-        .activity-offline {
-            background: #dc3545;
-        }
-
         .group-badge {
             background: #e9ecef;
             padding: 4px 10px;
@@ -319,7 +306,6 @@
         .status-approved { background: #d4edda; color: #155724; }
         .status-rejected { background: #f8d7da; color: #721c24; }
 
-        /* Language switcher in sidebar */
         .sidebar-lang-switch {
             padding: 15px 20px;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -354,6 +340,19 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    {% if session.logged_in %}
+    <div class="mobile-header">
+        <button class="btn text-white p-0" onclick="toggleSidebar()" type="button">
+            <i class="bi bi-list fs-2"></i>
+        </button>
+        <div class="fw-bold fs-6">Travel Conference Bot</div>
+        <div class="user-avatar" style="width: 32px; height: 32px; font-size: 0.85rem;">
+            {{ (session.full_name or session.username or 'U')[0]|upper }}
+        </div>
+    </div>
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+    {% endif %}
+
     <div class="toast-container">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -374,10 +373,13 @@
     <div class="container-fluid">
         <div class="row">
             {% if session.logged_in %}
-            <div class="col-md-3 col-lg-2 px-0 sidebar">
+            <div class="col-md-3 col-lg-2 px-0 sidebar" id="appSidebar">
                 <div class="user-info">
-                    <h5><i class="bi bi-person-circle me-2"></i> {{ session.full_name or session.username }}</h5>
-                    <p>{{ get_text('role_' + session.role) if session.role else get_text('role_user') }}</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 text-truncate"><i class="bi bi-person-circle me-2"></i> {{ session.full_name or session.username }}</h5>
+                        <button class="btn text-white-50 d-md-none p-0" onclick="toggleSidebar()"><i class="bi bi-x-lg fs-5"></i></button>
+                    </div>
+                    <p class="mt-1">{{ get_text('role_' + session.role) if session.role else get_text('role_user') }}</p>
                     {% if session.groups %}
                     <div class="mt-2">
                         {% for group in session.groups %}
@@ -418,7 +420,6 @@
                     <a class="nav-link text-danger" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">{{ get_text('logout') }}</a>
                 </nav>
 
-                <!-- Language Switcher in Bottom Left -->
                 <div class="sidebar-lang-switch">
                     <a href="/set_language/ru" class="sidebar-lang-btn {% if session.get('lang', 'ru') == 'ru' %}active{% endif %}">
                         🇷🇺 Русский
@@ -450,6 +451,11 @@
     <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
 
     <script>
+        function toggleSidebar() {
+            document.getElementById('appSidebar').classList.toggle('active');
+            document.getElementById('sidebarBackdrop').classList.toggle('active');
+        }
+
         document.querySelectorAll('.toast').forEach(toast => {
             setTimeout(() => {
                 const bsToast = bootstrap.Toast.getInstance(toast);
@@ -457,13 +463,6 @@
                 else toast.style.display = 'none';
             }, 5000);
         });
-
-        function showLoading(elementId) {
-            const el = document.getElementById(elementId);
-            if (el) {
-                el.innerHTML = '<div class="text-center py-5"><div class="loading-spinner"></div><p class="mt-2">{{ get_text("loading") }}</p></div>';
-            }
-        }
 
         function showToast(message, type = 'info') {
             const toastContainer = document.querySelector('.toast-container');
@@ -480,36 +479,32 @@
             toastContainer.insertAdjacentHTML('beforeend', toastHtml);
             setTimeout(() => { const toast = toastContainer.lastElementChild; if (toast) toast.remove(); }, 5000);
         }
-    </script>
-    <script>
+
         let globalPreviousConversations = {};
         let isInitialNotificationsLoad = true;
 
-        // Генератор приятного Telegram-подобного звука через Web Audio API
         function playNotificationBeep() {
             try {
                 const AudioContext = window.AudioContext || window.webkitAudioContext;
                 if (!AudioContext) return;
                 const ctx = new AudioContext();
 
-                // Первый тон (800 Hz)
                 const osc1 = ctx.createOscillator();
                 const gain1 = ctx.createGain();
                 osc1.type = 'sine';
-                osc1.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-                gain1.gain.setValueAtTime(0.15, ctx.currentTime);
+                osc1.frequency.setValueAtTime(587.33, ctx.currentTime);
+                gain1.gain.setValueAtTime(0.85, ctx.currentTime);
                 gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
                 osc1.connect(gain1);
                 gain1.connect(ctx.destination);
                 osc1.start(ctx.currentTime);
                 osc1.stop(ctx.currentTime + 0.15);
 
-                // Второй тон (1200 Hz) через 80мс
                 const osc2 = ctx.createOscillator();
                 const gain2 = ctx.createGain();
                 osc2.type = 'sine';
-                osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.08); // A5
-                gain2.gain.setValueAtTime(0.15, ctx.currentTime + 0.08);
+                osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.08);
+                gain2.gain.setValueAtTime(0.85, ctx.currentTime + 0.08);
                 gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
                 osc2.connect(gain2);
                 gain2.connect(ctx.destination);
@@ -530,7 +525,6 @@
                     const prev = globalPreviousConversations[conv.user_id];
                     const prevCount = prev ? prev.unread_count : 0;
 
-                    // Если счетчик вырос (или при первой загрузке обнаружены непрочитанные)
                     if (!isInitialNotificationsLoad && conv.unread_count > prevCount) {
                         const isCurrentlyChatting = (typeof currentUserId !== 'undefined' && currentUserId === conv.user_id && !document.hidden);
 
@@ -562,7 +556,6 @@
                 Notification.requestPermission();
             }
 
-            // Разблокировка AudioContext при первом же клике пользователя по странице
             document.addEventListener('click', function unlockAudio() {
                 try {
                     const AudioContext = window.AudioContext || window.webkitAudioContext;

@@ -4,14 +4,14 @@
 
 {% block extra_css %}
 <style>
-    .chat-container { display: flex; height: calc(100vh - 150px); background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.08); }
+    /* Десктопная разметка */
+    .chat-container { display: flex; height: calc(100vh - 150px); background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.08); position: relative; }
     .chat-sidebar { width: 320px; border-right: 1px solid #dee2e6; overflow-y: auto; background: #f8f9fa; }
-    .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden;}
-    .chat-header { padding: 15px 20px; border-bottom: 1px solid #dee2e6; background: white; }
+    .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; background: white; }
+    .chat-header { padding: 15px 20px; border-bottom: 1px solid #dee2e6; background: white; display: flex; align-items: center; justify-content: space-between; }
     .chat-messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px; background: #f8f9fa; }
 
-
-    /* Улучшенный футер чата */
+    /* Поле ввода */
     .chat-input { padding: 14px 20px; border-top: 1px solid #dee2e6; background: #ffffff; }
     .chat-input-wrapper {
         display: flex;
@@ -80,6 +80,19 @@
     .conversation-item.active { background: #e7f1ff; border-left: 3px solid #667eea; }
     .conversation-avatar { width: 45px; height: 45px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem; flex-shrink: 0;}
     .unread-badge { background: #dc3545; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; min-width: 20px; text-align: center; }
+
+    .conversation-item .last-msg {
+        font-size: 0.8rem;
+        color: #6c757d;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: block !important;
+        max-width: 100%;
+        line-height: 1.25;
+        margin-top: 2px;
+    }
+
     .message { margin-bottom: 15px; display: flex; }
     .message.incoming { justify-content: flex-start; }
     .message.outgoing { justify-content: flex-end; }
@@ -104,7 +117,6 @@
     .message.outgoing .message-sender { color: #f8f9fa; }
     .message.incoming .message-sender { color: #4a5568; }
     .message-time-inline { font-size: 0.65rem; opacity: 0.7; float: right; margin-left: 10px; margin-top: 5px; }
-    .conversation-item .last-msg { font-size: 0.8rem; color: #6c757d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .emoji-dropdown {
         position: absolute;
@@ -134,10 +146,23 @@
         transition: all 0.1s;
     }
     .emoji-item:hover { background: #f1f5f9; transform: scale(1.1); }
-    .position-relative { position: relative; }
-    .format-toolbar { position: relative; }
+    .format-toolbar {
+        position: relative;
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 4px 8px;
+        display: inline-flex;
+        gap: 6px;
+        border: 1px solid #dee2e6;
+        align-items: center;
+    }
+    .format-toolbar .btn {
+        padding: 5px 9px;
+        font-size: 0.85rem;
+        border-radius: 8px;
+        line-height: 1.2;
+    }
 
-    /* Карточка пользователя */
     .user-info-card {
         position: absolute;
         top: 60px;
@@ -168,26 +193,9 @@
         z-index: 10;
     }
     .user-info-card .card-body { padding: 16px; }
-    .user-info-card .info-row {
-        display: flex;
-        margin-bottom: 10px;
-        font-size: 0.85rem;
-        line-height: 1.4;
-    }
-    .user-info-card .info-label {
-        width: 120px;
-        min-width: 120px;
-        font-weight: 600;
-        color: #64748b;
-    }
-    .user-info-card .info-value {
-        flex: 1;
-        color: #1e293b;
-        word-break: break-word;
-        padding-left: 6px;
-        white-space: normal;
-        overflow-wrap: break-word;
-    }
+    .user-info-card .info-row { display: flex; margin-bottom: 10px; font-size: 0.85rem; line-height: 1.4; }
+    .user-info-card .info-label { width: 120px; min-width: 120px; font-weight: 600; color: #64748b; }
+    .user-info-card .info-value { flex: 1; color: #1e293b; word-break: break-word; padding-left: 6px; }
     .user-info-card .section-divider {
         font-size: 0.75rem;
         font-weight: 700;
@@ -199,24 +207,10 @@
         border-radius: 6px;
         margin: 12px 0 8px 0;
     }
-    .user-info-card .action-buttons {
-        display: flex;
-        gap: 10px;
-        margin-top: 12px;
-        padding-top: 12px;
-        border-top: 1px solid #e2e8f0;
-    }
-    .chat-messages div, .message-content {
-        white-space: pre-wrap !important;
-    }
+    .user-info-card .action-buttons { display: flex; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
+    .chat-messages .message-bubble div { white-space: pre-wrap !important; }
 
-    /* Карточки файлов в стиле Telegram */
-    .tg-files-container {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        margin-bottom: 4px;
-    }
+    .tg-files-container { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
     .tg-file-card {
         display: flex;
         align-items: center;
@@ -228,107 +222,24 @@
         width: 100%;
         box-sizing: border-box;
     }
-    .message.incoming .tg-file-card {
-        background: #f1f5f9;
-        color: #1e293b;
-        border: 1px solid #e2e8f0;
-    }
-    .message.incoming .tg-file-card:hover {
-        background: #e2e8f0;
-    }
-    .message.outgoing .tg-file-card {
-        background: rgba(255, 255, 255, 0.18);
-        color: #ffffff;
-        border: 1px solid rgba(255, 255, 255, 0.25);
-    }
-    .message.outgoing .tg-file-card:hover {
-        background: rgba(255, 255, 255, 0.28);
-    }
-    .tg-file-icon {
-        width: 32px;
-        height: 32px;
-        min-width: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 8px;
-        font-size: 1rem;
-    }
-    .message.incoming .tg-file-icon {
-        background: #667eea;
-        color: #ffffff;
-    }
-    .message.outgoing .tg-file-icon {
-        background: rgba(255, 255, 255, 0.3);
-        color: #ffffff;
-    }
-    .tg-file-badge {
-        font-size: 0.65rem;
-        padding: 1px 5px;
-        border-radius: 4px;
-        background: rgba(0,0,0,0.06);
-        display: inline-block;
-        margin-top: 1px;
-    }
-    .message.outgoing .tg-file-badge {
-        background: rgba(255,255,255,0.2);
-    }
+    .message.incoming .tg-file-card { background: #f1f5f9; color: #1e293b; border: 1px solid #e2e8f0; }
+    .message.incoming .tg-file-card:hover { background: #e2e8f0; }
+    .message.outgoing .tg-file-card { background: rgba(255, 255, 255, 0.18); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.25); }
+    .message.outgoing .tg-file-card:hover { background: rgba(255, 255, 255, 0.28); }
+    .tg-file-icon { width: 32px; height: 32px; min-width: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 8px; font-size: 1rem; }
+    .message.incoming .tg-file-icon { background: #667eea; color: #ffffff; }
+    .message.outgoing .tg-file-icon { background: rgba(255, 255, 255, 0.3); color: #ffffff; }
+    .tg-file-badge { font-size: 0.65rem; padding: 1px 5px; border-radius: 4px; background: rgba(0,0,0,0.06); display: inline-block; margin-top: 1px; }
+    .message.outgoing .tg-file-badge { background: rgba(255,255,255,0.2); }
 
-    /* Компактная Telegram-сетка изображений */
-    .tg-images-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        margin-bottom: 4px;
-        max-width: 340px;
-    }
-    .tg-img-wrapper {
-        position: relative;
-        overflow: hidden;
-        border-radius: 10px;
-        margin: 0;
-        padding: 0;
-    }
-    .tg-images-grid.single .tg-img-wrapper {
-        width: 100%;
-        max-width: 320px;
-    }
-    .tg-images-grid.multi .tg-img-wrapper {
-        width: calc(50% - 2px);
-        height: 125px;
-    }
-    .tg-chat-image {
-        width: 100%;
-        height: 100%;
-        max-height: 250px;
-        object-fit: cover;
-        border-radius: 10px;
-        cursor: pointer;
-        transition: transform 0.15s ease, opacity 0.15s;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-        display: block;
-    }
-    .tg-chat-image:hover {
-        transform: scale(1.02);
-        opacity: 0.95;
-    }
+    .tg-images-grid { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; max-width: 340px; }
+    .tg-img-wrapper { position: relative; overflow: hidden; border-radius: 10px; margin: 0; padding: 0; }
+    .tg-images-grid.single .tg-img-wrapper { width: 100%; max-width: 320px; }
+    .tg-images-grid.multi .tg-img-wrapper { width: calc(50% - 2px); height: 125px; }
+    .tg-chat-image { width: 100%; height: 100%; max-height: 250px; object-fit: cover; border-radius: 10px; cursor: pointer; display: block; }
+    .tg-voice-player { display: flex; align-items: center; width: 250px; height: 38px; border-radius: 20px; outline: none; margin-bottom: 4px; }
+    .message.outgoing .tg-voice-player { filter: invert(1) hue-rotate(180deg); }
 
-    /* Кастомный аудиоплеер для голосовых */
-    .tg-voice-player {
-        display: flex;
-        align-items: center;
-        width: 250px;
-        height: 38px;
-        border-radius: 20px;
-        outline: none;
-        margin-bottom: 4px;
-    }
-    .message.outgoing .tg-voice-player {
-        filter: invert(1) hue-rotate(180deg);
-    }
-
-    /* Чипы прикрепленных файлов с крестиком */
     .file-chip {
         display: inline-flex;
         align-items: center;
@@ -339,10 +250,6 @@
         border-radius: 16px;
         font-size: 0.8rem;
         margin: 3px 6px 3px 0;
-        transition: all 0.2s;
-    }
-    .file-chip:hover {
-        background: #e0e7ff;
     }
     .file-chip-remove {
         cursor: pointer;
@@ -354,18 +261,223 @@
         height: 16px;
         border-radius: 50%;
         color: #6366f1;
-        transition: all 0.15s;
-    }
-    .file-chip-remove:hover {
-        background: #dc2626;
-        color: #ffffff;
     }
 
+    .mobile-chat-back-btn {
+        display: none;
+        background: transparent;
+        border: none;
+        color: #475569;
+        font-size: 1.35rem;
+        padding: 0 8px 0 0;
+        cursor: pointer;
+        line-height: 1;
+    }
+
+    /* ПОЛНАЯ АДАПТАЦИЯ ДЛЯ СМАРТФОНОВ (<= 768px) */
+    @media (max-width: 768px) {
+        /* Убираем fixed с body, фиксируем высоту экрана без поломки touch-событий */
+        html, body {
+            height: 100% !important;
+            min-height: 100% !important;
+            overflow: hidden !important;
+            position: relative !important;
+        }
+
+        /* Родительская колонка контента: ровно под высоту видимой области мобильного браузера */
+        .main-content {
+            padding: 0 !important;
+            height: calc(100dvh - 56px) !important;
+            height: calc(100vh - 56px) !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+
+        /* Фиксируем шапку с вкладками вверху */
+        .chat-nav-tabs-wrapper {
+            flex-shrink: 0 !important;
+            padding: 6px 8px 0 8px !important;
+            background: #f0f2f5 !important;
+            margin-bottom: 0 !important;
+        }
+        .chat-nav-tabs-wrapper .nav-tabs {
+            border-bottom: none !important;
+        }
+
+        /* Контейнер вкладки чата занимает всё оставшееся пространство */
+        #chatsTab {
+            flex: 1 1 0% !important;
+            min-height: 0 !important;
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+        }
+
+        /* Контейнер чатов */
+        .chat-container {
+            flex: 1 1 0% !important;
+            min-height: 0 !important;
+            height: 100% !important;
+            max-height: 100% !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            margin-bottom: 0 !important;
+            display: flex !important;
+            position: relative !important;
+            overflow: hidden !important;
+        }
+
+        /* Сайдбар со списком чатов: включен touch-скролл и видимый скроллбар */
+        .chat-sidebar {
+            width: 100% !important;
+            min-width: 100% !important;
+            border-right: none !important;
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            overflow-y: scroll !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
+        }
+
+        #conversationsList {
+            flex: 1 1 0% !important;
+            min-height: 0 !important;
+            overflow-y: scroll !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
+            padding-bottom: 20px;
+        }
+
+        /* Окно диалога */
+        .chat-main {
+            display: none !important;
+            width: 100% !important;
+            min-width: 100% !important;
+            height: 100% !important;
+            flex: 1 1 0% !important;
+            min-height: 0 !important;
+            flex-direction: column !important;
+            position: relative !important;
+        }
+
+        /* Когда открыт чат: прячем список, показываем диалог */
+        .chat-container.mobile-chat-open .chat-sidebar {
+            display: none !important;
+        }
+        .chat-container.mobile-chat-open .chat-main {
+            display: flex !important;
+        }
+
+        .mobile-chat-back-btn {
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chat-header {
+            padding: 8px 12px !important;
+            flex-shrink: 0 !important;
+            background: #ffffff !important;
+            border-bottom: 1px solid #dee2e6 !important;
+            z-index: 10;
+        }
+
+        /* Лента сообщений: жестко изолированный скроллируемый контейнер */
+        .chat-messages {
+            flex: 1 1 0% !important;
+            min-height: 0 !important;
+            height: auto !important;
+            overflow-y: scroll !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
+            padding: 10px 10px 15px 10px !important;
+        }
+
+        .message-bubble {
+            max-width: 88% !important;
+            padding: 8px 12px;
+        }
+
+        /* Строка ввода сообщений: всегда зафиксирована внизу экрана */
+        .chat-input {
+            flex-shrink: 0 !important;
+            padding: 8px 10px 12px 10px !important;
+            background: #ffffff !important;
+            border-top: 1px solid #dee2e6 !important;
+            z-index: 20;
+        }
+
+        .chat-input-wrapper {
+            padding: 4px 8px 4px 10px !important;
+        }
+
+        .chat-textarea {
+            font-size: 16px !important; /* Отключает принудительный зум в мобильных браузерах */
+            padding: 5px 4px !important;
+        }
+
+        .format-toolbar {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            padding: 2px 6px;
+            margin-bottom: 6px !important;
+            gap: 4px;
+            width: 100%;
+        }
+
+        #chatEmojiPicker {
+            position: fixed !important;
+            bottom: 70px !important;
+            left: 10px !important;
+            right: 10px !important;
+            width: auto !important;
+            max-width: none !important;
+            z-index: 1100;
+        }
+
+        .user-info-card {
+            top: 0 !important;
+            right: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            max-height: 100% !important;
+            border-radius: 0 !important;
+            z-index: 1050;
+        }
+
+        #questionsTab {
+            height: 100% !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            padding: 8px;
+        }
+
+        /* Принудительное включение отображения скроллбаров для мобилок */
+        .chat-sidebar::-webkit-scrollbar,
+        #conversationsList::-webkit-scrollbar,
+        .chat-messages::-webkit-scrollbar {
+            width: 4px !important;
+            display: block !important;
+        }
+        .chat-sidebar::-webkit-scrollbar-thumb,
+        #conversationsList::-webkit-scrollbar-thumb,
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #cbd5e1 !important;
+            border-radius: 4px !important;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="mb-3">
+<div class="chat-nav-tabs-wrapper mb-1">
     <ul class="nav nav-tabs" id="chatTabs">
         <li class="nav-item">
             <button class="nav-link active" data-tab="chats" onclick="switchTab('chats')">{{ get_text('chats_tab') }}</button>
@@ -377,7 +489,8 @@
 </div>
 
 <div id="chatsTab">
-    <div class="chat-container">
+    <div class="chat-container" id="chatContainer">
+        <!-- Список чатов -->
         <div class="chat-sidebar" id="chatSidebar">
             <div class="p-3 border-bottom">
                 <h6 class="mb-2">{{ get_text('chats_tab') }}</h6>
@@ -385,15 +498,15 @@
             </div>
             <div id="conversationsList">
                 {% for conv in conversations %}
-                <div class="conversation-item" data-user-id="{{ conv.user_id }}" onclick="loadChat({{ conv.user_id }})">
+                <div class="conversation-item" data-user-id="{{ conv.user_id }}" data-search="{{ conv.full_name or conv.username }}" onclick="loadChat({{ conv.user_id }})">
                     <div class="d-flex align-items-center">
-                        <div class="conversation-avatar me-3">{{ conv.username[0]|upper }}</div>
-                        <div class="flex-grow-1">
+                        <div class="conversation-avatar me-3">{{ (conv.full_name or conv.username or '?')[0]|upper }}</div>
+                        <div class="flex-grow-1" style="min-width: 0;">
                             <div class="d-flex justify-content-between align-items-center">
-                                <strong>{{ conv.username }}</strong>
+                                <strong class="text-truncate" style="max-width: 100%; display: block;">{{ conv.full_name or conv.username }}</strong>
                                 {% if conv.unread_count > 0 %}<span class="unread-badge">{{ conv.unread_count }}</span>{% endif %}
                             </div>
-                            <small class="text-muted d-block text-truncate" style="max-width: 180px;">{{ (conv.last_message or '...') | striptags | truncate(40) }}</small>
+                            <div class="last-msg">{{ (conv.last_message or '...') | striptags | replace('\n', ' ') | truncate(45) }}</div>
                         </div>
                     </div>
                 </div>
@@ -401,13 +514,28 @@
             </div>
         </div>
 
+        <!-- Окно чата -->
         <div class="chat-main" id="chatMain">
             <div class="chat-header" id="chatHeader">
-                <div class="d-flex align-items-center">
-                    <div class="conversation-avatar me-3" style="width: 40px; height: 40px; font-size: 1rem;">?</div>
-                    <div><h6 class="mb-0" id="currentUserName">{{ get_text('select_chat_to_start') }}</h6><small class="text-muted" id="currentUserInfo"></small></div>
+                <div class="d-flex align-items-center" style="min-width: 0;">
+                    <!-- Кнопка возврата назад к списку чатов на смартфонах -->
+                    <button type="button" class="mobile-chat-back-btn" onclick="event.stopPropagation(); backToChatsList();" title="Назад к чатам">
+                        <i class="bi bi-arrow-left"></i>
+                    </button>
+                    <div class="conversation-avatar me-3" style="width: 38px; height: 38px; font-size: 1rem;">?</div>
+                    <div class="text-truncate">
+                        <h6 class="mb-0 text-truncate" id="currentUserName">{{ get_text('select_chat_to_start') }}</h6>
+                        <small class="text-muted" id="currentUserInfo"></small>
+                    </div>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" onclick="currentUserId && showUserCard(currentUserId)" title="{{ get_text('user_details') }}">
+                        <i class="bi bi-info-lg"></i>
+                    </button>
                 </div>
             </div>
+
+            <!-- Карточка пользователя -->
             <div id="userInfoCard" class="user-info-card">
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
@@ -464,12 +592,13 @@
             </div>
 
             <div class="chat-input" id="chatInput" style="display: none;">
-                <div class="format-toolbar mb-2" style="background: #f8f9fa; border-radius: 8px; padding: 4px 10px; display: inline-flex; gap: 6px; border: 1px solid #dee2e6; flex-wrap: wrap;">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="wrapChatText('<b>', '</b>')" title="{{ get_text('formatting_bold') }} (Ctrl+B)"><i class="bi bi-type-bold"></i></button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="wrapChatText('<i>', '</i>')" title="{{ get_text('formatting_italic') }} (Ctrl+I)"><i class="bi bi-type-italic"></i></button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="wrapChatText('<code>', '</code>')" title="{{ get_text('formatting_code') }}"><i class="bi bi-code-slash"></i></button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertChatLink()" title="{{ get_text('formatting_link') }}"><i class="bi bi-link-45deg"></i></button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary emoji-picker-btn" onclick="toggleChatEmojiPicker()" title="{{ get_text('formatting_emoji') }}"><i class="bi bi-emoji-smile"></i></button>
+                <!-- Панель форматирования текста -->
+                <div class="format-toolbar mb-2">
+                    <button type="button" class="btn btn-outline-secondary" onclick="wrapChatText('<b>', '</b>')" title="{{ get_text('formatting_bold') }} (Ctrl+B)"><i class="bi bi-type-bold"></i></button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="wrapChatText('<i>', '</i>')" title="{{ get_text('formatting_italic') }} (Ctrl+I)"><i class="bi bi-type-italic"></i></button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="wrapChatText('<code>', '</code>')" title="{{ get_text('formatting_code') }}"><i class="bi bi-code-slash"></i></button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="insertChatLink()" title="{{ get_text('formatting_link') }}"><i class="bi bi-link-45deg"></i></button>
+                    <button type="button" class="btn btn-outline-secondary emoji-picker-btn" onclick="toggleChatEmojiPicker()" title="{{ get_text('formatting_emoji') }}"><i class="bi bi-emoji-smile"></i></button>
 
                     <div id="chatEmojiPicker" class="emoji-dropdown">
                         <div class="emoji-grid">
@@ -508,7 +637,7 @@
 
                 <div id="fileList" class="d-flex flex-wrap align-items-center mb-2"></div>
 
-                <!-- Красивая строка ввода -->
+                <!-- Строка ввода сообщения -->
                 <form id="replyForm" onsubmit="sendMessage(event)">
                     <div class="chat-input-wrapper">
                         <label class="btn-attach" for="fileInput" title="{{ get_text('attach_file') }}">
@@ -649,7 +778,6 @@
     let isScrolledToBottom = true;
     let isUploadingFile = false;
 
-    // Массив для накопительного выбора файлов из разных папок
     let selectedFilesQueue = [];
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -658,6 +786,7 @@
     const messagesDiv = document.getElementById('chatMessages');
     const replyMessageInput = document.getElementById('replyMessage');
     const chatPreviewDiv = document.getElementById('chatPreview');
+    const chatContainerEl = document.getElementById('chatContainer');
 
     messagesDiv.addEventListener('scroll', () => {
         isScrolledToBottom = messagesDiv.scrollHeight - messagesDiv.clientHeight <= messagesDiv.scrollTop + 50;
@@ -669,6 +798,24 @@
         }, 500);
     }
 
+    function backToChatsList(e) {
+        if (e) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
+
+        closeUserCard();
+
+        if (chatContainerEl) {
+            chatContainerEl.classList.remove('mobile-chat-open');
+        }
+        clearTimeout(chatPollTimer);
+        isPolling = false;
+        if (currentUserId) {
+            saveDraft(currentUserId);
+        }
+    }
+
     function autoResizeTextarea(el) {
         el.style.height = 'auto';
         el.style.height = Math.min(el.scrollHeight, 120) + 'px';
@@ -678,13 +825,11 @@
         const inputFiles = Array.from(event.target.files);
         if (!inputFiles.length) return;
 
-        // Добавляем новые файлы к уже имеющимся в очереди
         for (const file of inputFiles) {
             if (selectedFilesQueue.length >= 10) {
                 showToast(locales.filesLimitWarning, 'warning');
                 break;
             }
-            // Исключаем полный дубликат по имени, размеру и времени
             const isDuplicate = selectedFilesQueue.some(f =>
                 f.name === file.name && f.size === file.size && f.lastModified === file.lastModified
             );
@@ -693,7 +838,6 @@
             }
         }
 
-        // Сбрасываем значение input[type=file], чтобы можно было повторно выбрать тот же файл из другой/этой же папки
         event.target.value = '';
         renderFileList();
     }
@@ -771,7 +915,6 @@
         updateChatPreview();
     }
 
-    // === СИСТЕМА ЧЕРНОВИКОВ (DRAFTS) ===
     function saveDraft(userId) {
         if (!userId) return;
         const text = replyMessageInput.value;
@@ -795,25 +938,26 @@
         localStorage.removeItem(`chat_draft_${userId}`);
     }
 
-    // Сохраняем черновик при каждом вводе
     if (replyMessageInput) {
-        replyMessageInput.addEventListener('input', () => {
-            if (currentUserId) saveDraft(currentUserId);
-            updateChatPreview();
+        replyMessageInput.addEventListener('focus', () => {
+            setTimeout(() => {
+                scrollToBottomForce(true);
+            }, 300);
         });
     }
 
     function insertChatEmoji(emoji) {
         const start = replyMessageInput.selectionStart;
-        const newText = replyMessageInput.value.substring(0, start) + emoji + replyMessageInput.value.substring(start);
-        replyMessageInput.value = newText;
-        setSelectionRange(start + emoji.length, start + emoji.length);
+        replyMessageInput.value = replyMessageInput.value.substring(0, start) + emoji + replyMessageInput.value.substring(start);
+        replyMessageInput.setSelectionRange(start + emoji.length, start + emoji.length);
+        replyMessageInput.focus();
         updateChatPreview();
         document.getElementById('chatEmojiPicker').classList.remove('show');
     }
 
     function toggleChatEmojiPicker() {
         const picker = document.getElementById('chatEmojiPicker');
+        if (!picker) return;
         picker.classList.toggle('show');
         if (picker.classList.contains('show')) {
             setTimeout(() => {
@@ -956,9 +1100,15 @@
 
     function initUserCardTrigger() {
         const header = document.querySelector('.chat-header');
-        if (header) {
+        if (header && !header.dataset.hasUserCardListener) {
+            header.dataset.hasUserCardListener = 'true';
             header.style.cursor = 'pointer';
             header.addEventListener('click', function(e) {
+                // Если кликнули по кнопке назад или внутри нее — игнорируем
+                if (e.target.closest('.mobile-chat-back-btn')) {
+                    return;
+                }
+                // Если карточка уже открыта или клик был внутри самой карточки/кнопок внутри шапки
                 if (currentUserId && !document.getElementById('userInfoCard').contains(e.target)) {
                     showUserCard(currentUserId);
                 }
@@ -990,14 +1140,30 @@
         });
     }
 
+    function scrollToBottomForce(smooth = false) {
+        if (!messagesDiv) return;
+        requestAnimationFrame(() => {
+            // Листаем сам контейнер сообщений
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            if (smooth) {
+                messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+            }
+        });
+    }
+
     async function loadChat(userId, isPollingReq = false) {
         if (isPollingReq && isUploadingFile) {
             chatPollTimer = setTimeout(() => loadChat(userId, true), 2500);
             return;
         }
 
+        // Переключение экрана чата на смартфонах
+        const chatContainer = document.getElementById('chatContainer');
+        if (chatContainer) {
+            chatContainer.classList.add('mobile-chat-open');
+        }
+
         if (!isPollingReq) {
-            // Сохраняем черновик предыдущего диалога перед переходом
             if (currentUserId && currentUserId !== userId) {
                 saveDraft(currentUserId);
             }
@@ -1014,7 +1180,6 @@
                 if (item.dataset.userId == userId) item.classList.add('active');
             });
 
-            // Восстанавливаем черновик для выбранного чата
             restoreDraft(userId);
         }
 
@@ -1030,6 +1195,7 @@
             const messages = (data.messages || []).reverse();
 
             if (!isPollingReq) {
+                closeUserCard();
                 const userFullName = data.full_name || '';
                 const headerName = userFullName ? `${userFullName} (@${data.username || userId})` : `@${data.username || userId}`;
                 document.getElementById('currentUserName').textContent = headerName;
@@ -1085,13 +1251,11 @@
                         const dept = msg.source_type.replace('_question', '').toUpperCase();
                         content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">[${locales.questionFrom} ${dept}]</small><br>${msg.message_text}`;
                     } else {
-                        // Отрисовка вложений: Картинки, Голосовые/Аудио, Документы
                         if (msg.files && msg.files.length > 0) {
                             const isSingle = msg.files.length === 1;
 
                             content += `<div class="tg-files-wrapper mb-1">`;
 
-                            // Сетка изображений
                             content += `<div class="tg-images-grid ${isSingle ? 'single' : 'multi'}">`;
                             msg.files.forEach((fId) => {
                                 content += `
@@ -1100,25 +1264,23 @@
                                          loading="lazy"
                                          class="tg-chat-image"
                                          alt="Image"
+                                         onload="scrollToBottomForce()"
                                          onclick="openImageModal('${fId}')"
                                          onerror="this.closest('.tg-img-wrapper').remove(); checkAudioOrDoc('${fId}');" />
                                 </div>`;
                             });
                             content += `</div>`;
 
-                            // Список для голосовых и документов
                             content += `<div class="tg-files-container">`;
                             msg.files.forEach((fId, index) => {
                                 content += `
                                 <div id="media_wrap_${fId}" style="display:none; flex-direction:column; gap:4px;">
-                                    <!-- Аудиоплеер для голосовых -->
                                     <audio controls class="tg-voice-player" id="audio_${fId}" preload="none" style="display:none;">
                                         <source src="/api/file/${fId}" type="audio/ogg">
                                         <source src="/api/file/${fId}" type="audio/mp4">
                                         <source src="/api/file/${fId}" type="audio/mpeg">
                                     </audio>
 
-                                    <!-- Карточка для файлов и логов -->
                                     <a href="/api/file/${fId}?download=1" target="_blank" id="doc_${fId}" class="tg-file-card" style="display: none;">
                                         <div class="tg-file-icon">
                                             <i class="bi bi-file-earmark-text-fill"></i>
@@ -1146,10 +1308,18 @@
             }
 
             if (!isPollingReq) {
-                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                closeUserCard();
+
+                scrollToBottomForce(false);
+                setTimeout(() => scrollToBottomForce(false), 60);
+                setTimeout(() => scrollToBottomForce(false), 200);
+                setTimeout(() => scrollToBottomForce(false), 450);
+
                 if (messages.length > 0) fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
             } else if (hasAnyNew) {
-                if (isScrolledToBottom) messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
+                if (isScrolledToBottom) {
+                    scrollToBottomForce(true);
+                }
                 if (hasNewIncoming) {
                     fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
                     const convItem = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
@@ -1280,18 +1450,11 @@
                 try {
                     const data = JSON.parse(xhr.responseText);
                     if (data.success) {
-                        // 1. Очищаем сохраненный черновик для текущего пользователя
                         clearDraft(currentUserId);
-
-                        // 2. Сбрасываем значение поля ввода и высоту textarea
                         msgInput.value = '';
                         autoResizeTextarea(msgInput);
-
-                        // 3. Очищаем очередь прикрепленных файлов
                         selectedFilesQueue = [];
                         renderFileList();
-
-                        // 4. Обновляем предпросмотр и подгружаем сообщения
                         updateChatPreview();
                         loadChat(currentUserId, false);
                     } else {
@@ -1336,8 +1499,8 @@
                 const time = conv.last_message_time ? new Date(conv.last_message_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
 
                 let rawMsg = conv.last_message || '...';
-                let cleanMsg = rawMsg.replace(/<\/?[^>]+(>|$)/g, "");
-                let previewMsg = escapeHtml(cleanMsg).replace(/<br\s*\/?>/gi, ' ');
+                let cleanMsg = rawMsg.replace(/<\/?[^>]+(>|$)/g, " ").replace(/[\r\n]+/g, " ").trim();
+                let previewMsg = escapeHtml(cleanMsg);
 
                 html += `
                 <div class="conversation-item ${isActive}" data-user-id="${conv.user_id}" data-search="${displayName}" onclick="loadChat(${conv.user_id})">
@@ -1345,12 +1508,12 @@
                         <div class="conversation-avatar me-3">${(conv.full_name || conv.username || '?')[0].toUpperCase()}</div>
                         <div class="flex-grow-1" style="min-width: 0;">
                             <div class="d-flex justify-content-between">
-                                <strong class="text-truncate" style="max-width: 100%; display: block;">@${displayName}</strong>
+                                <strong class="text-truncate" style="max-width: 100%; display: block;">${displayName}</strong>
                                 <small class="text-muted">${time}</small>
                             </div>
-                            <div class="d-flex justify-content-between">
+                            <div class="d-flex justify-content-between align-items-center">
                                 <div class="last-msg">${previewMsg}</div>
-                                ${conv.unread_count > 0 ? `<span class="unread-badge">${conv.unread_count}</span>` : ''}
+                                ${conv.unread_count > 0 ? `<span class="unread-badge ms-2">${conv.unread_count}</span>` : ''}
                             </div>
                         </div>
                     </div>
@@ -1366,7 +1529,7 @@
         if (!text) return '';
         const div = document.createElement('div');
         div.textContent = text;
-        return div.innerHTML.replace(/\n/g, '<br>');
+        return div.innerHTML;
     }
 
     function filterChats() {
@@ -1446,20 +1609,20 @@
 
             html += `
             <div class="question-item">
-                <div class="d-flex justify-content-between mb-2">
+                <div class="d-flex justify-content-between align-items-center mb-1">
                     <div>
                         <span class="question-department ${q.department}">${q.department.toUpperCase()}</span>
-                        <strong class="ms-2">@${q.username}</strong>
+                        <strong class="ms-1">@${q.username}</strong>
                     </div>
-                    <small class="text-muted">${time}</small>
+                    <small class="text-muted" style="font-size: 0.75rem;">${time}</small>
                 </div>
                 <div class="question-text">${q.question}</div>
-                <div class="text-end mt-2">
-                    <button class="btn btn-sm btn-outline-secondary me-2" onclick="openForwardModal(${q.id}, '${q.department}')">
-                        <i class="bi bi-share"></i> ${locales.forwardBtnShort}
+                <div class="question-actions-mobile text-end mt-2">
+                    <button class="btn btn-sm btn-outline-secondary me-1" onclick="openForwardModal(${q.id}, '${q.department}')">
+                        <i class="bi bi-share me-1"></i> ${locales.forwardBtnShort}
                     </button>
                     <button class="btn btn-sm btn-primary" onclick="replyToQuestion(${q.id}, '${q.department}', ${q.user_id})">
-                        <i class="bi bi-reply"></i> ${locales.replyBtn}
+                        <i class="bi bi-reply me-1"></i> ${locales.replyBtn}
                     </button>
                 </div>
             </div>`;
@@ -1569,6 +1732,7 @@
     loadAllQuestions();
     updateSidebar();
 </script>
+
 <div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true" style="background: rgba(0,0,0,0.85);">
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content" style="background: transparent; border: none;">

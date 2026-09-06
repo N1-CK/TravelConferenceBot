@@ -33,6 +33,216 @@
     .status-in_progress { background: #cfe2ff; color: #084298; }
     .status-ready, .status-completed { background: #d4edda; color: #155724; }
     .status-purchased { background: #d1e7dd; color: #0f5132; }
+
+    /* По умолчанию аккордеон скрыт на десктопе */
+    .mobile-expand-toggle,
+    .mobile-extra-info {
+        display: none;
+    }
+
+    /* Адаптив для смартфонов */
+    @media (max-width: 768px) {
+        /* 1. Дашборд: 2 плашки в ряд, компактный аккуратный вид */
+        .row.mb-4 {
+            margin-left: -5px;
+            margin-right: -5px;
+        }
+        .row.mb-4 > .col-md-3 {
+            flex: 0 0 50%;
+            max-width: 50%;
+            padding-left: 5px;
+            padding-right: 5px;
+            margin-bottom: 10px !important;
+        }
+        .stat-card {
+            padding: 0.75rem 0.5rem;
+            border-radius: 14px;
+        }
+        .stat-card .stat-number {
+            font-size: 1.5rem;
+            margin-bottom: 0.2rem;
+        }
+        .stat-card .stat-label {
+            font-size: 0.7rem;
+            letter-spacing: 0;
+            line-height: 1.15;
+        }
+
+        /* 2. Статусы сверху таблицы: аккуратная сетка 2х2 без горизонтального скролла */
+        .card-header {
+            flex-direction: column;
+            gap: 10px;
+            align-items: stretch !important;
+            padding: 0.9rem 1rem;
+        }
+        .card-header .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            width: 100%;
+        }
+        .card-header .btn-group .btn {
+            border-radius: 10px !important;
+            padding: 6px 8px;
+            font-size: 0.75rem;
+            text-align: center;
+            white-space: normal;
+            line-height: 1.2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 34px;
+        }
+
+        /* 3. Красивая аккуратная строка поиска DataTables на мобилках */
+        .dataTables_wrapper .dataTables_filter {
+            float: none !important;
+            text-align: left !important;
+            margin-bottom: 15px;
+            width: 100%;
+        }
+        .dataTables_wrapper .dataTables_filter label {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #495057;
+            gap: 6px;
+        }
+        .dataTables_wrapper .dataTables_filter input {
+            width: 100% !important;
+            margin-left: 0 !important;
+            padding: 8px 14px;
+            border-radius: 12px;
+            border: 1px solid #ced4da;
+            background-color: #f8f9fa;
+        }
+        .dataTables_wrapper .dataTables_filter input:focus {
+            background-color: #fff;
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+            outline: none;
+        }
+        .dataTables_wrapper .dataTables_length {
+            display: none;
+        }
+
+        /* 4. Таблица в мобильные карточки */
+        #requestsTable thead {
+            display: none;
+        }
+        #requestsTable, #requestsTable tbody, #requestsTable tr {
+            display: block;
+            width: 100%;
+        }
+        #requestsTable tr {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e9ecef;
+            margin-bottom: 14px;
+            padding: 14px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+            position: relative;
+        }
+
+        #requestsTable td.col-secondary {
+            display: none !important;
+        }
+
+        #requestsTable td.col-user-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border: none;
+            padding: 0 0 10px 0;
+            border-bottom: 1px solid #f1f3f5;
+        }
+
+        #requestsTable td.col-flight-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: none;
+            padding: 10px 0;
+        }
+
+        .mobile-expand-toggle {
+            display: block;
+            width: 100%;
+        }
+        .mobile-expand-toggle summary {
+            list-style: none;
+            cursor: pointer;
+            outline: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 6px 0;
+            color: #667eea;
+            font-size: 0.85rem;
+            font-weight: 500;
+            user-select: none;
+        }
+        .mobile-expand-toggle summary::-webkit-details-marker {
+            display: none;
+        }
+        .mobile-expand-toggle summary i {
+            transition: transform 0.25s ease;
+            margin-left: 6px;
+        }
+        .mobile-expand-toggle[open] summary i {
+            transform: rotate(180deg);
+        }
+
+        .mobile-extra-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px;
+            margin-top: 6px;
+            background: #f8f9fc;
+            border-radius: 12px;
+            font-size: 0.85rem;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px dashed #e2e8f0;
+            padding-bottom: 6px;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        .info-label {
+            color: #6c757d;
+            font-weight: 500;
+        }
+
+        #requestsTable td.col-actions {
+            display: flex !important;
+            justify-content: stretch;
+            border: none;
+            padding: 12px 0 0 0;
+            margin-top: 6px;
+            border-top: 1px solid #f1f3f5;
+        }
+        #requestsTable td.col-actions .btn-group {
+            width: 100%;
+            display: flex;
+            gap: 8px;
+        }
+        #requestsTable td.col-actions .btn-group .btn {
+            border-radius: 10px !important;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+        }
+        #requestsTable td.col-actions .btn-view {
+            flex: 1;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -70,7 +280,7 @@
 
     <!-- Requests Table -->
     <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
             <span><i class="bi bi-airplane"></i> {{ get_text('travel_requests') }}</span>
             <div class="btn-group btn-group-sm" role="group">
                 <button type="button" class="btn btn-outline-secondary filter-btn active" data-status="all">{{ get_text('all_statuses') }}</button>
@@ -81,7 +291,7 @@
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table id="requestsTable" class="table table-hover">
+                <table id="requestsTable" class="table table-hover align-middle">
                     <thead>
                         <tr>
                             <th>{{ get_text('id') }}</th>
@@ -92,7 +302,7 @@
                             <th>{{ get_text('travel_visa_status') }}</th>
                             <th>{{ get_text('visa_request_status') }}</th>
                             <th>{{ get_text('flight_request_status') }}</th>
-                            <th>Суточные</th>
+                            <th>{{ get_text('travel_per_diem_head') }}</th>
                             <th>{{ get_text('created_at') }}</th>
                             <th>{{ get_text('actions') }}</th>
                         </tr>
@@ -100,12 +310,29 @@
                     <tbody>
                         {% for req in requests %}
                         <tr data-visa-status="{{ req.visa_request_status }}" data-flight-status="{{ req.flight_request_status }}">
-                            <td>{{ req.id }}</td>
-                            <td><strong>@{{ req.username }}</strong></td>
-                            <td>{{ req.first_name or '' }}</td>
-                            <td>{{ req.city_from or '-' }}</td>
-                            <td>{{ req.city_to or '-' }}</td>
-                            <td>
+                            <td class="col-user-summary">
+                                <span class="d-none d-md-inline">{{ req.id }}</span>
+                                <div class="d-md-none">
+                                    <span class="badge bg-light text-dark border me-1">#{{ req.id }}</span>
+                                    <strong>@{{ req.username }}</strong>
+                                </div>
+                                <div class="text-end d-md-none">
+                                    <span class="text-secondary fw-bold">{{ req.first_name or '' }}</span>
+                                </div>
+                            </td>
+
+                            <!-- Username (Desktop) -->
+                            <td class="col-secondary"><strong>@{{ req.username }}</strong></td>
+
+                            <!-- Full Name (Desktop) -->
+                            <td class="col-secondary">{{ req.first_name or '-' }}</td>
+
+                            <!-- Route -->
+                            <td class="col-secondary">{{ req.city_from or '-' }}</td>
+                            <td class="col-secondary">{{ req.city_to or '-' }}</td>
+
+                            <!-- Visa Availability -->
+                            <td class="col-secondary">
                                 {% if req.visa_status == 'have' %}
                                     <span class="badge bg-success">{{ get_text('visa_have') }}</span>
                                 {% elif req.visa_status == 'not_have' %}
@@ -114,7 +341,9 @@
                                     <span class="badge bg-info">{{ get_text('visa_special') }}</span>
                                 {% endif %}
                             </td>
-                            <td>
+
+                            <!-- Visa Status -->
+                            <td class="col-secondary">
                                 <span class="status-badge status-{{ req.visa_request_status }}">
                                     {% if req.visa_request_status == 'pending' %}
                                         {{ get_text('status_pending') }}
@@ -125,7 +354,10 @@
                                     {% endif %}
                                 </span>
                             </td>
-                            <td>
+
+                            <!-- Flight Status + Mobile Accordion -->
+                            <td class="col-flight-status">
+                                <div class="d-md-none text-muted small fw-bold">{{ get_text('ticket', default='Билет') }}:</div>
                                 <span class="status-badge status-{{ req.flight_request_status }}">
                                     {% if req.flight_request_status == 'pending' %}
                                         {{ get_text('status_pending') }}
@@ -135,31 +367,85 @@
                                         {{ get_text('flights_purchased') }}
                                     {% endif %}
                                 </span>
+
+                                <div class="mobile-expand-toggle mt-2">
+                                    <details>
+                                        <summary>
+                                            <span>{{ get_text('more_info', default='Подробнее') }}</span> <i class="bi bi-chevron-down"></i>
+                                        </summary>
+                                        <div class="mobile-extra-info">
+                                            <div class="info-row">
+                                                <span class="info-label">{{ get_text('departure_from') }}:</span>
+                                                <span>{{ req.city_from or '-' }}</span>
+                                            </div>
+                                            <div class="info-row">
+                                                <span class="info-label">{{ get_text('return_to') }}:</span>
+                                                <span>{{ req.city_to or '-' }}</span>
+                                            </div>
+                                            <div class="info-row">
+                                                <span class="info-label">{{ get_text('visa_status') }}:</span>
+                                                <span>
+                                                    <span class="status-badge status-{{ req.visa_request_status }}">
+                                                        {% if req.visa_request_status == 'pending' %}{{ get_text('status_pending') }}
+                                                        {% elif req.visa_request_status == 'in_progress' %}{{ get_text('status_in_progress') }}
+                                                        {% elif req.visa_request_status == 'ready' %}{{ get_text('status_ready') }}
+                                                        {% endif %}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            <div class="info-row">
+                                                <span class="info-label">{{ get_text('travel_per_diem') }}:</span>
+                                                <span>
+                                                    {% if req.payment_details %}
+                                                        <span class="status-badge status-{{ req.per_diem_status }}">
+                                                            {% if req.per_diem_status == 'pending' %}⏳ {{ get_text('status_pending') }}
+                                                            {% elif req.per_diem_status == 'in_progress' %}🔄 {{ get_text('status_in_progress') }}
+                                                            {% elif req.per_diem_status in ['completed', 'ready'] %}✅ {{ get_text('status_ready') }}
+                                                            {% endif %}
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="text-muted small">{{ get_text('not_filled') }}</span>
+                                                    {% endif %}
+                                                </span>
+                                            </div>
+                                            <div class="info-row">
+                                                <span class="info-label">{{ get_text('application_date', default='Дата заявки') }}:</span>
+                                                <span class="text-muted">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</span>
+                                            </div>
+                                        </div>
+                                    </details>
+                                </div>
                             </td>
-                            <td>
+
+                            <!-- Per Diem (Desktop) -->
+                            <td class="col-secondary">
                                 {% if req.payment_details %}
                                     <span class="status-badge status-{{ req.per_diem_status }}">
-                                        {% if req.per_diem_status == 'pending' %}⏳ Ожидание
-                                        {% elif req.per_diem_status == 'in_progress' %}🔄 В процессе
-                                        {% elif req.per_diem_status in ['completed', 'ready'] %}✅ Готово
+                                        {% if req.per_diem_status == 'pending' %}⏳ {{ get_text('status_pending') }}
+                                        {% elif req.per_diem_status == 'in_progress' %}🔄 {{ get_text('status_in_progress') }}
+                                        {% elif req.per_diem_status in ['completed', 'ready'] %}✅ {{ get_text('status_ready') }}
                                         {% endif %}
                                     </span>
                                 {% else %}
-                                    <span class="text-muted small">Не заполнены</span>
+                                    <span class="text-muted small">{{ get_text('not_filled') }}</span>
                                 {% endif %}
                             </td>
-                            <td>{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</td>
-                            <td>
+
+                            <!-- Created At (Desktop) -->
+                            <td class="col-secondary">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</td>
+
+                            <!-- Actions -->
+                            <td class="col-actions">
                                 <div class="btn-group btn-group-sm" role="group">
-                                    <button class="btn btn-sm btn-outline-primary"
+                                    <button class="btn btn-outline-primary btn-view"
                                             onclick="viewRequestDetails({{ req.id }})"
                                             title="{{ get_text('view_details') }}">
-                                        <i class="bi bi-eye"></i>
+                                        <i class="bi bi-eye"></i> <span class="d-md-none ms-1">{{ get_text('details', default='Детали') }}</span>
                                     </button>
-                                    <button class="btn btn-sm btn-outline-info"
+                                    <button class="btn btn-outline-info"
                                             onclick="openReplyModal('{{ req.user_id }}')"
-                                            title="Написать пользователю">
-                                        <i class="bi bi-chat-dots"></i>
+                                            title="{{ get_text('reply_to_user') }}">
+                                        <i class="bi bi-chat-dots"></i> <span class="d-md-none ms-1">{{ get_text('write', default='Написать') }}</span>
                                     </button>
                                 </div>
                             </td>
@@ -246,7 +532,7 @@
         const toastHtml = `
             <div class="toast show" role="alert" data-bs-autohide="true" data-bs-delay="3000">
                 <div class="toast-header">
-                    <strong class="me-auto">${type === 'success' ? 'Успешно' : 'Ошибка'}</strong>
+                    <strong class="me-auto">${type === 'success' ? '{{ get_text("operation_success") }}' : '{{ get_text("error_occurred") }}'}</strong>
                     <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
                 </div>
                 <div class="toast-body">${escapeHtml(message)}</div>
@@ -285,7 +571,15 @@
             'status_pending': '{{ get_text("status_pending") }}',
             'status_in_progress': '{{ get_text("status_in_progress") }}',
             'status_ready': '{{ get_text("status_ready") }}',
-            'flights_purchased': '{{ get_text("flights_purchased") }}'
+            'flights_purchased': '{{ get_text("flights_purchased") }}',
+            'payment_type': '{{ get_text("payment_type") }}',
+            'per_diem_status': '{{ get_text("per_diem_status") }}',
+            'payment_details': '{{ get_text("payment_details") }}',
+            'not_filled': '{{ get_text("not_filled") }}',
+            'yes': '{{ get_text("yes") }}',
+            'no': '{{ get_text("no") }}',
+            'per_diem_card': '{{ get_text("per_diem_card") }}',
+            'per_diem_crypto': '{{ get_text("per_diem_crypto") }}'
         };
         return texts[key] || key;
     }
@@ -324,8 +618,8 @@
             if (!response.ok) throw new Error('Request failed');
             const data = await response.json();
 
-            const paymentType = data.payment_type === 'crypto' ? '🪙 Криптокошелек' : (data.payment_type === 'card' ? '💳 Банковская карта' : '-');
-            const paymentDetails = data.payment_details || 'Не указаны';
+            const paymentType = data.payment_type === 'crypto' ? getText('per_diem_crypto') : (data.payment_type === 'card' ? getText('per_diem_card') : '-');
+            const paymentDetails = data.payment_details || getText('not_filled');
             const perDiemStatus = data.per_diem_status || 'pending';
 
             const html = `
@@ -338,23 +632,23 @@
                     <tr><th>${getText('full_name')}</th><td>${escapeHtml(data.first_name || '')}</td></tr>
                     <tr><th>${getText('phone')}</th><td>${escapeHtml(data.phone || '-')}</td></tr>
                     <tr>
-                        <th>Тип выплаты суточных</th>
+                        <th>${getText('payment_type')}</th>
                         <td><strong>${escapeHtml(paymentType)}</strong></td>
                     </tr>
                     <tr>
-                        <th>Криптокошелек / Карты</th>
+                        <th>${getText('payment_details')}</th>
                         <td><pre style="white-space: pre-wrap; font-weight: bold; color: #0d6efd; margin: 0;">${escapeHtml(paymentDetails)}</pre></td>
                     </tr>
                     <tr>
-                        <th>Статус суточных</th>
+                        <th>${getText('per_diem_status')}</th>
                         <td>${getStatusBadge(perDiemStatus)}</td>
                     </tr>
 
                     <tr class="table-secondary"><th colspan="2">✈️ ${getText('route_info')}</th></tr>
                     <tr><th>${getText('departure_from')}</th><td>${escapeHtml(data.city_from || '-')}</td></tr>
                     <tr><th>${getText('return_to')}</th><td>${escapeHtml(data.city_to || '-')}</td></tr>
-                    <tr><th>${getText('needs_baggage')}</th><td>${data.needs_baggage ? '✅ Да' : '❌ Нет'}</td></tr>
-                    <tr><th>${getText('hotel_needed')}</th><td>${data.hotel_needed ? '✅ Да' : '❌ Нет'}</td></tr>
+                    <tr><th>${getText('needs_baggage')}</th><td>${data.needs_baggage ? '✅ ' + getText('yes') : '❌ ' + getText('no')}</td></tr>
+                    <tr><th>${getText('hotel_needed')}</th><td>${data.hotel_needed ? '✅ ' + getText('yes') : '❌ ' + getText('no')}</td></tr>
 
                     <tr class="table-secondary"><th colspan="2">🛂 ${getText('visa_info')}</th></tr>
                     <tr><th>${getText('visa_status')}</th><td>${getVisaStatusText(data.visa_status)}</td></tr>
@@ -366,31 +660,30 @@
                     <tr><th>${getText('passport_data')}</th><td><pre style="white-space: pre-wrap; margin:0;">${escapeHtml(data.passport_data || '-')}</pre></td></tr>
                 </table>
 
-                <!-- КНОПКИ ДЕЙСТВИЙ ВНИЗУ КАРТОЧКИ -->
                 <div class="mt-3">
-                    <label class="form-label fw-bold">💰 Статус суточных:</label>
+                    <label class="form-label fw-bold">💰 ${getText('per_diem_status')}:</label>
                     <div class="btn-group w-100" role="group">
-                        <button class="btn btn-sm btn-outline-warning" onclick="updatePerDiemStatus(${data.per_diem_id || data.id}, 'pending')" ${perDiemStatus === 'pending' ? 'disabled' : ''}>⏳ В ожидании</button>
-                        <button class="btn btn-sm btn-outline-info" onclick="updatePerDiemStatus(${data.per_diem_id || data.id}, 'in_progress')" ${perDiemStatus === 'in_progress' ? 'disabled' : ''}>🔄 В процессе</button>
-                        <button class="btn btn-sm btn-outline-success" onclick="updatePerDiemStatus(${data.per_diem_id || data.id}, 'completed')" ${perDiemStatus === 'completed' || perDiemStatus === 'ready' ? 'disabled' : ''}>✅ Готово</button>
+                        <button class="btn btn-sm btn-outline-warning" onclick="updatePerDiemStatus(${data.per_diem_id || data.id}, 'pending')" ${perDiemStatus === 'pending' ? 'disabled' : ''}>⏳ ${getText('status_pending')}</button>
+                        <button class="btn btn-sm btn-outline-info" onclick="updatePerDiemStatus(${data.per_diem_id || data.id}, 'in_progress')" ${perDiemStatus === 'in_progress' ? 'disabled' : ''}>🔄 ${getText('status_in_progress')}</button>
+                        <button class="btn btn-sm btn-outline-success" onclick="updatePerDiemStatus(${data.per_diem_id || data.id}, 'completed')" ${perDiemStatus === 'completed' || perDiemStatus === 'ready' ? 'disabled' : ''}>✅ ${getText('status_ready')}</button>
                     </div>
                 </div>
 
                 <div class="mt-3">
-                    <label class="form-label fw-bold">🛂 Статус визы:</label>
+                    <label class="form-label fw-bold">🛂 ${getText('visa_request_status')}:</label>
                     <div class="btn-group w-100" role="group">
-                        <button class="btn btn-sm btn-outline-warning" onclick="updateVisaStatus(${data.id}, 'pending')" ${data.visa_request_status === 'pending' ? 'disabled' : ''}>⏳ На проверке</button>
-                        <button class="btn btn-sm btn-outline-info" onclick="updateVisaStatus(${data.id}, 'in_progress')" ${data.visa_request_status === 'in_progress' ? 'disabled' : ''}>🔄 В процессе</button>
-                        <button class="btn btn-sm btn-outline-success" onclick="updateVisaStatus(${data.id}, 'ready')" ${data.visa_request_status === 'ready' ? 'disabled' : ''}>✅ Готово</button>
+                        <button class="btn btn-sm btn-outline-warning" onclick="updateVisaStatus(${data.id}, 'pending')" ${data.visa_request_status === 'pending' ? 'disabled' : ''}>⏳ ${getText('status_pending')}</button>
+                        <button class="btn btn-sm btn-outline-info" onclick="updateVisaStatus(${data.id}, 'in_progress')" ${data.visa_request_status === 'in_progress' ? 'disabled' : ''}>🔄 ${getText('status_in_progress')}</button>
+                        <button class="btn btn-sm btn-outline-success" onclick="updateVisaStatus(${data.id}, 'ready')" ${data.visa_request_status === 'ready' ? 'disabled' : ''}>✅ ${getText('status_ready')}</button>
                     </div>
                 </div>
 
                 <div class="mt-2">
-                    <label class="form-label fw-bold">🎫 Статус билетов:</label>
+                    <label class="form-label fw-bold">🎫 ${getText('flight_request_status')}:</label>
                     <div class="btn-group w-100" role="group">
-                        <button class="btn btn-sm btn-outline-warning" onclick="updateFlightStatus(${data.id}, 'pending')" ${data.flight_request_status === 'pending' ? 'disabled' : ''}>⏳ Ожидание</button>
-                        <button class="btn btn-sm btn-outline-info" onclick="updateFlightStatus(${data.id}, 'in_progress')" ${data.flight_request_status === 'in_progress' ? 'disabled' : ''}>🔄 В процессе</button>
-                        <button class="btn btn-sm btn-outline-success" onclick="updateFlightStatus(${data.id}, 'purchased')" ${data.flight_request_status === 'purchased' ? 'disabled' : ''}>🎫 Билеты куплены</button>
+                        <button class="btn btn-sm btn-outline-warning" onclick="updateFlightStatus(${data.id}, 'pending')" ${data.flight_request_status === 'pending' ? 'disabled' : ''}>⏳ ${getText('status_pending')}</button>
+                        <button class="btn btn-sm btn-outline-info" onclick="updateFlightStatus(${data.id}, 'in_progress')" ${data.flight_request_status === 'in_progress' ? 'disabled' : ''}>🔄 ${getText('status_in_progress')}</button>
+                        <button class="btn btn-sm btn-outline-success" onclick="updateFlightStatus(${data.id}, 'purchased')" ${data.flight_request_status === 'purchased' ? 'disabled' : ''}>🎫 ${getText('flights_purchased')}</button>
                     </div>
                 </div>
             `;
@@ -398,7 +691,7 @@
             document.getElementById('requestModalBody').innerHTML = html;
             new bootstrap.Modal(document.getElementById('requestModal')).show();
         } catch (e) {
-            showToast('Ошибка загрузки деталей', 'danger');
+            showToast('{{ get_text("error_loading_data") }}', 'danger');
         }
     }
 
@@ -409,13 +702,13 @@
             const response = await fetch(`/api/per_diem/${perDiemId}/status`, { method: 'POST', body: formData });
             const data = await response.json();
             if (data.success) {
-                showToast('Статус суточных изменен', 'success');
+                showToast('{{ get_text("status_changed") }}', 'success');
                 setTimeout(() => location.reload(), 1000);
             } else {
-                showToast('Ошибка обновления суточных', 'danger');
+                showToast('{{ get_text("error_status_change") }}', 'danger');
             }
         } catch (e) {
-            showToast('Ошибка сети', 'danger');
+            showToast('{{ get_text("network_error") }}', 'danger');
         }
     }
 
@@ -426,10 +719,10 @@
             const response = await fetch(`/api/travel/request/${requestId}/visa_status`, { method: 'POST', body: formData });
             const data = await response.json();
             if (data.success) {
-                showToast('Статус визы изменен', 'success');
+                showToast('{{ get_text("status_changed") }}', 'success');
                 setTimeout(() => location.reload(), 1000);
             }
-        } catch (e) { showToast('Ошибка', 'danger'); }
+        } catch (e) { showToast('{{ get_text("error_status_change") }}', 'danger'); }
     }
 
     async function updateFlightStatus(requestId, status) {
@@ -439,10 +732,10 @@
             const response = await fetch(`/api/travel/request/${requestId}/flight_status`, { method: 'POST', body: formData });
             const data = await response.json();
             if (data.success) {
-                showToast('Статус билета изменен', 'success');
+                showToast('{{ get_text("status_changed") }}', 'success');
                 setTimeout(() => location.reload(), 1000);
             }
-        } catch (e) { showToast('Ошибка', 'danger'); }
+        } catch (e) { showToast('{{ get_text("error_status_change") }}', 'danger'); }
     }
 
     function openReplyModal(userId) {
@@ -451,7 +744,11 @@
     }
 
     function initDataTable() {
+        const lang = '{{ session.get("lang", "ru") }}';
         requestsTable = $('#requestsTable').DataTable({
+            language: {
+                url: `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`
+            },
             pageLength: 25,
             order: [[0, 'desc']]
         });

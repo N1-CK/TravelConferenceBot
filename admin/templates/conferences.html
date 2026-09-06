@@ -84,6 +84,46 @@
         flex: 1;
         color: #212529;
     }
+
+    /* Адаптив для смартфонов (≤ 768px) */
+    @media (max-width: 768px) {
+        /* Дашборд: сетка 2х2 */
+        .row.mb-4 {
+            margin-left: -5px !important;
+            margin-right: -5px !important;
+        }
+        .row.mb-4 > [class*="col-"] {
+            flex: 0 0 50% !important;
+            max-width: 50% !important;
+            padding-left: 5px !important;
+            padding-right: 5px !important;
+            margin-bottom: 10px !important;
+        }
+        .stat-card {
+            padding: 0.75rem 0.5rem !important;
+            border-radius: 14px !important;
+        }
+        .stat-card .stat-icon i {
+            font-size: 1.5rem !important;
+        }
+        .stat-card .stat-icon {
+            margin-bottom: 0.2rem !important;
+        }
+        .stat-card .stat-number {
+            font-size: 1.45rem !important;
+            margin-bottom: 0.2rem !important;
+        }
+        .stat-card .stat-label {
+            font-size: 0.7rem !important;
+            letter-spacing: 0 !important;
+            line-height: 1.15 !important;
+        }
+
+        .conference-card {
+            padding: 12px !important;
+            margin-bottom: 10px !important;
+        }
+    }
 </style>
 {% endblock %}
 

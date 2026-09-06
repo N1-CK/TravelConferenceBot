@@ -32,13 +32,124 @@
         max-height: 60vh;
         overflow-y: auto;
     }
+
+    /* Мобильные элементы по умолчанию скрыты на вебе */
+    .mobile-row-head,
+    .mobile-row-status {
+        display: none;
+    }
+
+    /* Адаптив для смартфонов (≤ 768px) */
+    /* Мобильные элементы по умолчанию скрыты на вебе */
+    .mobile-broadcast-card {
+        display: none;
+    }
+
+    /* Адаптив для смартфонов (≤ 768px) */
+    @media (max-width: 768px) {
+        /* 1. Дашборд: 2 карточки в ряд */
+        .dashboard-stats-row {
+            margin-left: -5px !important;
+            margin-right: -5px !important;
+        }
+        .dashboard-stats-row > div {
+            flex: 0 0 50% !important;
+            max-width: 50% !important;
+            padding-left: 5px !important;
+            padding-right: 5px !important;
+            margin-bottom: 10px !important;
+        }
+        .dashboard-stats-row .stat-card {
+            padding: 0.75rem 0.5rem !important;
+            border-radius: 14px !important;
+        }
+        .dashboard-stats-row .stat-card .stat-icon i {
+            font-size: 1.5rem !important;
+        }
+        .dashboard-stats-row .stat-card .stat-icon {
+            margin-bottom: 0.2rem !important;
+        }
+        .dashboard-stats-row .stat-card .stat-number {
+            font-size: 1.45rem !important;
+            margin-bottom: 0.2rem !important;
+        }
+        .dashboard-stats-row .stat-card .stat-label {
+            font-size: 0.7rem !important;
+            letter-spacing: 0 !important;
+            line-height: 1.15 !important;
+        }
+
+        .modal-search-box {
+            max-width: 100% !important;
+            width: 100% !important;
+        }
+
+        /* 2. Мобильная таблица без расползания */
+        #allBroadcastsTable thead {
+            display: none !important;
+        }
+        #allBroadcastsTable,
+        #allBroadcastsTable tbody,
+        #allBroadcastsTable tr {
+            display: block !important;
+            width: 100% !important;
+        }
+        #allBroadcastsTable tr {
+            background: white !important;
+            border-radius: 14px !important;
+            border: 1px solid #e2e8f0 !important;
+            margin-bottom: 10px !important;
+            padding: 12px 14px !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+        }
+
+        /* Скрываем десктопные td */
+        #allBroadcastsTable td.web-col {
+            display: none !important;
+        }
+
+        /* Аккуратная собранная карточка для мобилки */
+        .mobile-broadcast-card {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 8px !important;
+        }
+
+        .mobile-card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .mobile-card-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.82rem;
+            color: #64748b;
+        }
+
+        .mobile-card-bottom {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .mobile-card-bottom .badge {
+            font-size: 0.75rem;
+            padding: 5px 10px;
+            border-radius: 8px;
+        }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <h2 class="mb-4 fade-in">{{ get_text('dashboard_welcome') }}</h2>
 
-<div class="row mb-4">
+<!-- Карточки метрик (на мобилках 2х2, на вебе в одну строку) -->
+<div class="row mb-4 dashboard-stats-row">
     <div class="col-md-3 mb-3">
         <div class="stat-card">
             <div class="stat-icon text-primary mb-2"><i class="bi bi-people fs-1"></i></div>
@@ -247,7 +358,7 @@
 </div>
 
 <!-- ============================================ -->
-<!-- МОДАЛЬНОЕ ОКНО 1: ВСЕ РАССЫЛКИ (СО СКРОЛЛОМ) -->
+<!-- МОДАЛЬНОЕ ОКНО 1: ВСЕ РАССЫЛКИ -->
 <!-- ============================================ -->
 <div class="modal fade" id="allBroadcastsModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -258,7 +369,7 @@
             </div>
             <div class="modal-body p-0">
                 <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div class="input-group" style="max-width: 380px;">
+                    <div class="input-group modal-search-box" style="max-width: 380px;">
                         <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                         <input type="text" id="broadcastSearchInput" class="form-control" placeholder="{{ get_text('search_broadcasts_placeholder') }}" onkeyup="filterBroadcastsTable()">
                     </div>
@@ -388,17 +499,41 @@
             'custom': `<span class="badge bg-secondary">${i18n.broadcast_selected}</span>`
         };
 
-        tbody.innerHTML = items.map(b => `
-            <tr class="broadcast-row" onclick="openBroadcastModal(${b.id}, true)">
-                <td><strong>#${b.id}</strong></td>
-                <td><small>${b.formatted_time || b.timestamp || '-'}</small></td>
-                <td>@${b.username || 'admin'}</td>
-                <td>${typeLabels[b.broadcast_type] || `<span class="badge bg-secondary">${b.broadcast_type || '-'}</span>`}</td>
-                <td>${b.company ? `<span class="badge bg-light text-dark border">${b.company}</span>` : '-'}</td>
-                <td><span class="badge bg-success">${b.success_count || 0} ✓</span></td>
-                <td>${(b.failed_count > 0) ? `<span class="badge bg-danger">${b.failed_count} ✗</span>` : '<span class="text-muted">0</span>'}</td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = items.map(b => {
+            const timeStr = b.formatted_time || b.timestamp || '-';
+            const senderStr = b.username || 'admin';
+            const successCount = b.success_count || 0;
+            const failedCount = b.failed_count || 0;
+
+            return `
+                <tr class="broadcast-row" onclick="openBroadcastModal(${b.id}, true)">
+                    <!-- Мобильный компактный блок (статусы аккуратно собраны вместе, не уезжают по краям) -->
+                    <div class="mobile-broadcast-card">
+                        <div class="mobile-card-top">
+                            <div class="mobile-card-meta">
+                                <span class="badge bg-light text-dark border fw-bold">#${b.id}</span>
+                                <span><i class="bi bi-clock me-1"></i>${timeStr}</span>
+                            </div>
+                            <span class="badge bg-light text-primary border">@${senderStr}</span>
+                        </div>
+                        <div class="mobile-card-bottom">
+                            <span class="badge bg-success"><i class="bi bi-check2 me-1"></i>${successCount} ✓</span>
+                            ${(failedCount > 0) ? `<span class="badge bg-danger"><i class="bi bi-x me-1"></i>${failedCount} ✗</span>` : '<span class="badge bg-light text-muted border">0 ✗</span>'}
+                            ${b.company ? `<span class="badge bg-light text-secondary border ms-auto">${b.company}</span>` : ''}
+                        </div>
+                    </div>
+
+                    <!-- ВЕБ-КОЛОНКИ (остаются ровно такими, как были) -->
+                    <td class="web-col"><strong>#${b.id}</strong></td>
+                    <td class="web-col"><small>${timeStr}</small></td>
+                    <td class="web-col">@${senderStr}</td>
+                    <td class="web-col">${typeLabels[b.broadcast_type] || `<span class="badge bg-secondary">${b.broadcast_type || '-'}</span>`}</td>
+                    <td class="web-col">${b.company ? `<span class="badge bg-light text-dark border">${b.company}</span>` : '-'}</td>
+                    <td class="web-col"><span class="badge bg-success">${successCount} ✓</span></td>
+                    <td class="web-col">${(failedCount > 0) ? `<span class="badge bg-danger">${failedCount} ✗</span>` : '<span class="text-muted">0</span>'}</td>
+                </tr>
+            `;
+        }).join('');
     }
 
     function filterBroadcastsTable() {

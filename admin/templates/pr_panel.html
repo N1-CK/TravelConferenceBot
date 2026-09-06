@@ -27,10 +27,13 @@
         border-radius: 20px;
         font-size: 0.8rem;
         font-weight: 600;
+        display: inline-block;
+        white-space: nowrap;
     }
     .status-pending { background: #fff3cd; color: #856404; }
     .status-in_progress { background: #cfe2ff; color: #084298; }
     .status-ready { background: #d4edda; color: #155724; }
+
     .nav-tabs .nav-link {
         font-size: 1rem;
         padding: 10px 20px;
@@ -50,6 +53,288 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+
+    /* Мобильный аккордеон и карточка */
+    .mobile-pr-card {
+        display: none;
+    }
+
+    @media (max-width: 768px) {
+        .nav-tabs {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            border-bottom: 2px solid #dee2e6 !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
+        .nav-tabs .nav-item {
+            flex: 0 0 auto !important;
+        }
+        .nav-tabs .nav-link {
+            padding: 8px 14px !important;
+            font-size: 0.85rem !important;
+            white-space: nowrap !important;
+        }
+
+        /* 1. Дашборд: сетка 2х2 */
+        .tab-pane .row {
+            margin-left: -5px !important;
+            margin-right: -5px !important;
+        }
+        .tab-pane .row > [class*="col-"] {
+            flex: 0 0 50% !important;
+            max-width: 50% !important;
+            padding-left: 5px !important;
+            padding-right: 5px !important;
+            margin-bottom: 10px !important;
+        }
+        .stat-card {
+            padding: 0.75rem 0.5rem !important;
+            border-radius: 14px !important;
+        }
+        .stat-card .stat-number {
+            font-size: 1.5rem !important;
+            margin-bottom: 0.2rem !important;
+        }
+        .stat-card .stat-label {
+            font-size: 0.7rem !important;
+            letter-spacing: 0 !important;
+            line-height: 1.15 !important;
+        }
+
+        /* 2. Поле поиска DataTables — принудительно на 100% ширины */
+        .dataTables_wrapper {
+            display: block !important;
+            width: 100% !important;
+            padding: 0 !important;
+        }
+        .dataTables_wrapper > .row:first-child {
+            display: block !important;
+            width: 100% !important;
+            margin: 0 0 15px 0 !important;
+            padding: 0 !important;
+        }
+        .dataTables_wrapper > .row:first-child > div {
+            display: block !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            flex: none !important;
+            padding: 0 !important;
+        }
+        .dataTables_wrapper .dataTables_length {
+            display: none !important;
+        }
+        .dataTables_wrapper .dataTables_filter {
+            display: block !important;
+            float: none !important;
+            text-align: left !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        .dataTables_wrapper .dataTables_filter label {
+            display: flex !important;
+            flex-direction: column !important;
+            width: 100% !important;
+            font-size: 0.85rem !important;
+            font-weight: 600 !important;
+            color: #495057 !important;
+            gap: 6px !important;
+            margin: 0 !important;
+            text-align: left !important;
+        }
+        .dataTables_wrapper .dataTables_filter input {
+            display: block !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 8px 14px !important;
+            border-radius: 12px !important;
+            border: 1px solid #ced4da !important;
+            background-color: #f8f9fa !important;
+            box-sizing: border-box !important;
+            font-size: 0.95rem !important;
+        }
+        .dataTables_wrapper .dataTables_filter input:focus {
+            background-color: #fff !important;
+            border-color: #667eea !important;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15) !important;
+            outline: none !important;
+        }
+
+        /* 3. Карточки заявок на 100% ширины */
+        .card-body {
+            padding: 10px !important;
+            overflow: hidden !important;
+        }
+        .table-responsive {
+            border: none !important;
+            overflow: visible !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        table.dataTable,
+        table.dataTable.no-footer,
+        #bannersTable,
+        #cardsTable,
+        #bookingsTable,
+        #reportsTable {
+            width: 100% !important;
+            min-width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: table !important;
+            border-collapse: collapse !important;
+            box-sizing: border-box !important;
+        }
+
+        #bannersTable thead, #cardsTable thead {
+            display: none !important;
+        }
+
+        .desktop-td {
+            display: none !important;
+        }
+
+        .mobile-td-card {
+            display: block !important;
+            width: 100% !important;
+            padding: 0 !important;
+            border: none !important;
+            box-sizing: border-box !important;
+        }
+
+        .mobile-pr-card {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 10px !important;
+            width: 100% !important;
+            background: white !important;
+            border-radius: 16px !important;
+            border: 1px solid #e9ecef !important;
+            margin-bottom: 14px !important;
+            padding: 14px !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+            box-sizing: border-box !important;
+        }
+
+        .mobile-card-top {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            border-bottom: 1px solid #f1f3f5 !important;
+            padding-bottom: 8px !important;
+        }
+
+        .mobile-card-status-row {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+        }
+
+        .mobile-expand-toggle summary {
+            list-style: none !important;
+            cursor: pointer !important;
+            outline: none !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 6px 0 !important;
+            color: #667eea !important;
+            font-size: 0.85rem !important;
+            font-weight: 500 !important;
+        }
+        .mobile-expand-toggle summary::-webkit-details-marker {
+            display: none !important;
+        }
+        .mobile-expand-toggle summary i {
+            transition: transform 0.25s ease !important;
+            margin-left: 6px !important;
+        }
+        .mobile-expand-toggle[open] summary i {
+            transform: rotate(180deg) !important;
+        }
+
+        .mobile-extra-info {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 8px !important;
+            padding: 12px !important;
+            margin-top: 6px !important;
+            background: #f8f9fc !important;
+            border-radius: 12px !important;
+            font-size: 0.85rem !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        .info-row {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            border-bottom: 1px dashed #e2e8f0 !important;
+            padding-bottom: 6px !important;
+        }
+        .info-row:last-child {
+            border-bottom: none !important;
+            padding-bottom: 0 !important;
+        }
+        .info-label {
+            color: #6c757d !important;
+            font-weight: 500 !important;
+        }
+
+        .mobile-card-actions {
+            border-top: 1px solid #f1f3f5 !important;
+            padding-top: 10px !important;
+        }
+        .mobile-card-actions .btn-group {
+            width: 100% !important;
+            display: flex !important;
+            gap: 6px !important;
+        }
+        .mobile-card-actions .btn {
+            flex: 1 !important;
+            border-radius: 8px !important;
+            padding: 8px 6px !important;
+            font-size: 0.8rem !important;
+        }
+
+        /* 4. Карточки Affiliate */
+        #bookingsTable tr, #reportsTable tr {
+            display: block !important;
+            width: 100% !important;
+            background: white !important;
+            border-radius: 16px !important;
+            border: 1px solid #e9ecef !important;
+            margin-bottom: 12px !important;
+            padding: 12px 14px !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+            box-sizing: border-box !important;
+        }
+        .affiliate-card-mobile {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 8px !important;
+            width: 100% !important;
+        }
+        .affiliate-top {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            border-bottom: 1px solid #f1f3f5 !important;
+            padding-bottom: 8px !important;
+        }
+        .affiliate-row {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            font-size: 0.85rem !important;
+        }
     }
 </style>
 {% endblock %}
@@ -120,7 +405,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="bannersTable" class="table table-hover">
+                        <table id="bannersTable" class="table table-hover align-middle">
                             <thead>
                                 <tr>
                                     <th>{{ get_text('id') }}</th>
@@ -137,14 +422,86 @@
                             <tbody>
                                 {% for req in banner_requests %}
                                 <tr data-status="{{ req.status }}">
-                                    <td>{{ req.id }}</td>
-                                    <td><strong>@{{ req.username }}</strong></td>
-                                    <td>{{ req.full_name or '-' }}</td>
-                                    <td>{{ req.position or '-' }}</td>
-                                    <td>{{ req.company or '-' }}</td>
-                                    <td>{{ '🇷🇺 RU' if req.language == 'ru' else '🇬🇧 EN' }}</td>
-                                    <td>{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</td>
-                                    <td>
+                                    <!-- МОБИЛЬНАЯ КАРТОЧКА НА 100% ШИРИНЫ (вложена в 1 td с colspan) -->
+                                    <td class="mobile-td-card d-md-none" colspan="9">
+                                        <div class="mobile-pr-card">
+                                            <div class="mobile-card-top">
+                                                <div>
+                                                    <span class="badge bg-light text-dark border me-1">#{{ req.id }}</span>
+                                                    <strong>@{{ req.username }}</strong>
+                                                </div>
+                                                <span class="text-secondary fw-bold">{{ req.full_name or '' }}</span>
+                                            </div>
+
+                                            <div class="mobile-card-status-row">
+                                                <span class="status-badge status-{{ req.status }}">
+                                                    {% if req.status == 'pending' %}
+                                                        <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_event') }}
+                                                    {% elif req.status == 'in_progress' %}
+                                                        <i class="bi bi-arrow-repeat"></i> {{ get_text('status_in_progress') }}
+                                                    {% elif req.status == 'ready' %}
+                                                        <i class="bi bi-check-lg"></i> {{ get_text('status_ready') }}
+                                                    {% endif %}
+                                                </span>
+                                            </div>
+
+                                            <div class="mobile-expand-toggle w-100">
+                                                <details>
+                                                    <summary>
+                                                        <span>{{ get_text('more_info', default='Подробнее') }}</span> <i class="bi bi-chevron-down"></i>
+                                                    </summary>
+                                                    <div class="mobile-extra-info">
+                                                        <div class="info-row">
+                                                            <span class="info-label">{{ get_text('position') }}:</span>
+                                                            <span>{{ req.position or '-' }}</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-label">{{ get_text('company') }}:</span>
+                                                            <span>{{ req.company or '-' }}</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-label">{{ get_text('language') }}:</span>
+                                                            <span>{{ '🇷🇺 RU' if req.language == 'ru' else '🇬🇧 EN' }}</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-label">{{ get_text('created_at') }}:</span>
+                                                            <span class="text-muted">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</span>
+                                                        </div>
+                                                    </div>
+                                                </details>
+                                            </div>
+
+                                            <div class="mobile-card-actions">
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <button class="btn btn-outline-warning"
+                                                            onclick="updateBannerStatus({{ req.id }}, 'pending')"
+                                                            {% if req.status == 'pending' %}disabled{% endif %}>
+                                                        <i class="bi bi-hourglass-split"></i> Ожидание
+                                                    </button>
+                                                    <button class="btn btn-outline-info"
+                                                            onclick="updateBannerStatus({{ req.id }}, 'in_progress')"
+                                                            {% if req.status == 'in_progress' %}disabled{% endif %}>
+                                                        <i class="bi bi-arrow-repeat"></i> В процессе
+                                                    </button>
+                                                    <button class="btn btn-outline-success"
+                                                            onclick="updateBannerStatus({{ req.id }}, 'ready')"
+                                                            {% if req.status == 'ready' %}disabled{% endif %}>
+                                                        <i class="bi bi-check-lg"></i> Готово
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <!-- ДЕСКТОПНЫЕ КОЛОНКИ (абсолютно без изменений) -->
+                                    <td class="desktop-td d-none d-md-table-cell">{{ req.id }}</td>
+                                    <td class="desktop-td d-none d-md-table-cell"><strong>@{{ req.username }}</strong></td>
+                                    <td class="desktop-td d-none d-md-table-cell">{{ req.full_name or '-' }}</td>
+                                    <td class="desktop-td d-none d-md-table-cell">{{ req.position or '-' }}</td>
+                                    <td class="desktop-td d-none d-md-table-cell">{{ req.company or '-' }}</td>
+                                    <td class="desktop-td d-none d-md-table-cell">{{ '🇷🇺 RU' if req.language == 'ru' else '🇬🇧 EN' }}</td>
+                                    <td class="desktop-td d-none d-md-table-cell">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</td>
+                                    <td class="desktop-td d-none d-md-table-cell">
                                         <span class="status-badge status-{{ req.status }}">
                                             {% if req.status == 'pending' %}
                                                 <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_event') }}
@@ -155,7 +512,7 @@
                                             {% endif %}
                                         </span>
                                     </td>
-                                    <td>
+                                    <td class="desktop-td d-none d-md-table-cell">
                                         <div class="btn-group btn-group-sm" role="group">
                                             <button class="btn btn-sm btn-outline-warning"
                                                     onclick="updateBannerStatus({{ req.id }}, 'pending')"
@@ -180,7 +537,7 @@
                                 </tr>
                                 {% else %}
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted py-4">
+                                    <td colspan="9" class="text-center text-muted py-4">
                                         <i class="bi bi-image fs-1"></i>
                                         <p class="mt-2">{{ get_text('no_banner_requests') }}</p>
                                     </td>
@@ -230,7 +587,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="cardsTable" class="table table-hover">
+                        <table id="cardsTable" class="table table-hover align-middle">
                             <thead>
                                 <tr>
                                     <th>{{ get_text('id') }}</th>
@@ -247,20 +604,92 @@
                             <tbody>
                                 {% for card in business_cards %}
                                 <tr data-status="{{ card.status }}">
-                                    <td>{{ card.id }}</td>
-                                    <td><strong>@{{ card.username }}</strong></td>
-                                    <td>{{ card.full_name or '-' }}</td>
-                                    <td>{{ card.position_en or '-' }}</td>
-                                    <td>{{ card.company or '-' }}</td>
-                                    <td>
+                                    <!-- МОБИЛЬНАЯ КАРТОЧКА ВИЗИТКИ НА 100% ШИРИНЫ -->
+                                    <td class="mobile-td-card d-md-none" colspan="9">
+                                        <div class="mobile-pr-card">
+                                            <div class="mobile-card-top">
+                                                <div>
+                                                    <span class="badge bg-light text-dark border me-1">#{{ card.id }}</span>
+                                                    <strong>@{{ card.username }}</strong>
+                                                </div>
+                                                <span class="text-secondary fw-bold">{{ card.full_name or '' }}</span>
+                                            </div>
+
+                                            <div class="mobile-card-status-row">
+                                                <span class="status-badge status-{{ card.status }}">
+                                                    {% if card.status == 'pending' %}
+                                                        <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_event') }}
+                                                    {% elif card.status == 'in_progress' %}
+                                                        <i class="bi bi-arrow-repeat"></i> {{ get_text('status_in_progress') }}
+                                                    {% elif card.status == 'ready' %}
+                                                        <i class="bi bi-check-lg"></i> {{ get_text('status_ready') }}
+                                                    {% endif %}
+                                                </span>
+                                            </div>
+
+                                            <div class="mobile-expand-toggle w-100">
+                                                <details>
+                                                    <summary>
+                                                        <span>{{ get_text('more_info', default='Подробнее') }}</span> <i class="bi bi-chevron-down"></i>
+                                                    </summary>
+                                                    <div class="mobile-extra-info">
+                                                        <div class="info-row">
+                                                            <span class="info-label">{{ get_text('position') }}:</span>
+                                                            <span>{{ card.position_en or '-' }}</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-label">{{ get_text('company') }}:</span>
+                                                            <span>{{ card.company or '-' }}</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-label">{{ get_text('brand_style') }}:</span>
+                                                            <span>{{ get_text('yes') if card.brand_style else get_text('no') }}</span>
+                                                        </div>
+                                                        <div class="info-row">
+                                                            <span class="info-label">{{ get_text('created_at') }}:</span>
+                                                            <span class="text-muted">{{ card.created_at.strftime('%d.%m.%Y %H:%M') if card.created_at else '-' }}</span>
+                                                        </div>
+                                                    </div>
+                                                </details>
+                                            </div>
+
+                                            <div class="mobile-card-actions">
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <button class="btn btn-outline-warning"
+                                                            onclick="updateCardStatus({{ card.id }}, 'pending')"
+                                                            {% if card.status == 'pending' %}disabled{% endif %}>
+                                                        <i class="bi bi-hourglass-split"></i> Ожидание
+                                                    </button>
+                                                    <button class="btn btn-outline-info"
+                                                            onclick="updateCardStatus({{ card.id }}, 'in_progress')"
+                                                            {% if card.status == 'in_progress' %}disabled{% endif %}>
+                                                        <i class="bi bi-arrow-repeat"></i> В процессе
+                                                    </button>
+                                                    <button class="btn btn-outline-success"
+                                                            onclick="updateCardStatus({{ card.id }}, 'ready')"
+                                                            {% if card.status == 'ready' %}disabled{% endif %}>
+                                                        <i class="bi bi-check-lg"></i> Готово
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <!-- ДЕСКТОПНЫЕ КОЛОНКИ -->
+                                    <td class="desktop-td d-none d-md-table-cell">{{ card.id }}</td>
+                                    <td class="desktop-td d-none d-md-table-cell"><strong>@{{ card.username }}</strong></td>
+                                    <td class="desktop-td d-none d-md-table-cell">{{ card.full_name or '-' }}</td>
+                                    <td class="desktop-td d-none d-md-table-cell">{{ card.position_en or '-' }}</td>
+                                    <td class="desktop-td d-none d-md-table-cell">{{ card.company or '-' }}</td>
+                                    <td class="desktop-td d-none d-md-table-cell">
                                         {% if card.brand_style %}
                                         <span class="badge bg-success">{{ get_text('yes') }}</span>
                                         {% else %}
                                         <span class="badge bg-secondary">{{ get_text('no') }}</span>
                                         {% endif %}
-                                    </div>
-                                    <td>{{ card.created_at.strftime('%d.%m.%Y %H:%M') if card.created_at else '-' }}</td>
-                                    <td>
+                                    </td>
+                                    <td class="desktop-td d-none d-md-table-cell">{{ card.created_at.strftime('%d.%m.%Y %H:%M') if card.created_at else '-' }}</td>
+                                    <td class="desktop-td d-none d-md-table-cell">
                                         <span class="status-badge status-{{ card.status }}">
                                             {% if card.status == 'pending' %}
                                                 <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_event') }}
@@ -270,8 +699,8 @@
                                                 <i class="bi bi-check-lg"></i> {{ get_text('status_ready') }}
                                             {% endif %}
                                         </span>
-                                    </div>
-                                    <td>
+                                    </td>
+                                    <td class="desktop-td d-none d-md-table-cell">
                                         <div class="btn-group btn-group-sm" role="group">
                                             <button class="btn btn-sm btn-outline-warning"
                                                     onclick="updateCardStatus({{ card.id }}, 'pending')"
@@ -292,7 +721,7 @@
                                                 <i class="bi bi-check-lg"></i>
                                             </button>
                                         </div>
-                                    </div>
+                                    </td>
                                 </tr>
                                 {% else %}
                                 <tr>
@@ -317,7 +746,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="bookingsTable" class="table table-hover table-affiliate">
+                        <table id="bookingsTable" class="table table-hover table-affiliate align-middle">
                             <thead>
                                 <tr>
                                     <th>{{ get_text('id') }}</th>
@@ -350,7 +779,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="reportsTable" class="table table-hover table-affiliate">
+                        <table id="reportsTable" class="table table-hover table-affiliate align-middle">
                             <thead>
                                 <tr>
                                     <th>{{ get_text('id') }}</th>
@@ -375,7 +804,7 @@
     </div>
 </div>
 
-<!-- Modal для просмотра деталей бронирования -->
+<!-- Modal детали бронирования -->
 <div class="modal fade" id="bookingModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -391,7 +820,7 @@
     </div>
 </div>
 
-<!-- Modal для просмотра деталей отчета -->
+<!-- Modal детали отчета -->
 <div class="modal fade" id="reportModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -410,27 +839,69 @@
 
 {% block extra_js %}
 <script>
-    let currentBannerFilter = '{{ banner_filter if banner_filter else "all" }}';
-    let currentCardsFilter = '{{ cards_filter if cards_filter else "all" }}';
+    let currentBannerFilter = 'all';
+    let currentCardsFilter = 'all';
+    let bannersTable, cardsTable;
     let bookingsData = [];
     let reportsData = [];
 
     $(document).ready(function() {
-        $('#bannersTable, #cardsTable').DataTable({
+        const lang = '{{ session.get("lang", "ru") }}';
+        bannersTable = $('#bannersTable').DataTable({
             language: {
-                url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/{{ "ru" if session.get("lang", "ru") == "ru" else "en" }}.json'
+                url: `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`
             },
             pageLength: 25,
+            autoWidth: false,
             order: [[0, 'desc']]
+        });
+
+        cardsTable = $('#cardsTable').DataTable({
+            language: {
+                url: `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`
+            },
+            pageLength: 25,
+            autoWidth: false,
+            order: [[0, 'desc']]
+        });
+
+        $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function(e) {
+            $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
         });
 
         loadAffiliateBookings();
         loadAffiliateReports();
     });
 
-    // ============================================
-    // AFFILIATE BOOKINGS
-    // ============================================
+    $.fn.dataTable.ext.search.push(
+        function(settings, data, dataIndex) {
+            if (settings.nTable.id === 'bannersTable') {
+                if (currentBannerFilter === 'all') return true;
+                const row = bannersTable.row(dataIndex).node();
+                return $(row).attr('data-status') === currentBannerFilter;
+            }
+            if (settings.nTable.id === 'cardsTable') {
+                if (currentCardsFilter === 'all') return true;
+                const row = cardsTable.row(dataIndex).node();
+                return $(row).attr('data-status') === currentCardsFilter;
+            }
+            return true;
+        }
+    );
+
+    function filterBanners(status) {
+        currentBannerFilter = status;
+        bannersTable.draw();
+        document.querySelectorAll('#banners .stat-card').forEach(card => card.classList.remove('active'));
+        if (event && event.currentTarget) event.currentTarget.classList.add('active');
+    }
+
+    function filterCards(status) {
+        currentCardsFilter = status;
+        cardsTable.draw();
+        document.querySelectorAll('#cards .stat-card').forEach(card => card.classList.remove('active'));
+        if (event && event.currentTarget) event.currentTarget.classList.add('active');
+    }
 
     async function loadAffiliateBookings() {
         try {
@@ -438,7 +909,6 @@
             bookingsData = await response.json();
             renderBookingsTable(bookingsData);
         } catch (e) {
-            console.error('Error loading bookings:', e);
             document.getElementById('bookingsTableBody').innerHTML =
                 '<tr><td colspan="11" class="text-center text-danger">{{ get_text("error_occurred") }}</td></tr>';
         }
@@ -446,7 +916,6 @@
 
     function renderBookingsTable(bookings) {
         const tbody = document.getElementById('bookingsTableBody');
-
         if (!bookings.length) {
             tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">{{ get_text("affiliate_no_bookings") }}</td></tr>';
             return;
@@ -456,17 +925,32 @@
         for (const b of bookings) {
             html += `
                 <tr>
-                    <td>${b.id}</td>
-                    <td><strong>@${b.username}</strong></td>
-                    <td>${b.manager || '-'}</td>
-                    <td><small>${b.datetime || '-'}</small></td>
-                    <td class="booking-details" title="${b.company || ''}">${b.company || '-'}</td>
-                    <td>${b.partner || '-'}</td>
-                    <td class="booking-details" title="${b.restaurant || ''}">${b.restaurant || '-'}</td>
-                    <td>${b.people || '-'}</td>
-                    <td>${b.payment_method || '-'}</td>
-                    <td>${b.partnertype || '-'}</td>
-                    <td>
+                    <td class="d-md-none p-0 border-0" colspan="11">
+                        <div class="affiliate-card-mobile">
+                            <div class="affiliate-top">
+                                <div><span class="badge bg-light text-dark border me-1">#${b.id}</span><strong>@${b.username}</strong></div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="viewBookingDetails(${b.id})" title="{{ get_text('view') }}">
+                                    <i class="bi bi-eye"></i> Детали
+                                </button>
+                            </div>
+                            <div class="affiliate-row"><span class="text-muted">Менеджер:</span> <span>${b.manager || '-'}</span></div>
+                            <div class="affiliate-row"><span class="text-muted">Дата:</span> <span>${b.datetime || '-'}</span></div>
+                            <div class="affiliate-row"><span class="text-muted">Компания:</span> <span>${b.company || '-'}</span></div>
+                            <div class="affiliate-row"><span class="text-muted">Партнер:</span> <span>${b.partner || '-'}</span></div>
+                        </div>
+                    </td>
+
+                    <td class="d-none d-md-table-cell">${b.id}</td>
+                    <td class="d-none d-md-table-cell"><strong>@${b.username}</strong></td>
+                    <td class="d-none d-md-table-cell">${b.manager || '-'}</td>
+                    <td class="d-none d-md-table-cell"><small>${b.datetime || '-'}</small></td>
+                    <td class="d-none d-md-table-cell booking-details" title="${b.company || ''}">${b.company || '-'}</td>
+                    <td class="d-none d-md-table-cell">${b.partner || '-'}</td>
+                    <td class="d-none d-md-table-cell booking-details" title="${b.restaurant || ''}">${b.restaurant || '-'}</td>
+                    <td class="d-none d-md-table-cell">${b.people || '-'}</td>
+                    <td class="d-none d-md-table-cell">${b.payment_method || '-'}</td>
+                    <td class="d-none d-md-table-cell">${b.partnertype || '-'}</td>
+                    <td class="d-none d-md-table-cell">
                         <button class="btn btn-sm btn-outline-primary" onclick="viewBookingDetails(${b.id})" title="{{ get_text('view') }}">
                             <i class="bi bi-eye"></i>
                         </button>
@@ -500,17 +984,12 @@
         new bootstrap.Modal(document.getElementById('bookingModal')).show();
     }
 
-    // ============================================
-    // AFFILIATE REPORTS
-    // ============================================
-
     async function loadAffiliateReports() {
         try {
             const response = await fetch('/api/affiliate/reports');
             reportsData = await response.json();
             renderReportsTable(reportsData);
         } catch (e) {
-            console.error('Error loading reports:', e);
             document.getElementById('reportsTableBody').innerHTML =
                 '<tr><td colspan="9" class="text-center text-danger">{{ get_text("error_occurred") }}</td></tr>';
         }
@@ -518,7 +997,6 @@
 
     function renderReportsTable(reports) {
         const tbody = document.getElementById('reportsTableBody');
-
         if (!reports.length) {
             tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">{{ get_text("affiliate_no_reports") }}</td></tr>';
             return;
@@ -528,15 +1006,30 @@
         for (const r of reports) {
             html += `
                 <tr>
-                    <td>${r.id}</td>
-                    <td><strong>@${r.username}</strong></td>
-                    <td class="booking-details" title="${r.company || ''}">${r.company || '-'}</td>
-                    <td><small>${r.meeting_date || '-'}</small></td>
-                    <td>${r.manager || '-'}</td>
-                    <td>${r.partner || '-'}</td>
-                    <td class="report-details" title="${(r.result || '').replace(/"/g, '&quot;')}">${(r.result || '-').substring(0, 50)}${(r.result || '').length > 50 ? '...' : ''}</td>
-                    <td>${r.budget || '0'}</td>
-                    <td>
+                    <td class="d-md-none p-0 border-0" colspan="9">
+                        <div class="affiliate-card-mobile">
+                            <div class="affiliate-top">
+                                <div><span class="badge bg-light text-dark border me-1">#${r.id}</span><strong>@${r.username}</strong></div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="viewReportDetails(${r.id})" title="{{ get_text('view') }}">
+                                    <i class="bi bi-eye"></i> Детали
+                                </button>
+                            </div>
+                            <div class="affiliate-row"><span class="text-muted">Компания:</span> <span>${r.company || '-'}</span></div>
+                            <div class="affiliate-row"><span class="text-muted">Дата:</span> <span>${r.meeting_date || '-'}</span></div>
+                            <div class="affiliate-row"><span class="text-muted">Менеджер:</span> <span>${r.manager || '-'}</span></div>
+                            <div class="affiliate-row"><span class="text-muted">Бюджет:</span> <span class="badge bg-success">${r.budget || '0'}</span></div>
+                        </div>
+                    </td>
+
+                    <td class="d-none d-md-table-cell">${r.id}</td>
+                    <td class="d-none d-md-table-cell"><strong>@${r.username}</strong></td>
+                    <td class="d-none d-md-table-cell booking-details" title="${r.company || ''}">${r.company || '-'}</td>
+                    <td class="d-none d-md-table-cell"><small>${r.meeting_date || '-'}</small></td>
+                    <td class="d-none d-md-table-cell">${r.manager || '-'}</td>
+                    <td class="d-none d-md-table-cell">${r.partner || '-'}</td>
+                    <td class="d-none d-md-table-cell report-details" title="${(r.result || '').replace(/"/g, '&quot;')}">${(r.result || '-').substring(0, 50)}${(r.result || '').length > 50 ? '...' : ''}</td>
+                    <td class="d-none d-md-table-cell">${r.budget || '0'}</td>
+                    <td class="d-none d-md-table-cell">
                         <button class="btn btn-sm btn-outline-primary" onclick="viewReportDetails(${r.id})" title="{{ get_text('view') }}">
                             <i class="bi bi-eye"></i>
                         </button>
@@ -568,34 +1061,6 @@
         new bootstrap.Modal(document.getElementById('reportModal')).show();
     }
 
-    // ============================================
-    // EXISTING FUNCTIONS (banners, cards)
-    // ============================================
-
-    function filterBanners(status) {
-        currentBannerFilter = status;
-        const table = $('#bannersTable').DataTable();
-        if (status === 'all') {
-            table.search('').columns().search('').draw();
-        } else {
-            table.column(6).search(status).draw();
-        }
-        document.querySelectorAll('#banners .stat-card').forEach(card => card.classList.remove('active'));
-        event.currentTarget.classList.add('active');
-    }
-
-    function filterCards(status) {
-        currentCardsFilter = status;
-        const table = $('#cardsTable').DataTable();
-        if (status === 'all') {
-            table.search('').columns().search('').draw();
-        } else {
-            table.column(7).search(status).draw();
-        }
-        document.querySelectorAll('#cards .stat-card').forEach(card => card.classList.remove('active'));
-        event.currentTarget.classList.add('active');
-    }
-
     function updateBannerStatus(id, status) {
         const statusNames = {
             'pending': '{{ get_text("status_pending_event") }}',
@@ -615,7 +1080,6 @@
                     showToast('{{ get_text("error_status_change") }}', 'danger');
                 }
             }).catch(error => {
-                console.error('Error:', error);
                 showToast('{{ get_text("error_status_change") }}', 'danger');
             });
         }
@@ -640,7 +1104,6 @@
                     showToast('{{ get_text("error_status_change") }}', 'danger');
                 }
             }).catch(error => {
-                console.error('Error:', error);
                 showToast('{{ get_text("error_status_change") }}', 'danger');
             });
         }

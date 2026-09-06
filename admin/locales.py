@@ -58,6 +58,7 @@ TEXTS = {
         'travel_flight_info': '📋 Информация о рейсах',
         'travel_hotel': '🏨 Бронирование отеля',
         'travel_per_diem': '💰 Суточные',
+        'travel_per_diem_head': 'Суточные',
         'travel_my_requests': '📋 Мои заявки',
         'travel_visa_status': 'Статус визы',
         'travel_passport_data': 'Паспортные данные',
@@ -273,6 +274,12 @@ TEXTS = {
         'visa_status_changed': 'Статус визы изменен на',
         'flight_status_changed': 'Статус билета изменен на',
         'visa_status': 'Статус визы',
+        'details': 'Детали',
+        'write': 'Написать',
+        'more_info': 'Подробнее',
+        'per_diem': 'Суточные',
+        'ticket': 'Билет',
+        'application_date': 'Дата заявки',
 
         # Статистика
         'total_users': 'Всего пользователей',
@@ -532,6 +539,7 @@ TEXTS = {
         'travel_flight_info': '📋 Flight Information',
         'travel_hotel': '🏨 Hotel Booking',
         'travel_per_diem': '💰 Daily allowance',
+        'travel_per_diem_head': 'Daily allowance',
         'travel_my_requests': '📋 My Requests',
         'travel_visa_status': 'Visa Status',
         'travel_passport_data': 'Passport Data',
@@ -747,6 +755,12 @@ TEXTS = {
         'visa_status_changed': 'Visa status changed to',
         'flight_status_changed': 'Flight status changed to',
         'visa_status': 'Visa status',
+        'details': 'Details',
+        'write': 'Message',
+        'more_info': 'More info',
+        'per_diem': 'Per diem',
+        'ticket': 'Ticket',
+        'application_date': 'Request date',
 
         # Statistics
         'total_users': 'Total Users',

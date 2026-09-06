@@ -11,6 +11,7 @@
         text-align: center;
         transition: all 0.3s;
         height: 100%;
+        cursor: pointer;
     }
     .stat-card:hover {
         transform: translateY(-3px);
@@ -21,21 +22,212 @@
         border-radius: 20px;
         font-size: 0.8rem;
         font-weight: 600;
+        display: inline-block;
+        white-space: nowrap;
     }
     .status-pending { background: #fff3cd; color: #856404; }
     .status-in_progress { background: #cfe2ff; color: #084298; }
     .status-ready { background: #d4edda; color: #155724; }
-    .filter-badge {
-        cursor: pointer;
-        transition: all 0.2s;
+
+    .mobile-expand-toggle,
+    .mobile-extra-info {
+        display: none;
     }
-    .filter-badge.active {
-        transform: scale(1.05);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    }
-    .table-header {
-        background: #f8f9fa;
-        font-weight: 600;
+
+    /* Адаптив для смартфонов (≤ 768px) */
+    @media (max-width: 768px) {
+        /* 1. Дашборд: 2 в ряд */
+        .row.mb-4 {
+            margin-left: -5px !important;
+            margin-right: -5px !important;
+        }
+        .row.mb-4 > [class*="col-"] {
+            flex: 0 0 50% !important;
+            max-width: 50% !important;
+            padding-left: 5px !important;
+            padding-right: 5px !important;
+            margin-bottom: 10px !important;
+        }
+        .stat-card {
+            padding: 0.75rem 0.5rem !important;
+            border-radius: 14px !important;
+        }
+        .stat-card .stat-number {
+            font-size: 1.5rem !important;
+            margin-bottom: 0.2rem !important;
+        }
+        .stat-card .stat-label {
+            font-size: 0.7rem !important;
+            letter-spacing: 0 !important;
+            line-height: 1.15 !important;
+        }
+
+        /* 2. Кнопки фильтров: сетка 2x2 */
+        .card-header {
+            flex-direction: column !important;
+            gap: 10px !important;
+            align-items: stretch !important;
+        }
+        .card-header .float-end {
+            float: none !important;
+            width: 100% !important;
+        }
+        .card-header .btn-group {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 6px !important;
+            width: 100% !important;
+        }
+        .card-header .btn-group .btn {
+            border-radius: 10px !important;
+            padding: 6px 8px !important;
+            font-size: 0.75rem !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+        }
+
+        /* 3. Поиск DataTables */
+        .dataTables_wrapper .dataTables_filter {
+            float: none !important;
+            text-align: left !important;
+            margin-bottom: 15px !important;
+            width: 100% !important;
+        }
+        .dataTables_wrapper .dataTables_filter label {
+            display: flex !important;
+            flex-direction: column !important;
+            width: 100% !important;
+            font-size: 0.85rem !important;
+            font-weight: 600 !important;
+            color: #495057 !important;
+            gap: 6px !important;
+        }
+        .dataTables_wrapper .dataTables_filter input {
+            width: 100% !important;
+            margin-left: 0 !important;
+            padding: 8px 14px !important;
+            border-radius: 12px !important;
+            border: 1px solid #ced4da !important;
+            background-color: #f8f9fa !important;
+        }
+        .dataTables_wrapper .dataTables_length {
+            display: none !important;
+        }
+
+        /* 4. Мобильная карточка заявки */
+        #ticketsTable thead {
+            display: none !important;
+        }
+        #ticketsTable,
+        #ticketsTable tbody,
+        #ticketsTable tr {
+            display: block !important;
+            width: 100% !important;
+        }
+        #ticketsTable tr {
+            background: white !important;
+            border-radius: 16px !important;
+            border: 1px solid #e9ecef !important;
+            margin-bottom: 14px !important;
+            padding: 14px !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+        }
+
+        #ticketsTable td.t-col-hide {
+            display: none !important;
+        }
+
+        #ticketsTable td.t-col-header {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            border: none !important;
+            padding: 0 0 10px 0 !important;
+            border-bottom: 1px solid #f1f3f5 !important;
+        }
+
+        #ticketsTable td.t-col-status {
+            display: flex !important;
+            flex-direction: column !important;
+            border: none !important;
+            padding: 10px 0 !important;
+        }
+
+        .mobile-expand-toggle {
+            display: block !important;
+            width: 100% !important;
+        }
+        .mobile-expand-toggle summary {
+            list-style: none !important;
+            cursor: pointer !important;
+            outline: none !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 8px 0 !important;
+            color: #667eea !important;
+            font-size: 0.85rem !important;
+            font-weight: 500 !important;
+            user-select: none !important;
+        }
+        .mobile-expand-toggle summary::-webkit-details-marker {
+            display: none !important;
+        }
+        .mobile-expand-toggle summary i {
+            transition: transform 0.25s ease !important;
+            margin-left: 6px !important;
+        }
+        .mobile-expand-toggle[open] summary i {
+            transform: rotate(180deg) !important;
+        }
+
+        .mobile-extra-info {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 8px !important;
+            padding: 12px !important;
+            margin-top: 6px !important;
+            background: #f8f9fc !important;
+            border-radius: 12px !important;
+            font-size: 0.85rem !important;
+        }
+        .info-row {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            border-bottom: 1px dashed #e2e8f0 !important;
+            padding-bottom: 6px !important;
+        }
+        .info-row:last-child {
+            border-bottom: none !important;
+            padding-bottom: 0 !important;
+        }
+        .info-label {
+            color: #6c757d !important;
+            font-weight: 500 !important;
+        }
+
+        #ticketsTable td.t-col-actions {
+            display: flex !important;
+            justify-content: stretch !important;
+            border: none !important;
+            padding: 10px 0 0 0 !important;
+            margin-top: 6px !important;
+            border-top: 1px solid #f1f3f5 !important;
+        }
+        #ticketsTable td.t-col-actions .btn-group {
+            width: 100% !important;
+            display: flex !important;
+            gap: 6px !important;
+        }
+        #ticketsTable td.t-col-actions .btn {
+            flex: 1 !important;
+            border-radius: 8px !important;
+            padding: 8px 6px !important;
+            font-size: 0.8rem !important;
+        }
     }
 </style>
 {% endblock %}
@@ -44,35 +236,35 @@
 <div class="fade-in">
     <h2 class="mb-4"><i class="bi bi-ticket-perforated"></i> {{ get_text('event_panel_title') }}</h2>
 
-    <!-- Stats Cards -->
+    <!-- Stats Cards (2x2 на мобилке) -->
     <div class="row mb-4">
         <div class="col-md-4 mb-3">
-            <div class="stat-card">
+            <div class="stat-card" onclick="filterByCard('pending')">
                 <div class="stat-number text-warning">{{ stats.ticket_stats.pending }}</div>
                 <div class="stat-label">{{ get_text('tickets_pending') }}</div>
-                <small class="text-muted">{{ get_text('awaiting_processing') }}</small>
+                <small class="text-muted d-none d-md-block">{{ get_text('awaiting_processing') }}</small>
             </div>
         </div>
         <div class="col-md-4 mb-3">
-            <div class="stat-card">
+            <div class="stat-card" onclick="filterByCard('in_progress')">
                 <div class="stat-number text-info">{{ stats.ticket_stats.in_progress }}</div>
                 <div class="stat-label">{{ get_text('tickets_in_progress') }}</div>
-                <small class="text-muted">{{ get_text('in_processing') }}</small>
+                <small class="text-muted d-none d-md-block">{{ get_text('in_processing') }}</small>
             </div>
         </div>
         <div class="col-md-4 mb-3">
-            <div class="stat-card">
+            <div class="stat-card" onclick="filterByCard('ready')">
                 <div class="stat-number text-success">{{ stats.ticket_stats.ready }}</div>
                 <div class="stat-label">{{ get_text('tickets_ready') }}</div>
-                <small class="text-muted">{{ get_text('ready_to_send') }}</small>
+                <small class="text-muted d-none d-md-block">{{ get_text('ready_to_send') }}</small>
             </div>
         </div>
     </div>
 
     <!-- Ticket Requests Table -->
     <div class="card">
-        <div class="card-header">
-            <i class="bi bi-ticket"></i> {{ get_text('ticket_requests') }}
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-ticket"></i> {{ get_text('ticket_requests') }}</span>
             <div class="float-end">
                 <div class="btn-group btn-group-sm" role="group">
                     <button type="button" class="btn btn-outline-secondary filter-btn active" data-status="all">{{ get_text('all_statuses') }}</button>
@@ -84,7 +276,7 @@
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table id="ticketsTable" class="table table-hover">
+                <table id="ticketsTable" class="table table-hover align-middle">
                     <thead class="table-header">
                         <tr>
                             <th>{{ get_text('id') }}</th>
@@ -103,45 +295,97 @@
                     <tbody>
                         {% for req in ticket_requests %}
                         <tr data-status="{{ req.status }}">
-                            <td>{{ req.id }}</td>
-                            <td><strong>@{{ req.username }}</strong></td>
-                            <td>{{ req.full_name or '-' }}</td>
-                            <td>{{ req.position or '-' }}</td>
-                            <td>{{ req.company or '-' }}</td>
-                            <td>{{ req.email or '-' }}</td>
-                            <td>{{ req.phone or '-' }}</td>
-                            <td>{{ req.country or '-' }}</td>
-                            <td>{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</td>
-                            <td>
-                                <span class="status-badge status-{{ req.status }}">
-                                    {% if req.status == 'pending' %}
-                                        <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_event') }}
-                                    {% elif req.status == 'in_progress' %}
-                                        <i class="bi bi-arrow-repeat"></i> {{ get_text('status_in_progress') }}
-                                    {% elif req.status == 'ready' %}
-                                        <i class="bi bi-check-lg"></i> {{ get_text('status_ready') }}
-                                    {% endif %}
-                                </span>
+                            <!-- ID (На вебе только чистый ID, на мобилке шапка карточки) -->
+                            <td class="t-col-header">
+                                <span class="d-none d-md-inline">{{ req.id }}</span>
+                                <div class="d-md-none">
+                                    <span class="badge bg-light text-dark border me-1">#{{ req.id }}</span>
+                                    <strong>@{{ req.username }}</strong>
+                                </div>
+                                <div class="d-md-none text-end">
+                                    <span class="text-secondary fw-bold">{{ req.full_name or '' }}</span>
+                                </div>
                             </td>
-                            <td>
+
+                            <!-- Десктопные колонки -->
+                            <td class="t-col-hide"><strong>@{{ req.username }}</strong></td>
+                            <td class="t-col-hide">{{ req.full_name or '-' }}</td>
+                            <td class="t-col-hide">{{ req.position or '-' }}</td>
+                            <td class="t-col-hide">{{ req.company or '-' }}</td>
+                            <td class="t-col-hide">{{ req.email or '-' }}</td>
+                            <td class="t-col-hide">{{ req.phone or '-' }}</td>
+                            <td class="t-col-hide">{{ req.country or '-' }}</td>
+                            <td class="t-col-hide">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</td>
+
+                            <!-- Статус + Мобильный аккордеон с полями -->
+                            <td class="t-col-status">
+                                <div>
+                                    <span class="status-badge status-{{ req.status }}">
+                                        {% if req.status == 'pending' %}
+                                            <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_event') }}
+                                        {% elif req.status == 'in_progress' %}
+                                            <i class="bi bi-arrow-repeat"></i> {{ get_text('status_in_progress') }}
+                                        {% elif req.status == 'ready' %}
+                                            <i class="bi bi-check-lg"></i> {{ get_text('status_ready') }}
+                                        {% endif %}
+                                    </span>
+                                </div>
+
+                                <div class="mobile-expand-toggle w-100">
+                                    <details>
+                                        <summary>
+                                            <span>{{ get_text('more_info', default='Подробнее') }}</span> <i class="bi bi-chevron-down"></i>
+                                        </summary>
+                                        <div class="mobile-extra-info">
+                                            <div class="info-row">
+                                                <span class="info-label">{{ get_text('position') }}:</span>
+                                                <span>{{ req.position or '-' }}</span>
+                                            </div>
+                                            <div class="info-row">
+                                                <span class="info-label">{{ get_text('company') }}:</span>
+                                                <span>{{ req.company or '-' }}</span>
+                                            </div>
+                                            <div class="info-row">
+                                                <span class="info-label">{{ get_text('email') }}:</span>
+                                                <span class="text-truncate" style="max-width: 180px;">{{ req.email or '-' }}</span>
+                                            </div>
+                                            <div class="info-row">
+                                                <span class="info-label">{{ get_text('phone') }}:</span>
+                                                <span>{{ req.phone or '-' }}</span>
+                                            </div>
+                                            <div class="info-row">
+                                                <span class="info-label">{{ get_text('country') }}:</span>
+                                                <span>{{ req.country or '-' }}</span>
+                                            </div>
+                                            <div class="info-row">
+                                                <span class="info-label">{{ get_text('created_at') }}:</span>
+                                                <span class="text-muted">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</span>
+                                            </div>
+                                        </div>
+                                    </details>
+                                </div>
+                            </td>
+
+                            <!-- Кнопки действий -->
+                            <td class="t-col-actions">
                                 <div class="btn-group btn-group-sm" role="group">
-                                    <button class="btn btn-sm btn-outline-warning"
+                                    <button class="btn btn-outline-warning"
                                             onclick="updateTicketStatus({{ req.id }}, 'pending')"
                                             {% if req.status == 'pending' %}disabled{% endif %}
                                             title="{{ get_text('set_pending') }}">
-                                        <i class="bi bi-hourglass-split"></i>
+                                        <i class="bi bi-hourglass-split"></i> <span class="d-md-none ms-1">Ожидание</span>
                                     </button>
-                                    <button class="btn btn-sm btn-outline-info"
+                                    <button class="btn btn-outline-info"
                                             onclick="updateTicketStatus({{ req.id }}, 'in_progress')"
                                             {% if req.status == 'in_progress' %}disabled{% endif %}
                                             title="{{ get_text('set_in_progress') }}">
-                                        <i class="bi bi-arrow-repeat"></i>
+                                        <i class="bi bi-arrow-repeat"></i> <span class="d-md-none ms-1">В процессе</span>
                                     </button>
-                                    <button class="btn btn-sm btn-outline-success"
+                                    <button class="btn btn-outline-success"
                                             onclick="updateTicketStatus({{ req.id }}, 'ready')"
                                             {% if req.status == 'ready' %}disabled{% endif %}
                                             title="{{ get_text('set_ready') }}">
-                                        <i class="bi bi-check-lg"></i>
+                                        <i class="bi bi-check-lg"></i> <span class="d-md-none ms-1">Готово</span>
                                     </button>
                                 </div>
                             </td>
@@ -164,10 +408,13 @@
 
 {% block extra_js %}
 <script>
+    let ticketsTable;
+
     $(document).ready(function() {
-        $('#ticketsTable').DataTable({
+        const lang = '{{ session.get("lang", "ru") }}';
+        ticketsTable = $('#ticketsTable').DataTable({
             language: {
-                url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/{{ "ru" if session.get("lang", "ru") == "ru" else "en" }}.json'
+                url: `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`
             },
             pageLength: 25,
             order: [[0, 'desc']]
@@ -203,23 +450,34 @@
         }
     }
 
-    // Фильтрация таблицы по статусу
+    // Рабочая фильтрация DataTables по статусам
+    $.fn.dataTable.ext.search.push(
+        function(settings, data, dataIndex) {
+            if (settings.nTable.id !== 'ticketsTable') return true;
+
+            const selectedStatus = $('.filter-btn.active').data('status');
+            if (!selectedStatus || selectedStatus === 'all') return true;
+
+            const row = ticketsTable.row(dataIndex).node();
+            const rowStatus = $(row).attr('data-status');
+            return rowStatus === selectedStatus;
+        }
+    );
+
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', function() {
-            const status = this.dataset.status;
-
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             this.classList.add('active');
-
-            const table = $('#ticketsTable').DataTable();
-
-            if (status === 'all') {
-                table.search('').columns().search('').draw();
-            } else {
-                table.column(9).search(status).draw();
-            }
+            ticketsTable.draw();
         });
     });
+
+    function filterByCard(status) {
+        const targetBtn = document.querySelector(`.filter-btn[data-status="${status}"]`);
+        if (targetBtn) {
+            targetBtn.click();
+        }
+    }
 
     function showToast(message, type) {
         const toastContainer = document.querySelector('.toast-container');
@@ -248,7 +506,6 @@
         `;
 
         toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-
         setTimeout(() => {
             const toast = toastContainer.lastElementChild;
             if (toast) toast.remove();
