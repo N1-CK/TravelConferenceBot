@@ -1,6 +1,8 @@
 # handlers/managers_chat.py - ПОЛНАЯ ВЕРСИЯ С ПОДДЕРЖКОЙ ПЕРЕСЫЛКИ
 
 import os
+from typing import Union
+
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
@@ -28,58 +30,128 @@ ADMIN_CHAT_ID = int(os.getenv("TG_ADMIN_CHAT_ID", 0))
 
 
 def get_manager_chat_id(department: str) -> int:
-    """Получить ID чата по отделу"""
+    """Получить ID чата по отделу или общий админ-чат"""
     mapping = {
         'pr': PR_MANAGER_CHAT_ID,
         'event': EVENT_MANAGER_CHAT_ID,
-        'travel': TRAVEL_MANAGER_CHAT_ID
+        'travel': TRAVEL_MANAGER_CHAT_ID,
+        'admin': ADMIN_CHAT_ID
     }
-    return mapping.get(department, 0)
+    # Если чат отдела не задан, шлем в TG_ADMIN_CHAT_ID
+    return mapping.get(department) or ADMIN_CHAT_ID
 
 
 async def send_question_to_manager(bot: Bot, manager_chat_id: int, user_data: dict,
                                    question_text: str, question_type: str):
-    """Отправка вопроса в чат менеджера"""
-    if not manager_chat_id:
-        logger.warning(f"⚠️ Chat ID для менеджера {question_type} не настроен")
+    """Отправка вопроса в чат менеджера без инлайн-кнопок"""
+    dept = question_type.replace('_question', '')
+    target_chat = manager_chat_id or get_manager_chat_id(dept)
+    if not target_chat:
+        logger.warning(f"⚠️ Chat ID для {question_type} и общий TG_ADMIN_CHAT_ID не настроены")
         return
 
-    # Определяем отдел по типу вопроса
-    department = question_type.replace('_question', '')
-
-    # keyboard = InlineKeyboardMarkup(inline_keyboard=[
-    #     [InlineKeyboardButton(
-    #         text="📝 Ответить пользователю",
-    #         callback_data=f"reply_to_{user_data['user_id']}_{question_type}"
-    #     )],
-    #     [InlineKeyboardButton(
-    #         text="🔄 Переслать в другой отдел",
-    #         callback_data=f"share_question_{question_type}_{user_data.get('question_id', 'new')}"
-    #     )]
-    # ])
-
     message_text = (
-        f"❓ Новый вопрос ({question_type.upper()})\n\n"
-        f"Пользователь: @{user_data['username']}\n\n"
-        f"Вопрос: {question_text}\n"
+        f"❓ <b>Новый вопрос ({dept.upper()})</b>\n\n"
+        f"<b>Пользователь:</b> @{user_data.get('username') or 'без username'}\n"
+        f"<b>ID:</b> <code>{user_data.get('user_id')}</code>\n\n"
+        f"💬 <b>Вопрос:</b>\n{question_text}"
     )
 
     try:
-        message = await bot.send_message(
-            chat_id=manager_chat_id,
-            text=message_text
+        await bot.send_message(
+            chat_id=target_chat,
+            text=message_text,
+            parse_mode="HTML"
         )
-
-        # Сохраняем соответствие
-        key = f"{manager_chat_id}_{message.message_id}"
-        user_manager_mapping[key] = {
-            'user_id': user_data['user_id'],
-            'username': user_data['username'],
-            'question_type': question_type,
-            'question_id': user_data.get('question_id')
-        }
     except Exception as e:
-        logger.error(f"❌ Ошибка отправки в чат менеджера {question_type}: {e}")
+        logger.error(f"❌ Ошибка отправки в чат {dept} ({target_chat}): {e}")
+
+async def forward_user_message_to_admin(bot: Bot, message: Message, department: str = 'admin'):
+    """Пересылка произвольного сообщения/медиа пользователя в нужный чат"""
+    target_chat = get_manager_chat_id(department)
+    if not target_chat:
+        return
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="📝 Ответить",
+            callback_data=f"reply_to_{message.from_user.id}_{department}"
+        )]
+    ])
+
+    user_info = f"📩 <b>Сообщение от @{message.from_user.username or message.from_user.first_name}</b> (ID: <code>{message.from_user.id}</code>)\n\n"
+
+    try:
+        # Если это просто текст
+        if message.text:
+            await bot.send_message(
+                chat_id=target_chat,
+                text=user_info + message.text,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+        else:
+            # Если это фото, документ, голос и т.д.
+            caption = user_info + (message.caption or "")
+            await bot.copy_message(
+                chat_id=target_chat,
+                from_chat_id=message.chat.id,
+                message_id=message.message_id,
+                caption=caption,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+    except Exception as e:
+        logger.error(f"❌ Ошибка отправки входящего сообщения в чат {target_chat}: {e}")
+
+
+async def send_request_notification_to_manager(
+    bot: Bot,
+    department: str,
+    request_title: str,
+    user_data: dict,
+    details: dict,
+    request_id: Union[int, str] = None
+):
+    """
+    Отправка информации о новой заявке в чат соответствующего отдела.
+    """
+    target_chat = get_manager_chat_id(department)
+    if not target_chat:
+        logger.warning(f"⚠️ Chat ID для отдела {department} не настроен")
+        return
+
+    username_val = f"@{user_data['username']}" if user_data.get('username') else "без username"
+    req_num = f" #{request_id}" if request_id else ""
+
+    lines = [
+        f"📋 <b>Новая заявка: {request_title}{req_num}</b>\n",
+        f"<b>Пользователь:</b> {username_val}",
+        f"<b>ID:</b> <code>{user_data.get('user_id')}</code>",
+        "\n<b>Данные заявки:</b>"
+    ]
+
+    for field, val in details.items():
+        if val is not None and val != "":
+            lines.append(f"• <b>{field}:</b> {val}")
+
+    message_text = "\n".join(lines)
+
+    # keyboard = InlineKeyboardMarkup(inline_keyboard=[
+    #     [InlineKeyboardButton(
+    #         text="📝 Написать пользователю",
+    #         callback_data=f"reply_to_{user_data['user_id']}_{department}"
+    #     )]
+    # ])
+
+    try:
+        await bot.send_message(
+            chat_id=target_chat,
+            text=message_text,
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"❌ Ошибка отправки заявки {request_title} в отдел {department} ({target_chat}): {e}")
 
 
 @router.callback_query(F.data.startswith("reply_to_"))

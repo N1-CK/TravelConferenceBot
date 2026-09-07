@@ -1,5 +1,3 @@
-# handlers/travel_module.py - ПОЛНОСТЬЮ ЛОКАЛИЗОВАННАЯ ВЕРСИЯ
-
 import logging
 import re
 from datetime import datetime
@@ -11,6 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.enums import ParseMode
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from handlers.managers_chat import send_question_to_manager, get_manager_chat_id, send_request_notification_to_manager
 
 from database import db
 import os
@@ -451,6 +450,18 @@ async def visa_bought_myself(callback: CallbackQuery, state: FSMContext):
     }
     await db.save_visa_request(visa_data)
 
+    # Отправляем уведомление
+    await send_request_notification_to_manager(
+        bot=callback.message.bot,
+        department="travel",
+        request_title="🛂 Статус визы (Куплено самостоятельно)",
+        user_data={'user_id': user_id, 'username': callback.from_user.username},
+        details={
+            "Статус визы": "not_have",
+            "Помощь": "Не требуется (User booked independently)"
+        }
+    )
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_back_to_menu")]
     ])
@@ -792,6 +803,22 @@ async def send_request_to_manager(update: Union[Message, CallbackQuery], state: 
 
     await db.save_flight_request(flight_data)
 
+    # Отправляем в Travel-чат
+    bot_obj = update.bot if isinstance(update, Message) else update.message.bot
+    await send_request_notification_to_manager(
+        bot=bot_obj,
+        department="travel",
+        request_title="✈️ Заявка на билет",
+        user_data={'user_id': user_id, 'username': username},
+        details={
+            "Откуда": flight_data.get('city_from'),
+            "Куда": flight_data.get('city_to'),
+            "Багаж": "Да" if flight_data.get('needs_baggage') else "Нет",
+            "Статус визы": flight_data.get('visa_status'),
+            "Отель нужен": "Да" if data.get('hotel_needed') else "Нет"
+        }
+    )
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_back_to_menu")]
     ])
@@ -1013,6 +1040,18 @@ async def process_per_diem_consent(callback: CallbackQuery, state: FSMContext):
         details={"payment_type": data.get('payment_type')}
     )
 
+    # Отправляем в Travel-чат
+    await send_request_notification_to_manager(
+        bot=callback.message.bot,
+        department="travel",
+        request_title="💵 Суточные (Per Diem)",
+        user_data={'user_id': user_id, 'username': callback.from_user.username},
+        details={
+            "Способ выплаты": per_diem_data.get('payment_type'),
+            "Реквизиты": per_diem_data.get('payment_details')
+        }
+    )
+
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=await t(user_id, 'question_button'), callback_data="travel_question")],
         [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_back_to_menu")],
@@ -1117,19 +1156,19 @@ async def process_travel_question(message: Message, state: FSMContext):
     }
 
     if await db.save_travel_question(travel_question_data):
-        await send_question_to_manager(
-            bot=message.bot,
-            manager_chat_id=TRAVEL_MANAGER_CHAT_ID,
-            user_data=travel_question_data,
-            question_text=question_text,
-            question_type="travel"
-        )
-
         await db.log_user_action(
             user_id=user_id,
             username=message.from_user.username,
             action="travel_question_submitted",
             details={"data": travel_question_data}
+        )
+
+        await send_question_to_manager(
+            bot=message.bot,
+            manager_chat_id=get_manager_chat_id('travel'),
+            user_data=travel_question_data,
+            question_text=question_text,
+            question_type="travel"
         )
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=[

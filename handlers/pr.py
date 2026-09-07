@@ -3,7 +3,7 @@ from aiogram.types import CallbackQuery, Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
+from handlers.managers_chat import send_question_to_manager, get_manager_chat_id, send_request_notification_to_manager
 from keyboards import get_pr_menu_keyboard, get_back_next_keyboard
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import db
@@ -76,6 +76,21 @@ async def submit_business_cards_request(update, state: FSMContext):
             username=username,
             action="business_cards_request_submitted",
             details={"data": business_cards_data}
+        )
+
+        # Отправляем в PR-чат
+        await send_request_notification_to_manager(
+            bot=message_obj.bot,
+            department="pr",
+            request_title="📇 Визитки",
+            user_data={'user_id': user_id, 'username': username},
+            details={
+                "ФИО": business_cards_data.get('full_name'),
+                "Должность (EN)": business_cards_data.get('position_en'),
+                "Компания": business_cards_data.get('company'),
+                "Контакты": business_cards_data.get('contacts'),
+                "Комментарии": business_cards_data.get('comments') or "Нет"
+            }
         )
 
     builder = InlineKeyboardBuilder()
@@ -377,6 +392,21 @@ async def submit_banner_request(update, state: FSMContext):
             details={"request_id": "new", "data": banner_data}
         )
 
+        # Отправляем в PR-чат
+        await send_request_notification_to_manager(
+            bot=message_obj.bot,
+            department="pr",
+            request_title="🎨 Баннер",
+            user_data={'user_id': user_id, 'username': username},
+            details={
+                "Имя": banner_data.get('full_name'),
+                "Должность": banner_data.get('position'),
+                "Компания": banner_data.get('company'),
+                "Язык": banner_data.get('language'),
+                "Комментарии": banner_data.get('comments') or "Нет"
+            }
+        )
+
     await message_obj.answer(
         await t(user_id, 'banner_success'),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -599,19 +629,19 @@ async def process_pr_question(message: Message, state: FSMContext):
     }
 
     if await db.save_pr_question(pr_question_data):
-        await send_question_to_manager(
-            bot=message.bot,
-            manager_chat_id=PR_MANAGER_CHAT_ID,
-            user_data=pr_question_data,
-            question_text=question_text,
-            question_type="pr"
-        )
-
         await db.log_user_action(
             user_id=message.from_user.id,
             username=message.from_user.username,
             action="pr_question_submitted",
             details={"data": pr_question_data}
+        )
+
+        await send_question_to_manager(
+            bot=message.bot,
+            manager_chat_id=get_manager_chat_id('pr'),
+            user_data=pr_question_data,
+            question_text=question_text,
+            question_type="pr"
         )
 
     user_id = message.from_user.id

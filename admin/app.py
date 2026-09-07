@@ -882,7 +882,10 @@ def pr_panel():
     banner_requests = run_async(db.get_all_banner_requests())
     business_cards = run_async(db.get_all_business_cards())
 
-    # Убеждаемся, что у каждой заявки есть статус
+    # 1. Загружаем данные по бронированиям и отчетам на бэкенде
+    affiliate_bookings = run_async(db.get_all_affiliate_bookings()) or []
+    affiliate_reports = run_async(db.get_all_affiliate_reports()) or []
+
     for req in banner_requests:
         if 'status' not in req or not req.get('status'):
             req['status'] = 'pending'
@@ -890,11 +893,9 @@ def pr_panel():
         if 'status' not in card or not card.get('status'):
             card['status'] = 'pending'
 
-    # Получаем фильтры
     banner_filter = request.args.get('banner_filter', 'all')
     cards_filter = request.args.get('cards_filter', 'all')
 
-    # Применяем фильтры для отображения
     filtered_banners = banner_requests
     if banner_filter != 'all':
         filtered_banners = [r for r in banner_requests if r.get('status') == banner_filter]
@@ -903,7 +904,6 @@ def pr_panel():
     if cards_filter != 'all':
         filtered_cards = [c for c in business_cards if c.get('status') == cards_filter]
 
-    # Статистика для баннеров
     banner_stats = {
         'total': len(banner_requests),
         'pending': len([r for r in banner_requests if r.get('status') == 'pending']),
@@ -911,7 +911,6 @@ def pr_panel():
         'ready': len([r for r in banner_requests if r.get('status') == 'ready'])
     }
 
-    # Статистика для визиток
     cards_stats = {
         'total': len(business_cards),
         'pending': len([c for c in business_cards if c.get('status') == 'pending']),
@@ -922,12 +921,13 @@ def pr_panel():
     return render_template('pr_panel.html',
                            banner_requests=filtered_banners,
                            business_cards=filtered_cards,
+                           affiliate_bookings=affiliate_bookings,  # <-- Передаем в шаблон
+                           affiliate_reports=affiliate_reports,    # <-- Передаем в шаблон
                            banner_stats=banner_stats,
                            cards_stats=cards_stats,
                            banner_filter=banner_filter,
                            cards_filter=cards_filter,
                            username=session.get('username'))
-
 
 @app.route('/admin_users')
 @login_required
@@ -1869,16 +1869,40 @@ def api_get_my_questions():
 @app.route('/api/affiliate/bookings')
 @login_required
 def api_affiliate_bookings():
-    """API для получения бронирований"""
-    bookings = run_async(db.get_all_affiliate_bookings())
-    return jsonify(bookings)
+    """API для получения бронирований с форматированием дат"""
+    try:
+        bookings = run_async(db.get_all_affiliate_bookings()) or []
+        formatted = []
+        for b in bookings:
+            item = dict(b)
+            if item.get('created_at'):
+                item['created_at'] = item['created_at'].strftime('%d.%m.%Y %H:%M')
+            if item.get('updated_at'):
+                item['updated_at'] = item['updated_at'].strftime('%d.%m.%Y %H:%M')
+            formatted.append(item)
+        return jsonify(formatted)
+    except Exception as e:
+        logger.error(f"Error getting affiliate bookings: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/affiliate/reports')
 @login_required
 def api_affiliate_reports():
-    """API для получения отчетов"""
-    reports = run_async(db.get_all_affiliate_reports())
-    return jsonify(reports)
+    """API для получения отчетов с форматированием дат"""
+    try:
+        reports = run_async(db.get_all_affiliate_reports()) or []
+        formatted = []
+        for r in reports:
+            item = dict(r)
+            if item.get('created_at'):
+                item['created_at'] = item['created_at'].strftime('%d.%m.%Y %H:%M')
+            if item.get('updated_at'):
+                item['updated_at'] = item['updated_at'].strftime('%d.%m.%Y %H:%M')
+            formatted.append(item)
+        return jsonify(formatted)
+    except Exception as e:
+        logger.error(f"Error getting affiliate reports: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/affiliate/booking/<int:booking_id>/status', methods=['POST'])
 @login_required

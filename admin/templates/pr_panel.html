@@ -762,8 +762,30 @@
                                     <th>{{ get_text('actions') }}</th>
                                 </tr>
                             </thead>
-                            <tbody id="bookingsTableBody">
-                                <tr><td colspan="11" class="text-center">{{ get_text('loading') }}</td></tr>
+                            <tbody>
+                                {% for b in affiliate_bookings %}
+                                <tr>
+                                    <td>{{ b.id }}</td>
+                                    <td><strong>@{{ b.username }}</strong></td>
+                                    <td>{{ b.manager or '-' }}</td>
+                                    <td><small>{{ b.datetime or '-' }}</small></td>
+                                    <td class="booking-details" title="{{ b.company or '' }}">{{ b.company or '-' }}</td>
+                                    <td>{{ b.partner or '-' }}</td>
+                                    <td class="booking-details" title="{{ b.restaurant or '' }}">{{ b.restaurant or '-' }}</td>
+                                    <td>{{ b.people or '-' }}</td>
+                                    <td>{{ b.payment_method or '-' }}</td>
+                                    <td>{{ b.partnertype or '-' }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="viewBookingDetails({{ b.id }})" title="{{ get_text('view') }}">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="11" class="text-center text-muted py-4">{{ get_text('affiliate_no_bookings') }}</td>
+                                </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
@@ -771,36 +793,58 @@
             </div>
         </div>
 
-        <!-- AFFILIATE REPORTS TAB -->
-        <div class="tab-pane fade" id="affiliateReports" role="tabpanel">
-            <div class="card">
-                <div class="card-header">
-                    <i class="bi bi-file-text"></i> {{ get_text('affiliate_reports_title') }}
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table id="reportsTable" class="table table-hover table-affiliate align-middle">
-                            <thead>
-                                <tr>
-                                    <th>{{ get_text('id') }}</th>
-                                    <th>{{ get_text('username') }}</th>
-                                    <th>{{ get_text('company') }}</th>
-                                    <th>{{ get_text('affiliate_meeting_date') }}</th>
-                                    <th>{{ get_text('affiliate_manager') }}</th>
-                                    <th>{{ get_text('affiliate_partner') }}</th>
-                                    <th>{{ get_text('affiliate_results') }}</th>
-                                    <th>{{ get_text('affiliate_budget') }}</th>
-                                    <th>{{ get_text('actions') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody id="reportsTableBody">
-                                <tr><td colspan="9" class="text-center">{{ get_text('loading') }}</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+    <!-- AFFILIATE REPORTS TAB -->
+    <div class="tab-pane fade" id="affiliateReports" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-file-text"></i> {{ get_text('affiliate_reports_title') }}
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="reportsTable" class="table table-hover table-affiliate align-middle">
+                        <thead>
+                            <tr>
+                                <th>{{ get_text('id') }}</th>
+                                <th>{{ get_text('username') }}</th>
+                                <th>{{ get_text('company') }}</th>
+                                <th>{{ get_text('affiliate_meeting_date') }}</th>
+                                <th>{{ get_text('affiliate_manager') }}</th>
+                                <th>{{ get_text('affiliate_partner') }}</th>
+                                <th>{{ get_text('affiliate_results') }}</th>
+                                <th>{{ get_text('affiliate_budget') }}</th>
+                                <th>{{ get_text('actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in affiliate_reports %}
+                            <tr>
+                                <td>{{ r.id }}</td>
+                                <td><strong>@{{ r.username }}</strong></td>
+                                <td class="booking-details" title="{{ r.company or '' }}">{{ r.company or '-' }}</td>
+                                <td><small>{{ r.meeting_date or '-' }}</small></td>
+                                <td>{{ r.manager or '-' }}</td>
+                                <td>{{ r.partner or '-' }}</td>
+                                <td class="report-details" title="{{ r.result or '' }}">
+                                    {{ (r.result[:50] ~ '...') if r.result and r.result|length > 50 else (r.result or '-') }}
+                                </td>
+                                <td><span class="badge bg-success">{{ r.budget or '0' }}</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="viewReportDetails({{ r.id }})" title="{{ get_text('view') }}">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center text-muted py-4">{{ get_text('affiliate_no_reports') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
+    </div>
     </div>
 </div>
 
@@ -841,38 +885,36 @@
 <script>
     let currentBannerFilter = 'all';
     let currentCardsFilter = 'all';
-    let bannersTable, cardsTable;
-    let bookingsData = [];
-    let reportsData = [];
+    let bannersTable, cardsTable, bookingsTable, reportsTable;
+
+    // Передаем данные из Python напрямую в JS для работы модальных окон просмотра
+    const bookingsData = {{ affiliate_bookings|tojson|safe }};
+    const reportsData = {{ affiliate_reports|tojson|safe }};
+
+    const lang = '{{ session.get("lang", "ru") }}';
+    const datatableLangUrl = `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`;
 
     $(document).ready(function() {
-        const lang = '{{ session.get("lang", "ru") }}';
-        bannersTable = $('#bannersTable').DataTable({
-            language: {
-                url: `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`
-            },
+        const dtConfig = {
+            language: { url: datatableLangUrl },
             pageLength: 25,
             autoWidth: false,
             order: [[0, 'desc']]
-        });
+        };
 
-        cardsTable = $('#cardsTable').DataTable({
-            language: {
-                url: `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`
-            },
-            pageLength: 25,
-            autoWidth: false,
-            order: [[0, 'desc']]
-        });
+        // Инициализируем сразу все 4 таблицы
+        bannersTable = $('#bannersTable').DataTable(dtConfig);
+        cardsTable = $('#cardsTable').DataTable(dtConfig);
+        bookingsTable = $('#bookingsTable').DataTable(dtConfig);
+        reportsTable = $('#reportsTable').DataTable(dtConfig);
 
+        // Пересчет размеров колонок при переключении вкладок
         $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function(e) {
             $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
         });
-
-        loadAffiliateBookings();
-        loadAffiliateReports();
     });
 
+    // Фильтрация для баннеров и визиток по статусу
     $.fn.dataTable.ext.search.push(
         function(settings, data, dataIndex) {
             if (settings.nTable.id === 'bannersTable') {
@@ -903,64 +945,7 @@
         if (event && event.currentTarget) event.currentTarget.classList.add('active');
     }
 
-    async function loadAffiliateBookings() {
-        try {
-            const response = await fetch('/api/affiliate/bookings');
-            bookingsData = await response.json();
-            renderBookingsTable(bookingsData);
-        } catch (e) {
-            document.getElementById('bookingsTableBody').innerHTML =
-                '<tr><td colspan="11" class="text-center text-danger">{{ get_text("error_occurred") }}</td></tr>';
-        }
-    }
-
-    function renderBookingsTable(bookings) {
-        const tbody = document.getElementById('bookingsTableBody');
-        if (!bookings.length) {
-            tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">{{ get_text("affiliate_no_bookings") }}</td></tr>';
-            return;
-        }
-
-        let html = '';
-        for (const b of bookings) {
-            html += `
-                <tr>
-                    <td class="d-md-none p-0 border-0" colspan="11">
-                        <div class="affiliate-card-mobile">
-                            <div class="affiliate-top">
-                                <div><span class="badge bg-light text-dark border me-1">#${b.id}</span><strong>@${b.username}</strong></div>
-                                <button class="btn btn-sm btn-outline-primary" onclick="viewBookingDetails(${b.id})" title="{{ get_text('view') }}">
-                                    <i class="bi bi-eye"></i> Детали
-                                </button>
-                            </div>
-                            <div class="affiliate-row"><span class="text-muted">Менеджер:</span> <span>${b.manager || '-'}</span></div>
-                            <div class="affiliate-row"><span class="text-muted">Дата:</span> <span>${b.datetime || '-'}</span></div>
-                            <div class="affiliate-row"><span class="text-muted">Компания:</span> <span>${b.company || '-'}</span></div>
-                            <div class="affiliate-row"><span class="text-muted">Партнер:</span> <span>${b.partner || '-'}</span></div>
-                        </div>
-                    </td>
-
-                    <td class="d-none d-md-table-cell">${b.id}</td>
-                    <td class="d-none d-md-table-cell"><strong>@${b.username}</strong></td>
-                    <td class="d-none d-md-table-cell">${b.manager || '-'}</td>
-                    <td class="d-none d-md-table-cell"><small>${b.datetime || '-'}</small></td>
-                    <td class="d-none d-md-table-cell booking-details" title="${b.company || ''}">${b.company || '-'}</td>
-                    <td class="d-none d-md-table-cell">${b.partner || '-'}</td>
-                    <td class="d-none d-md-table-cell booking-details" title="${b.restaurant || ''}">${b.restaurant || '-'}</td>
-                    <td class="d-none d-md-table-cell">${b.people || '-'}</td>
-                    <td class="d-none d-md-table-cell">${b.payment_method || '-'}</td>
-                    <td class="d-none d-md-table-cell">${b.partnertype || '-'}</td>
-                    <td class="d-none d-md-table-cell">
-                        <button class="btn btn-sm btn-outline-primary" onclick="viewBookingDetails(${b.id})" title="{{ get_text('view') }}">
-                            <i class="bi bi-eye"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        }
-        tbody.innerHTML = html;
-    }
-
+    // Модальное окно деталей бронирования
     function viewBookingDetails(id) {
         const booking = bookingsData.find(b => b.id === id);
         if (!booking) return;
@@ -977,69 +962,14 @@
                 <tr><th>{{ get_text('affiliate_people') }}</th><td>${booking.people || '-'}</td></tr>
                 <tr><th>{{ get_text('affiliate_payment') }}</th><td>${booking.payment_method || '-'}</td></tr>
                 <tr><th>{{ get_text('affiliate_partner_type') }}</th><td>${booking.partnertype || '-'}</td></tr>
-                <tr><th>{{ get_text('created_at') }}</th><td>${booking.created_at ? new Date(booking.created_at).toLocaleString() : '-'}</td></tr>
+                <tr><th>{{ get_text('created_at') }}</th><td>${booking.created_at || '-'}</td></tr>
             </table>
         `;
         document.getElementById('bookingModalBody').innerHTML = html;
         new bootstrap.Modal(document.getElementById('bookingModal')).show();
     }
 
-    async function loadAffiliateReports() {
-        try {
-            const response = await fetch('/api/affiliate/reports');
-            reportsData = await response.json();
-            renderReportsTable(reportsData);
-        } catch (e) {
-            document.getElementById('reportsTableBody').innerHTML =
-                '<tr><td colspan="9" class="text-center text-danger">{{ get_text("error_occurred") }}</td></tr>';
-        }
-    }
-
-    function renderReportsTable(reports) {
-        const tbody = document.getElementById('reportsTableBody');
-        if (!reports.length) {
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">{{ get_text("affiliate_no_reports") }}</td></tr>';
-            return;
-        }
-
-        let html = '';
-        for (const r of reports) {
-            html += `
-                <tr>
-                    <td class="d-md-none p-0 border-0" colspan="9">
-                        <div class="affiliate-card-mobile">
-                            <div class="affiliate-top">
-                                <div><span class="badge bg-light text-dark border me-1">#${r.id}</span><strong>@${r.username}</strong></div>
-                                <button class="btn btn-sm btn-outline-primary" onclick="viewReportDetails(${r.id})" title="{{ get_text('view') }}">
-                                    <i class="bi bi-eye"></i> Детали
-                                </button>
-                            </div>
-                            <div class="affiliate-row"><span class="text-muted">Компания:</span> <span>${r.company || '-'}</span></div>
-                            <div class="affiliate-row"><span class="text-muted">Дата:</span> <span>${r.meeting_date || '-'}</span></div>
-                            <div class="affiliate-row"><span class="text-muted">Менеджер:</span> <span>${r.manager || '-'}</span></div>
-                            <div class="affiliate-row"><span class="text-muted">Бюджет:</span> <span class="badge bg-success">${r.budget || '0'}</span></div>
-                        </div>
-                    </td>
-
-                    <td class="d-none d-md-table-cell">${r.id}</td>
-                    <td class="d-none d-md-table-cell"><strong>@${r.username}</strong></td>
-                    <td class="d-none d-md-table-cell booking-details" title="${r.company || ''}">${r.company || '-'}</td>
-                    <td class="d-none d-md-table-cell"><small>${r.meeting_date || '-'}</small></td>
-                    <td class="d-none d-md-table-cell">${r.manager || '-'}</td>
-                    <td class="d-none d-md-table-cell">${r.partner || '-'}</td>
-                    <td class="d-none d-md-table-cell report-details" title="${(r.result || '').replace(/"/g, '&quot;')}">${(r.result || '-').substring(0, 50)}${(r.result || '').length > 50 ? '...' : ''}</td>
-                    <td class="d-none d-md-table-cell">${r.budget || '0'}</td>
-                    <td class="d-none d-md-table-cell">
-                        <button class="btn btn-sm btn-outline-primary" onclick="viewReportDetails(${r.id})" title="{{ get_text('view') }}">
-                            <i class="bi bi-eye"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        }
-        tbody.innerHTML = html;
-    }
-
+    // Модальное окно деталей отчета
     function viewReportDetails(id) {
         const report = reportsData.find(r => r.id === id);
         if (!report) return;
@@ -1054,13 +984,14 @@
                 <tr><th>{{ get_text('affiliate_partner') }}</th><td>${report.partner || '-'}</td></tr>
                 <tr><th>{{ get_text('affiliate_results') }}</th><td><pre class="mb-0" style="white-space: pre-wrap;">${report.result || '-'}</pre></td></tr>
                 <tr><th>{{ get_text('affiliate_budget') }}</th><td>${report.budget || '0'}</td></tr>
-                <tr><th>{{ get_text('created_at') }}</th><td>${report.created_at ? new Date(report.created_at).toLocaleString() : '-'}</td></tr>
+                <tr><th>{{ get_text('created_at') }}</th><td>${report.created_at || '-'}</td></tr>
             </table>
         `;
         document.getElementById('reportModalBody').innerHTML = html;
         new bootstrap.Modal(document.getElementById('reportModal')).show();
     }
 
+    // Смена статуса баннера
     function updateBannerStatus(id, status) {
         const statusNames = {
             'pending': '{{ get_text("status_pending_event") }}',
@@ -1085,6 +1016,7 @@
         }
     }
 
+    // Смена статуса визитки
     function updateCardStatus(id, status) {
         const statusNames = {
             'pending': '{{ get_text("status_pending_event") }}',
@@ -1109,25 +1041,21 @@
         }
     }
 
+    // Уведомления toast
     function showToast(message, type) {
         const toastContainer = document.querySelector('.toast-container');
+        if (!toastContainer) return;
         const typeMap = {
             success: 'check-circle-fill text-success',
             danger: 'exclamation-triangle-fill text-danger',
             warning: 'exclamation-triangle-fill text-warning',
             info: 'info-circle-fill text-info'
         };
-        const typeText = {
-            success: '{{ get_text("operation_success") }}',
-            danger: '{{ get_text("error_occurred") }}',
-            warning: '{{ get_text("warning") }}',
-            info: '{{ get_text("info") }}'
-        };
         const toastHtml = `
             <div class="toast show" role="alert" data-bs-autohide="true" data-bs-delay="3000">
                 <div class="toast-header">
-                    <i class="bi ${typeMap[type] || typeMap.info} me-2"></i>
-                    <strong class="me-auto">${typeText[type] || typeText.info}</strong>
+                    <i class="bi ${typeMap[type] || 'info-circle-fill text-info'} me-2"></i>
+                    <strong class="me-auto">{{ get_text("info") }}</strong>
                     <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
                 </div>
                 <div class="toast-body">${message}</div>

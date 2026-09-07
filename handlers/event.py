@@ -6,7 +6,7 @@ from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKe
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-
+from handlers.managers_chat import send_question_to_manager, get_manager_chat_id, send_request_notification_to_manager
 from keyboards import get_back_next_keyboard, get_event_menu_keyboard
 from database import db
 from handlers.managers_chat import send_question_to_manager
@@ -337,12 +337,35 @@ async def save_ticket_request(update, state: FSMContext):
     # Сохраняем в БД
     success = await db.save_ticket_request(ticket_data)
 
+    # Сохраняем в БД
+    success = await db.save_ticket_request(ticket_data)
+
     if success:
+        # success может возвращать tuple (True, request_id) согласно database.py
+        req_id = success[1] if isinstance(success, (tuple, list)) else None
+
         await db.log_user_action(
             user_id=user_id,
             username=username,
             action="ticket_request_submitted",
             details={"data": ticket_data}
+        )
+
+        # Отправляем в Event-чат
+        await send_request_notification_to_manager(
+            bot=message_obj.bot,
+            department="event",
+            request_title="🎫 Билет на конференцию",
+            user_data={'user_id': user_id, 'username': username},
+            details={
+                "ФИО": ticket_data.get('full_name'),
+                "Должность": ticket_data.get('position'),
+                "Компания": ticket_data.get('company'),
+                "Email": ticket_data.get('email'),
+                "Телефон": ticket_data.get('phone'),
+                "Страна": ticket_data.get('country')
+            },
+            request_id=req_id
         )
 
         await message_obj.answer(
@@ -453,13 +476,6 @@ async def process_event_question(message: Message, state: FSMContext):
     }
 
     if await db.save_event_question(event_question_data):
-        await send_question_to_manager(
-            bot=message.bot,
-            manager_chat_id=EVENT_MANAGER_CHAT_ID,
-            user_data=event_question_data,
-            question_text=question_text,
-            question_type="event"
-        )
 
         await db.log_user_action(
             user_id=user_id,
@@ -467,6 +483,15 @@ async def process_event_question(message: Message, state: FSMContext):
             action="event_question_submitted",
             details={"data": event_question_data}
         )
+
+        await send_question_to_manager(
+            bot=message.bot,
+            manager_chat_id=get_manager_chat_id('event'),
+            user_data=event_question_data,
+            question_text=question_text,
+            question_type="event"
+        )
+
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=await t(user_id, 'back_to_event'), callback_data="menu_event")]

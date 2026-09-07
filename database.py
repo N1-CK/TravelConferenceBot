@@ -118,15 +118,14 @@ class Database:
                     )
                     ''',
 
-                    # Список всех компаний
-                    await conn.execute(f"""
+                    f"""
                         CREATE TABLE IF NOT EXISTS {self.db_schema_config}.companies (
                             id SERIAL PRIMARY KEY,
                             company_name TEXT UNIQUE NOT NULL,
                             is_active BOOLEAN DEFAULT TRUE,
                             updated_at TIMESTAMP DEFAULT NOW()
                         )
-                    """),
+                    """,
 
                     f"""
                         CREATE TABLE IF NOT EXISTS {self.db_schema_config}.conferences (
