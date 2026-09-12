@@ -70,7 +70,9 @@ class Database:
                 password=os.getenv('DB_PASSWORD'),
                 host=os.getenv('DB_HOST'),
                 port=os.getenv('DB_PORT'),
-                database=os.getenv('DB_NAME')
+                database=os.getenv('DB_NAME'),
+                min_size=5,
+                max_size=25
             )
 
             await self.create_all_tables()
@@ -302,6 +304,7 @@ class Database:
                     )
                     ''',
 
+
                     # Вопросы к PR
                     f'''
                     CREATE TABLE IF NOT EXISTS {self.db_schema_pr}.pr_questions (
@@ -427,6 +430,26 @@ class Database:
                         created_at TIMESTAMP DEFAULT NOW(),
                         PRIMARY KEY (folder_id, user_id)
                     )
+                    ''',
+
+                    # Персональные отметки непрочитанного менеджерами
+                    f'''
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.manager_unread_chats (
+                        manager_id INTEGER NOT NULL,
+                        user_id BIGINT NOT NULL,
+                        marked_at TIMESTAMP DEFAULT NOW(),
+                        PRIMARY KEY (manager_id, user_id)
+                    );
+                    ''',
+
+                    # Персональный архив чатов менеджера
+                    f'''
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.manager_archived_chats (
+                        manager_id INTEGER NOT NULL,
+                        user_id BIGINT NOT NULL,
+                        archived_at TIMESTAMP DEFAULT NOW(),
+                        PRIMARY KEY (manager_id, user_id)
+                    );
                     '''
                 ]
 
@@ -623,6 +646,56 @@ class Database:
         except Exception as e:
             logger.error(f"Error toggling folder item: {e}")
             return {'error': str(e)}
+
+    async def toggle_chat_unread(self, manager_id: int, user_id: int) -> bool:
+        """Переключить статус 'Пометить как непрочитанное' для менеджера"""
+        try:
+            async with self.pool.acquire() as conn:
+                exists = await conn.fetchval(f"""
+                    SELECT 1 FROM {self.db_schema_admin}.manager_unread_chats
+                    WHERE manager_id = $1 AND user_id = $2
+                """, manager_id, user_id)
+                if exists:
+                    await conn.execute(f"""
+                        DELETE FROM {self.db_schema_admin}.manager_unread_chats
+                        WHERE manager_id = $1 AND user_id = $2
+                    """, manager_id, user_id)
+                    return False  # Снята отметка
+                else:
+                    await conn.execute(f"""
+                        INSERT INTO {self.db_schema_admin}.manager_unread_chats (manager_id, user_id)
+                        VALUES ($1, $2)
+                        ON CONFLICT DO NOTHING
+                    """, manager_id, user_id)
+                    return True  # Помечено как непрочитанное
+        except Exception as e:
+            logger.error(f"Error toggling chat unread: {e}")
+            return False
+
+    async def toggle_chat_archive(self, manager_id: int, user_id: int) -> bool:
+        """Переключить архивный статус чата для менеджера"""
+        try:
+            async with self.pool.acquire() as conn:
+                exists = await conn.fetchval(f"""
+                    SELECT 1 FROM {self.db_schema_admin}.manager_archived_chats
+                    WHERE manager_id = $1 AND user_id = $2
+                """, manager_id, user_id)
+                if exists:
+                    await conn.execute(f"""
+                        DELETE FROM {self.db_schema_admin}.manager_archived_chats
+                        WHERE manager_id = $1 AND user_id = $2
+                    """, manager_id, user_id)
+                    return False  # Разархивирован
+                else:
+                    await conn.execute(f"""
+                        INSERT INTO {self.db_schema_admin}.manager_archived_chats (manager_id, user_id)
+                        VALUES ($1, $2)
+                        ON CONFLICT DO NOTHING
+                    """, manager_id, user_id)
+                    return True  # Архивирован
+        except Exception as e:
+            logger.error(f"Error toggling chat archive: {e}")
+            return False
 
     async def get_manager_user_folders_map(self, manager_id: int) -> dict:
         """Получить карту {user_id: [folder_id, ...]} для текущего менеджера"""
@@ -2601,9 +2674,10 @@ class Database:
             return []
 
     async def get_all_users_with_details(self) -> list:
-        """Получить всех пользователей с деталями"""
+        """Получить всех пользователей с деталями без N+1 запросов"""
         try:
             async with self.pool.acquire() as conn:
+                # Получаем пользователей и статус онлайн/активности
                 rows = await conn.fetch(f"""
                     SELECT 
                         up.user_id,
@@ -2619,31 +2693,34 @@ class Database:
                     ORDER BY up.registered_at DESC
                 """)
                 users = [dict(row) for row in rows]
+                if not users:
+                    return []
+
+                # 1 запрос: сразу собираем все конференции пользователей
+                conf_rows = await conn.fetch(f"""
+                    SELECT username, array_agg(conference_name) as confs
+                    FROM {self.db_schema}.user_conferences
+                    GROUP BY username
+                """)
+                conf_map = {r['username']: r['confs'] for r in conf_rows}
+
+                # 1 запрос: агрегированный подсчет заявок пользователей
+                req_rows = await conn.fetch(f"""
+                    SELECT username, COUNT(*) as cnt FROM (
+                        SELECT username FROM {self.db_schema_pr}.pr_banner_requests
+                        UNION ALL
+                        SELECT username FROM {self.db_schema_pr}.pr_business_cards
+                        UNION ALL
+                        SELECT username FROM {self.db_schema_travel}.travel_flight_request
+                    ) all_reqs
+                    GROUP BY username
+                """)
+                req_map = {r['username']: r['cnt'] for r in req_rows}
 
                 for user in users:
-                    confs = await conn.fetch(f"""
-                        SELECT conference_name
-                        FROM {self.db_schema}.user_conferences
-                        WHERE username = $1
-                    """, user['username'])
-                    user['conferences'] = [c['conference_name'] for c in confs]
-
-                    requests_count = 0
-                    for table in ['pr_banner_requests', 'pr_business_cards', 'travel_flight_request']:
-                        try:
-                            if table in ('pr_banner_requests', 'pr_business_cards'):
-                                cnt = await conn.fetchval(f"""
-                                    SELECT COUNT(*) FROM {self.db_schema_pr}.{table} WHERE username = $1
-                                """, user['username'])
-                                requests_count += cnt
-                            else:
-                                cnt = await conn.fetchval(f"""
-                                    SELECT COUNT(*) FROM {self.db_schema_travel}.{table} WHERE username = $1
-                                """, user['username'])
-                                requests_count += cnt
-                        except:
-                            pass
-                    user['requests_count'] = requests_count
+                    uname = user.get('username')
+                    user['conferences'] = conf_map.get(uname, [])
+                    user['requests_count'] = req_map.get(uname, 0)
 
                 return users
         except Exception as e:
@@ -3311,12 +3388,29 @@ class Database:
                         folders_map.setdefault(fr['user_id'], []).append(fr['folder_id'])
 
                 all_users = {}
+                archived_set = set()
+                manual_unread_set = set()
+                if manager_id:
+                    # Загружаем архивированные чаты менеджера
+                    arch_rows = await conn.fetch(f"""
+                        SELECT user_id FROM {self.db_schema_admin}.manager_archived_chats WHERE manager_id = $1
+                    """, manager_id)
+                    archived_set = {r['user_id'] for r in arch_rows}
+
+                    # Загружаем чаты, помеченные менеджером вручную как непрочитанные
+                    unr_rows = await conn.fetch(f"""
+                        SELECT user_id FROM {self.db_schema_admin}.manager_unread_chats WHERE manager_id = $1
+                    """, manager_id)
+                    manual_unread_set = {r['user_id'] for r in unr_rows}
 
                 def update_user_dict(row, prefix=""):
                     user_id = row['user_id']
                     msg_text = row['last_message'] or ''
                     msg_preview = f"{prefix} {msg_text[:80]}" if prefix and msg_text else (
                         msg_text[:100] if msg_text else '')
+                    is_manual_unread = user_id in manual_unread_set
+                    calculated_unread = row['unread_count'] + (
+                        1 if (is_manual_unread and row['unread_count'] == 0) else 0)
 
                     if user_id not in all_users:
                         all_users[user_id] = {
@@ -3325,7 +3419,9 @@ class Database:
                             'full_name': row['full_name'],
                             'last_message_time': row['last_message_time'],
                             'last_message': msg_preview,
-                            'unread_count': row['unread_count'],
+                            'unread_count': calculated_unread,
+                            'is_manual_unread': is_manual_unread,
+                            'is_archived': user_id in archived_set,
                             'folder_ids': folders_map.get(user_id, [])
                         }
                     else:
@@ -3420,6 +3516,11 @@ class Database:
                     UPDATE {self.db_schema}.user_messages
                     SET read_at = NOW(), manager_id = $1
                     WHERE user_id = $2 AND direction = 'incoming' AND read_at IS NULL
+                """, manager_id, user_id)
+
+                await conn.execute(f"""
+                    DELETE FROM {self.db_schema_admin}.manager_unread_chats
+                    WHERE manager_id = $1 AND user_id = $2
                 """, manager_id, user_id)
                 return True
         except Exception as e:

@@ -444,9 +444,9 @@ def dashboard():
 @app.route('/broadcast', methods=['GET', 'POST'])
 @login_required
 def broadcast():
-    companies = run_async(db.get_all_companies_from_config())
-    conferences = run_async(db.get_conferences_list())
-    users = run_async(db.get_all_users_with_details())
+    companies = run_async(db.get_all_companies_from_config()) or []
+    conferences = run_async(db.get_conferences_list()) or []
+    users = run_async(db.get_all_users_with_details()) or []
 
     if request.method == 'POST':
         message = request.form.get('message')
@@ -1156,6 +1156,20 @@ def api_get_conversations():
         if conv.get('last_message_time'):
             conv['last_message_time'] = conv['last_message_time'].isoformat()
     return jsonify(conversations)
+
+@app.route('/api/chat/<int:user_id>/toggle_unread', methods=['POST'])
+@login_required
+def api_toggle_chat_unread(user_id):
+    manager_id = session.get('manager_id', 0)
+    is_unread = run_async(db.toggle_chat_unread(manager_id, user_id))
+    return jsonify({'success': True, 'is_unread': is_unread})
+
+@app.route('/api/chat/<int:user_id>/toggle_archive', methods=['POST'])
+@login_required
+def api_toggle_chat_archive(user_id):
+    manager_id = session.get('manager_id', 0)
+    is_archived = run_async(db.toggle_chat_archive(manager_id, user_id))
+    return jsonify({'success': True, 'is_archived': is_archived})
 
 @app.route('/api/folders', methods=['GET'])
 @login_required
