@@ -84,29 +84,14 @@ class Database:
         """Создаем все таблицы для обоих ботов"""
         try:
             async with self.pool.acquire() as conn:
-                # Существующие таблицы Conference Bot
                 tables = [
-                    f'''
-                        CREATE SCHEMA IF NOT EXISTS systemcheck_bot;
-                    ''',
-                    f'''
-                        CREATE SCHEMA IF NOT EXISTS {self.db_schema};
-                    ''',
-                    f'''
-                        CREATE SCHEMA IF NOT EXISTS {self.db_schema_config};
-                    ''',
-                    f'''
-                        CREATE SCHEMA IF NOT EXISTS {self.db_schema_admin};
-                    ''',
-                    f'''
-                        CREATE SCHEMA IF NOT EXISTS {self.db_schema_travel};
-                    ''',
-                    f'''
-                        CREATE SCHEMA IF NOT EXISTS {self.db_schema_event};
-                    ''',
-                    f'''
-                        CREATE SCHEMA IF NOT EXISTS {self.db_schema_pr};
-                    ''',
+                    f'CREATE SCHEMA IF NOT EXISTS systemcheck_bot;',
+                    f'CREATE SCHEMA IF NOT EXISTS {self.db_schema};',
+                    f'CREATE SCHEMA IF NOT EXISTS {self.db_schema_config};',
+                    f'CREATE SCHEMA IF NOT EXISTS {self.db_schema_admin};',
+                    f'CREATE SCHEMA IF NOT EXISTS {self.db_schema_travel};',
+                    f'CREATE SCHEMA IF NOT EXISTS {self.db_schema_event};',
+                    f'CREATE SCHEMA IF NOT EXISTS {self.db_schema_pr};',
 
                     # Белый список
                     f'''
@@ -119,31 +104,31 @@ class Database:
                     ''',
 
                     f"""
-                        CREATE TABLE IF NOT EXISTS {self.db_schema_config}.companies (
-                            id SERIAL PRIMARY KEY,
-                            company_name TEXT UNIQUE NOT NULL,
-                            is_active BOOLEAN DEFAULT TRUE,
-                            updated_at TIMESTAMP DEFAULT NOW()
-                        )
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_config}.companies (
+                        id SERIAL PRIMARY KEY,
+                        company_name TEXT UNIQUE NOT NULL,
+                        is_active BOOLEAN DEFAULT TRUE,
+                        updated_at TIMESTAMP DEFAULT NOW()
+                    )
                     """,
 
                     f"""
-                        CREATE TABLE IF NOT EXISTS {self.db_schema_config}.conferences (
-                            id SERIAL PRIMARY KEY,
-                            conference_name TEXT UNIQUE NOT NULL,
-                            start_date TEXT,
-                            end_date TEXT,
-                            city TEXT,
-                            bot_link TEXT,
-                            additional_info TEXT,
-                            sheet_name TEXT,
-                            hotel TEXT,
-                            hotel_address TEXT,
-                            site_url TEXT,
-                            is_active BOOLEAN DEFAULT TRUE,
-                            created_at TIMESTAMP DEFAULT NOW(),
-                            updated_at TIMESTAMP DEFAULT NOW()
-                        )
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_config}.conferences (
+                        id SERIAL PRIMARY KEY,
+                        conference_name TEXT UNIQUE NOT NULL,
+                        start_date TEXT,
+                        end_date TEXT,
+                        city TEXT,
+                        bot_link TEXT,
+                        additional_info TEXT,
+                        sheet_name TEXT,
+                        hotel TEXT,
+                        hotel_address TEXT,
+                        site_url TEXT,
+                        is_active BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
+                    )
                     """,
 
                     f"""
@@ -204,13 +189,15 @@ class Database:
                         city_to TEXT,
                         needs_baggage BOOLEAN,
                         preferences TEXT,
-                        created_at TIMESTAMP DEFAULT NOW()
+                        status TEXT DEFAULT 'pending',
+                        visa_request_status TEXT DEFAULT 'pending',
+                        flight_request_status TEXT DEFAULT 'pending',
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW()
                     )
                     ''',
 
                     # ===== ТАБЛИЦЫ AFFILIATE BOT =====
-
-                    # Auth users (объединяем с whitelist)
                     f'''
                     CREATE TABLE IF NOT EXISTS {self.db_schema}.affiliate_auth_users (
                         username TEXT PRIMARY KEY REFERENCES {self.db_schema_config}.whitelist(username),
@@ -271,8 +258,6 @@ class Database:
                         updated_at TIMESTAMP DEFAULT NOW()
                     )
                     ''',
-
-                    # После существующих таблиц добавить:
 
                     # Вопросы к EVENT
                     f'''
@@ -358,33 +343,32 @@ class Database:
                     ''',
 
                     f'''
-                                CREATE TABLE IF NOT EXISTS {self.db_schema}.user_flights (
-                                    id SERIAL PRIMARY KEY,
-                                    username TEXT NOT NULL,
-                                    conference TEXT NOT NULL,
-                                    flight_number TEXT,
-                                    book_number TEXT,
-                                    departure_from TEXT,
-                                    arrival_city TEXT,
-                                    departure_date TEXT,
-                                    departure_time TEXT,
-                                    arrival_time TEXT,
-                                    airline TEXT,
-                                    luggage TEXT,
-                                    carry_luggage TEXT,
-                                    created_at TIMESTAMP DEFAULT NOW()
-                                )
-                                ''',
-
+                    CREATE TABLE IF NOT EXISTS {self.db_schema}.user_flights (
+                        id SERIAL PRIMARY KEY,
+                        username TEXT NOT NULL,
+                        conference TEXT NOT NULL,
+                        flight_number TEXT,
+                        book_number TEXT,
+                        departure_from TEXT,
+                        arrival_city TEXT,
+                        departure_date TEXT,
+                        departure_time TEXT,
+                        arrival_time TEXT,
+                        airline TEXT,
+                        luggage TEXT,
+                        carry_luggage TEXT,
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                    ''',
 
                     f'''
-                                CREATE TABLE IF NOT EXISTS {self.db_schema}.airlines (
-                                    id SERIAL PRIMARY KEY,
-                                    airline_name TEXT UNIQUE NOT NULL,
-                                    checkin_url TEXT,
-                                    created_at TIMESTAMP DEFAULT NOW()
-                                )
-                                ''',
+                    CREATE TABLE IF NOT EXISTS {self.db_schema}.airlines (
+                        id SERIAL PRIMARY KEY,
+                        airline_name TEXT UNIQUE NOT NULL,
+                        checkin_url TEXT,
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                    ''',
 
                     f'''
                     CREATE TABLE IF NOT EXISTS {self.db_schema}.user_agreements (
@@ -408,12 +392,13 @@ class Database:
                         conference_start_date TEXT,
                         conference_end_date TEXT,
                         city TEXT,
+                        bot_link TEXT,
+                        additional_info TEXT,
                         created_at TIMESTAMP DEFAULT NOW(),
                         updated_at TIMESTAMP DEFAULT NOW(),
                         UNIQUE(username, conference_name)
                     )
                     ''',
-
 
                     f'''
                     CREATE TABLE IF NOT EXISTS systemcheck_bot.bots_status (
@@ -423,51 +408,69 @@ class Database:
                         created_at TIMESTAMP DEFAULT NOW(),
                         updated_at TIMESTAMP DEFAULT NOW()
                     )
+                    ''',
+
+                    # Папки менеджеров
+                    f'''
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.manager_folders (
+                        id SERIAL PRIMARY KEY,
+                        manager_id INTEGER NOT NULL,
+                        name TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                    ''',
+
+                    f'''
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.manager_folder_items (
+                        folder_id INTEGER NOT NULL REFERENCES {self.db_schema_admin}.manager_folders(id) ON DELETE CASCADE,
+                        user_id BIGINT NOT NULL,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        PRIMARY KEY (folder_id, user_id)
+                    )
                     '''
                 ]
 
                 await conn.execute(f"""
-                                CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.admin_users (
-                                    id SERIAL PRIMARY KEY,
-                                    username TEXT UNIQUE NOT NULL,
-                                    password_hash TEXT NOT NULL,
-                                    full_name TEXT,
-                                    role TEXT NOT NULL DEFAULT 'user',
-                                    can_manage_users BOOLEAN DEFAULT FALSE,
-                                    can_broadcast BOOLEAN DEFAULT TRUE,
-                                    can_view_stats BOOLEAN DEFAULT TRUE,
-                                    can_manage_conferences BOOLEAN DEFAULT FALSE,
-                                    created_at TIMESTAMP DEFAULT NOW(),
-                                    last_login TIMESTAMP,
-                                    is_active BOOLEAN DEFAULT TRUE
-                                )
-                            """)
-
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.admin_users (
+                        id SERIAL PRIMARY KEY,
+                        username TEXT UNIQUE NOT NULL,
+                        password_hash TEXT NOT NULL,
+                        full_name TEXT,
+                        role TEXT NOT NULL DEFAULT 'user',
+                        can_manage_users BOOLEAN DEFAULT FALSE,
+                        can_broadcast BOOLEAN DEFAULT TRUE,
+                        can_view_stats BOOLEAN DEFAULT TRUE,
+                        can_manage_conferences BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        last_login TIMESTAMP,
+                        is_active BOOLEAN DEFAULT TRUE
+                    )
+                """)
 
                 # Таблица сессий админки
                 await conn.execute(f"""
-                                CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.admin_sessions (
-                                    id SERIAL PRIMARY KEY,
-                                    admin_id INTEGER REFERENCES {self.db_schema_admin}.admin_users(id),
-                                    session_token TEXT UNIQUE,
-                                    ip_address TEXT,
-                                    user_agent TEXT,
-                                    created_at TIMESTAMP DEFAULT NOW(),
-                                    expires_at TIMESTAMP
-                                )
-                            """)
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.admin_sessions (
+                        id SERIAL PRIMARY KEY,
+                        admin_id INTEGER REFERENCES {self.db_schema_admin}.admin_users(id),
+                        session_token TEXT UNIQUE,
+                        ip_address TEXT,
+                        user_agent TEXT,
+                        created_at TIMESTAMP DEFAULT NOW(),
+                        expires_at TIMESTAMP
+                    )
+                """)
 
                 # Таблица логов действий админов
                 await conn.execute(f"""
-                                CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.admin_logs (
-                                    id SERIAL PRIMARY KEY,
-                                    admin_id INTEGER REFERENCES {self.db_schema_admin}.admin_users(id),
-                                    action TEXT NOT NULL,
-                                    details JSONB,
-                                    ip_address TEXT,
-                                    created_at TIMESTAMP DEFAULT NOW()
-                                )
-                            """)
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.admin_logs (
+                        id SERIAL PRIMARY KEY,
+                        admin_id INTEGER REFERENCES {self.db_schema_admin}.admin_users(id),
+                        action TEXT NOT NULL,
+                        details JSONB,
+                        ip_address TEXT,
+                        created_at TIMESTAMP DEFAULT NOW()
+                    )
+                """)
 
                 await conn.execute(f"""
                     CREATE TABLE IF NOT EXISTS {self.db_schema}.user_messages (
@@ -475,7 +478,7 @@ class Database:
                         user_id BIGINT NOT NULL,
                         username TEXT NOT NULL,
                         manager_id INTEGER,
-                        direction TEXT NOT NULL, -- 'incoming' or 'outgoing'
+                        direction TEXT NOT NULL,
                         message_text TEXT,
                         file_type TEXT,
                         file_id TEXT,
@@ -502,11 +505,11 @@ class Database:
                 password_hash = sha256(default_pass.encode()).hexdigest()
 
                 await conn.execute(f"""
-                                INSERT INTO {self.db_schema_admin}.admin_users 
-                                (username, password_hash, full_name, role, can_manage_users, can_broadcast, can_view_stats, can_manage_conferences)
-                                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                                ON CONFLICT (username) DO NOTHING
-                            """, default_admin, password_hash, 'Administrator', 'admin', True, True, True, True)
+                    INSERT INTO {self.db_schema_admin}.admin_users 
+                    (username, password_hash, full_name, role, can_manage_users, can_broadcast, can_view_stats, can_manage_conferences)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    ON CONFLICT (username) DO NOTHING
+                """, default_admin, password_hash, 'Administrator', 'admin', True, True, True, True)
 
                 for table_sql in tables:
                     try:
@@ -520,6 +523,125 @@ class Database:
         except Exception as e:
             logger.error(f"Error creating tables: {e}")
             return False
+
+    # ===== МЕТОДЫ ДЛЯ ПАПОК ЧАТОВ =====
+
+    async def get_manager_folders(self, manager_id: int) -> list:
+        """Получить папки менеджера с количеством диалогов"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT 
+                        f.id,
+                        f.name,
+                        f.created_at,
+                        COUNT(fi.user_id) as count
+                    FROM {self.db_schema_admin}.manager_folders f
+                    LEFT JOIN {self.db_schema_admin}.manager_folder_items fi ON f.id = fi.folder_id
+                    WHERE f.manager_id = $1
+                    GROUP BY f.id, f.name, f.created_at
+                    ORDER BY f.created_at ASC
+                """, manager_id)
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"Error getting manager folders: {e}")
+            return []
+
+    async def create_manager_folder(self, manager_id: int, name: str) -> dict:
+        """Создать папку менеджера"""
+        try:
+            async with self.pool.acquire() as conn:
+                row = await conn.fetchrow(f"""
+                    INSERT INTO {self.db_schema_admin}.manager_folders (manager_id, name)
+                    VALUES ($1, $2)
+                    RETURNING id, name, created_at
+                """, manager_id, name)
+                if row:
+                    res = dict(row)
+                    res['count'] = 0
+                    return res
+                return None
+        except Exception as e:
+            logger.error(f"Error creating folder: {e}")
+            return None
+
+    async def delete_manager_folder(self, manager_id: int, folder_id: int) -> bool:
+        """Удалить папку менеджера"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    DELETE FROM {self.db_schema_admin}.manager_folders
+                    WHERE id = $1 AND manager_id = $2
+                """, folder_id, manager_id)
+                return True
+        except Exception as e:
+            logger.error(f"Error deleting folder: {e}")
+            return False
+
+    async def toggle_user_in_folder(self, manager_id: int, folder_id: int, user_id: int) -> dict:
+        """Добавить/удалить чат пользователя из папки менеджера"""
+        try:
+            async with self.pool.acquire() as conn:
+                owner = await conn.fetchval(f"""
+                    SELECT 1 FROM {self.db_schema_admin}.manager_folders
+                    WHERE id = $1 AND manager_id = $2
+                """, folder_id, manager_id)
+                if not owner:
+                    return {'error': 'Folder not found or access denied'}
+
+                exists = await conn.fetchval(f"""
+                    SELECT 1 FROM {self.db_schema_admin}.manager_folder_items
+                    WHERE folder_id = $1 AND user_id = $2
+                """, folder_id, user_id)
+
+                if exists:
+                    await conn.execute(f"""
+                        DELETE FROM {self.db_schema_admin}.manager_folder_items
+                        WHERE folder_id = $1 AND user_id = $2
+                    """, folder_id, user_id)
+                    in_folder = False
+                else:
+                    await conn.execute(f"""
+                        INSERT INTO {self.db_schema_admin}.manager_folder_items (folder_id, user_id)
+                        VALUES ($1, $2)
+                    """, folder_id, user_id)
+                    in_folder = True
+
+                folders = await conn.fetch(f"""
+                    SELECT fi.folder_id
+                    FROM {self.db_schema_admin}.manager_folder_items fi
+                    JOIN {self.db_schema_admin}.manager_folders f ON fi.folder_id = f.id
+                    WHERE f.manager_id = $1 AND fi.user_id = $2
+                """, manager_id, user_id)
+
+                return {
+                    'in_folder': in_folder,
+                    'user_id': user_id,
+                    'folder_id': folder_id,
+                    'user_folders': [r['folder_id'] for r in folders]
+                }
+        except Exception as e:
+            logger.error(f"Error toggling folder item: {e}")
+            return {'error': str(e)}
+
+    async def get_manager_user_folders_map(self, manager_id: int) -> dict:
+        """Получить карту {user_id: [folder_id, ...]} для текущего менеджера"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT fi.user_id, fi.folder_id
+                    FROM {self.db_schema_admin}.manager_folder_items fi
+                    JOIN {self.db_schema_admin}.manager_folders f ON fi.folder_id = f.id
+                    WHERE f.manager_id = $1
+                """, manager_id)
+                res = {}
+                for r in rows:
+                    uid = r['user_id']
+                    res.setdefault(uid, []).append(r['folder_id'])
+                return res
+        except Exception as e:
+            logger.error(f"Error getting user folders map: {e}")
+            return {}
 
     # ===== AFFILIATE BOT МЕТОДЫ =====
 
@@ -536,26 +658,23 @@ class Database:
                     ON CONFLICT (username) DO UPDATE
                     SET is_active = TRUE
                 """, clean_username)
-
                 return True
         except Exception as e:
             logger.error(f"Error adding affiliate user: {e}")
             return False
-
 
     async def get_cities_from_restaurants(self) -> list:
         """Получение списка городов из ресторанов"""
         try:
             async with self.pool.acquire() as conn:
                 records = await conn.fetch(f"""
-                    select city
-                    from (
-                        SELECT distinct max(id) as idd, city
+                    SELECT city
+                    FROM (
+                        SELECT DISTINCT max(id) as idd, city
                         FROM {self.db_schema_pr}.affil_restaurants
-                        WHERE created_at = (select max(created_at) from {self.db_schema_pr}.affil_restaurants)
-                        group by city) t1
+                        WHERE created_at = (SELECT max(created_at) FROM {self.db_schema_pr}.affil_restaurants)
+                        GROUP BY city) t1
                 """)
-                print(records)
                 return [record['city'] for record in records]
         except Exception as e:
             logger.error(f"Error getting cities: {e}")
@@ -608,7 +727,6 @@ class Database:
         """Получить вопрос по ID из указанной таблицы"""
         try:
             async with self.pool.acquire() as conn:
-                # table_name уже содержит полное имя таблицы (например travelconference_pr.pr_questions)
                 query = f'SELECT * FROM {table_name} WHERE id = $1'
                 row = await conn.fetchrow(query, question_id)
                 return dict(row) if row else {}
@@ -620,7 +738,6 @@ class Database:
         """Сохранить пересланный вопрос в целевую таблицу"""
         try:
             async with self.pool.acquire() as conn:
-                # target_table уже содержит полное имя таблицы
                 query = f"""
                     INSERT INTO {target_table} 
                     (username, user_id, category, question, created_at)
@@ -701,7 +818,6 @@ class Database:
             logger.error(f"Error getting restaurant: {e}")
             return None
 
-
     async def save_event_question(self, data: dict) -> bool:
         """Сохранение вопроса к EVENT-менеджеру"""
         try:
@@ -711,11 +827,11 @@ class Database:
                     (username, user_id, category, question)
                     VALUES ($1, $2, $3, $4)
                 """,
-                                   data['username'],
-                                   data['user_id'],
-                                   data.get('category', ''),
-                                   data.get('question', '')
-                                   )
+                   data['username'],
+                   data['user_id'],
+                   data.get('category', ''),
+                   data.get('question', '')
+                )
                 return True
         except Exception as e:
             logger.error(f"Error saving event question: {e}")
@@ -739,7 +855,6 @@ class Database:
         """Сохранение заявки на визу"""
         try:
             async with self.pool.acquire() as conn:
-                # Добавляем колонку status если нет
                 try:
                     await conn.execute(f"""
                         ALTER TABLE {self.db_schema_travel}.travel_flight_request 
@@ -758,15 +873,15 @@ class Database:
                      visa_request_status, flight_request_status)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', 'pending')
                 """,
-                                   data['username'],
-                                   data['user_id'],
-                                   data.get('visa_status', ''),
-                                   data.get('passport_data', ''),
-                                   data.get('city_from', ''),
-                                   data.get('city_to', ''),
-                                   data.get('needs_baggage', False),
-                                   data.get('preferences', '')
-                                   )
+                   data['username'],
+                   data['user_id'],
+                   data.get('visa_status', ''),
+                   data.get('passport_data', ''),
+                   data.get('city_from', ''),
+                   data.get('city_to', ''),
+                   data.get('needs_baggage', False),
+                   data.get('preferences', '')
+                )
                 return True
         except Exception as e:
             logger.error(f"Error saving visa request: {e}")
@@ -776,7 +891,6 @@ class Database:
         """Сохранение заявки на суточные"""
         try:
             async with self.pool.acquire() as conn:
-                # Создаем таблицу с правильной структурой если её нет
                 await conn.execute(f"""
                     CREATE TABLE IF NOT EXISTS {self.db_schema_travel}.travel_per_diem_requests (
                         id SERIAL PRIMARY KEY,
@@ -791,51 +905,21 @@ class Database:
                     )
                 """)
 
-                # Добавляем колонку payment_type если её нет
-                try:
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_per_diem_requests 
-                        ADD COLUMN IF NOT EXISTS payment_type TEXT
-                    """)
-                except:
-                    pass
-
-                # Добавляем колонку status если её нет
-                try:
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_per_diem_requests 
-                        ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'
-                    """)
-                except:
-                    pass
-
-                # Добавляем колонку updated_at если её нет
-                try:
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_per_diem_requests 
-                        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()
-                    """)
-                except:
-                    pass
-
-                # Вставляем данные
                 await conn.execute(f"""
                     INSERT INTO {self.db_schema_travel}.travel_per_diem_requests 
                     (username, user_id, payment_type, payment_details, consent_given, status)
                     VALUES ($1, $2, $3, $4, $5, 'pending')
                 """,
-                                   data['username'],
-                                   data['user_id'],
-                                   data.get('payment_type', ''),
-                                   data.get('payment_details', ''),
-                                   data.get('consent_given', False)
-                                   )
+                   data['username'],
+                   data['user_id'],
+                   data.get('payment_type', ''),
+                   data.get('payment_details', ''),
+                   data.get('consent_given', False)
+                )
                 return True
         except Exception as e:
             logger.error(f"Error saving per diem request: {e}")
             return False
-
-    # database.py - добавьте этот метод в класс Database
 
     async def get_questions_by_department(self, department: str, limit: int = 100) -> list:
         """Получить вопросы для конкретного отдела"""
@@ -872,43 +956,6 @@ class Database:
         """Получить все заявки на суточные"""
         try:
             async with self.pool.acquire() as conn:
-                # Сначала убедимся, что таблица имеет правильную структуру
-                try:
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_per_diem_requests 
-                        ADD COLUMN IF NOT EXISTS payment_type TEXT
-                    """)
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_per_diem_requests 
-                        ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'
-                    """)
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_per_diem_requests 
-                        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()
-                    """)
-                except Exception as e:
-                    logger.warning(f"Error adding columns to per_diem table: {e}")
-
-                # Обновляем старые записи, у которых нет payment_type
-                try:
-                    await conn.execute(f"""
-                        UPDATE {self.db_schema_travel}.travel_per_diem_requests 
-                        SET payment_type = 'card' 
-                        WHERE payment_type IS NULL AND payment_details IS NOT NULL
-                    """)
-                except:
-                    pass
-
-                # Обновляем статус для старых записей
-                try:
-                    await conn.execute(f"""
-                        UPDATE {self.db_schema_travel}.travel_per_diem_requests 
-                        SET status = 'pending' 
-                        WHERE status IS NULL
-                    """)
-                except:
-                    pass
-
                 rows = await conn.fetch(f"""
                     SELECT 
                         id, 
@@ -941,7 +988,6 @@ class Database:
         except Exception as e:
             logger.error(f"Error updating per diem status: {e}")
             return False
-
 
     async def get_all_travel_flight_requests(self) -> list:
         """Получить все заявки на билеты вместе с данными суточных"""
@@ -994,6 +1040,10 @@ class Database:
         except Exception as e:
             logger.error(f"Error getting travel flight request {request_id}: {e}")
             return {}
+
+    async def get_visa_request(self, request_id: int) -> dict:
+        """Получить визовую заявку по ID (алиас для совместимости API)"""
+        return await self.get_travel_flight_request_by_id(request_id)
 
     async def update_travel_visa_request_status(self, request_id: int, status: str) -> bool:
         """Обновить статус визовой заявки"""
@@ -1065,15 +1115,15 @@ class Database:
                     (username, user_id, full_name, position, company, language, photo_required, photo_file_id)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 """,
-                                   data['username'],
-                                   data['user_id'],
-                                   data.get('full_name', ''),
-                                   data.get('position', ''),
-                                   data.get('company', ''),
-                                   data.get('language', ''),
-                                   data.get('photo_required', False),
-                                   data.get('photo_file_id', '')
-                                   )
+                   data['username'],
+                   data['user_id'],
+                   data.get('full_name', ''),
+                   data.get('position', ''),
+                   data.get('company', ''),
+                   data.get('language', ''),
+                   data.get('photo_required', False),
+                   data.get('photo_file_id', '')
+                )
                 return True
         except Exception as e:
             logger.error(f"Error saving banner request: {e}")
@@ -1088,20 +1138,19 @@ class Database:
                     (username, user_id, full_name, position_en, company, contacts, brand_style)
                     VALUES ($1, $2, $3, $4, $5, $6, $7)
                 """,
-                                   data['username'],
-                                   data['user_id'],
-                                   data.get('full_name', ''),
-                                   data.get('position_en', ''),
-                                   data.get('company', ''),
-                                   data.get('contacts', ''),
-                                   data.get('brand_style', False)
-                                   )
+                   data['username'],
+                   data['user_id'],
+                   data.get('full_name', ''),
+                   data.get('position_en', ''),
+                   data.get('company', ''),
+                   data.get('contacts', ''),
+                   data.get('brand_style', False)
+                )
                 return True
         except Exception as e:
             logger.error(f"Error saving business cards: {e}")
             return False
 
-    # Методы для бронирований
     async def save_booking(self, booking_data: dict) -> bool:
         """Сохранение бронирования"""
         try:
@@ -1112,16 +1161,16 @@ class Database:
                      restaurant, people, payment_method, partnertype)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 """,
-                                   booking_data['username'],
-                                   booking_data['user_id'],
-                                   booking_data['manager'],
-                                   booking_data['datetime'],
-                                   booking_data['company'],
-                                   booking_data['partner'],
-                                   booking_data['restaurant'],
-                                   booking_data['people'],
-                                   booking_data['payment_method'],
-                                   booking_data['partnertype'])
+                   booking_data['username'],
+                   booking_data['user_id'],
+                   booking_data['manager'],
+                   booking_data['datetime'],
+                   booking_data['company'],
+                   booking_data['partner'],
+                   booking_data['restaurant'],
+                   booking_data['people'],
+                   booking_data['payment_method'],
+                   booking_data['partnertype'])
                 return True
         except Exception as e:
             logger.error(f"Error saving booking: {e}")
@@ -1151,7 +1200,7 @@ class Database:
                     VALUES ($1, $2, $3, $4)
                     RETURNING id
                 """, data['username'], data['user_id'],
-                                          data.get('category', ''), data.get('question', ''))
+                     data.get('category', ''), data.get('question', ''))
                 return True, row['id'] if row else None
         except Exception as e:
             logger.error(f"Error saving PR question: {e}")
@@ -1166,17 +1215,15 @@ class Database:
                     (username, user_id, category, question)
                     VALUES ($1, $2, $3, $4)
                 """,
-                                   data['username'],
-                                   data['user_id'],
-                                   data.get('category', ''),
-                                   data.get('question', '')
-                                   )
+                   data['username'],
+                   data['user_id'],
+                   data.get('category', ''),
+                   data.get('question', '')
+                )
                 return True
         except Exception as e:
             logger.error(f"Error saving travel question: {e}")
             return False
-
-    # В класс Database добавить методы:
 
     async def check_user_agreement(self, user_id: int, agreement_type: str = 'terms') -> bool:
         """Проверяем, давал ли пользователь согласие"""
@@ -1208,7 +1255,6 @@ class Database:
                         accepted_at = NOW()
                 """, user_id, username, agreement_type, version)
 
-                # Только username, без telegram_id и company
                 await conn.execute(f"""
                     INSERT INTO {self.db_schema_config}.whitelist (username, is_active)
                     VALUES ($1, TRUE)
@@ -1231,15 +1277,15 @@ class Database:
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
                     RETURNING id
                 """,
-                                          data['username'],
-                                          data['user_id'],
-                                          data.get('full_name', ''),
-                                          data.get('position', ''),
-                                          data.get('company', ''),
-                                          data.get('email', ''),
-                                          data.get('phone', ''),
-                                          data.get('country', '')
-                                          )
+                   data['username'],
+                   data['user_id'],
+                   data.get('full_name', ''),
+                   data.get('position', ''),
+                   data.get('company', ''),
+                   data.get('email', ''),
+                   data.get('phone', ''),
+                   data.get('country', '')
+                )
                 return True, row['id'] if row else None
         except Exception as e:
             logger.error(f"Error saving ticket request: {e}")
@@ -1264,15 +1310,6 @@ class Database:
         """Save flight request to database"""
         try:
             async with self.pool.acquire() as conn:
-                # Проверяем, есть ли колонка status, если нет - добавляем
-                try:
-                    await conn.execute(f"""
-                        ALTER TABLE {self.db_schema_travel}.travel_flight_request 
-                        ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'
-                    """)
-                except:
-                    pass
-
                 query = f"""
                     INSERT INTO {self.db_schema_travel}.travel_flight_request 
                     (username, user_id, visa_status, passport_data, city_from, city_to, needs_baggage, preferences, status)
@@ -1294,7 +1331,6 @@ class Database:
             logger.error(f"Error saving flight request: {e}")
             return False
 
-    # Методы для отчетов
     async def save_report(self, report_data: dict) -> bool:
         """Сохранение отчета"""
         try:
@@ -1304,24 +1340,22 @@ class Database:
                     (username, company, meeting_date, manager, partner, result, budget)
                     VALUES ($1, $2, $3, $4, $5, $6, $7)
                 """,
-                                   report_data['username'],
-                                   report_data['company'],
-                                   report_data['meeting_date'],
-                                   report_data['manager'],
-                                   report_data['partner'],
-                                   report_data['result'],
-                                   report_data['budget'])
+                   report_data['username'],
+                   report_data['company'],
+                   report_data['meeting_date'],
+                   report_data['manager'],
+                   report_data['partner'],
+                   report_data['result'],
+                   report_data['budget'])
                 return True
         except Exception as e:
             logger.error(f"Error saving report: {e}")
             return False
 
-
     async def sync_flights_data(self, flights_data: list):
         """Синхронизация данных о рейсах"""
         try:
             async with self.pool.acquire() as conn:
-                # Удаляем старые данные для пользователей
                 usernames = list(set([f['username'] for f in flights_data]))
                 for username in usernames:
                     await conn.execute(f"""
@@ -1329,7 +1363,6 @@ class Database:
                         WHERE username = $1
                     """, username)
 
-                # Вставляем новые данные
                 for flight in flights_data:
                     await conn.execute(f"""
                         INSERT INTO {self.db_schema}.user_flights 
@@ -1338,16 +1371,15 @@ class Database:
                          arrival_time, airline, luggage, carry_luggage)
                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                     """,
-                                       flight['username'], flight['conference'], flight['flight_number'],
-                                       flight['book_number'], flight['departure_from'], flight['arrival_city'],
-                                       flight['departure_date'], flight['departure_time'], flight['arrival_time'],
-                                       flight['airline'], flight['luggage'], flight['carry_luggage'])
+                       flight['username'], flight['conference'], flight['flight_number'],
+                       flight['book_number'], flight['departure_from'], flight['arrival_city'],
+                       flight['departure_date'], flight['departure_time'], flight['arrival_time'],
+                       flight['airline'], flight['luggage'], flight['carry_luggage'])
 
                 return True
         except Exception as e:
             logger.error(f"Error syncing flights data: {e}")
             return False
-
 
     async def check_whitelist(self, username: str) -> bool:
         """Проверка пользователя в whitelist (без учета наличия @ и регистра)"""
@@ -1383,15 +1415,12 @@ class Database:
             logger.error(f"Error getting selected conference: {e}")
             return ""
 
-    # database.py
     async def log_user_action(self, user_id: int, username: str, action: str, details: dict = None) -> bool:
         """Логирование действий пользователя"""
         try:
             import json
             async with self.pool.acquire() as conn:
-                # Преобразуем details в JSON строку если это словарь
                 details_json = json.dumps(details, default=str) if details else None
-
                 await conn.execute(f"""
                     INSERT INTO {self.db_schema}.user_logs (user_id, username, action, details, timestamp)
                     VALUES ($1, $2, $3, $4, NOW())
@@ -1405,30 +1434,29 @@ class Database:
         """Обновление статуса бота"""
         try:
             async with self.pool.acquire() as conn:
-                await conn.execute("""
-                                   INSERT INTO systemcheck_bot.bots_status (bot_id, status, components, updated_at)
-                                   VALUES ($1, $2, $3, NOW())
-                                   ON CONFLICT (bot_id) DO UPDATE
-                                       SET status     = EXCLUDED.status,
-                                           components = EXCLUDED.components,
-                                           updated_at = EXCLUDED.updated_at
-                                   """, bot_id, status, components)
+                await conn.execute(f"""
+                    INSERT INTO systemcheck_bot.bots_status (bot_id, status, components, updated_at)
+                    VALUES ($1, $2, $3, NOW())
+                    ON CONFLICT (bot_id) DO UPDATE
+                        SET status     = EXCLUDED.status,
+                            components = EXCLUDED.components,
+                            updated_at = EXCLUDED.updated_at
+                """, bot_id, status, components)
                 return True
         except Exception as e:
             logger.error(f"Error updating bot status: {e}")
             return False
-
 
     async def get_flight_details_travel(self, username: str, conference: str) -> List[Dict]:
         """Получить детали рейсов из схемы travel_bot"""
         try:
             async with self.pool.acquire() as conn:
                 query = f"""
-                        SELECT *
-                        FROM travel_bot.flights
-                        WHERE telegram_name ILIKE $1 AND conference ILIKE $2
-                        ORDER BY departure_date, departure_time \
-                        """
+                    SELECT *
+                    FROM travel_bot.flights
+                    WHERE telegram_name ILIKE $1 AND conference ILIKE $2
+                    ORDER BY departure_date, departure_time
+                """
                 result = await conn.fetch(query, f"%{username}%", f"%{conference}%")
                 return [dict(row) for row in result]
         except Exception as e:
@@ -1436,16 +1464,15 @@ class Database:
             return []
 
     async def get_hotel_info_travel(self, conference: str) -> Dict:
-        """Получить информацию об отеле из новой таблицы (ранее из travel_bot.hotels)"""
+        """Получить информацию об отеле"""
         try:
             async with self.pool.acquire() as conn:
-                # Используем алиасы, чтобы ответ словаря (address, site) соответствовал тому, что ожидает бот
                 query = f"""
-                        SELECT hotel, hotel_address as address, site_url as site
-                        FROM {self.db_schema_config}.conferences
-                        WHERE conference_name ILIKE $1
-                        LIMIT 1
-                        """
+                    SELECT hotel, hotel_address as address, site_url as site
+                    FROM {self.db_schema_config}.conferences
+                    WHERE conference_name ILIKE $1
+                    LIMIT 1
+                """
                 result = await conn.fetchrow(query, f"%{conference}%")
                 return dict(result) if result else {}
         except Exception as e:
@@ -1457,17 +1484,16 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 query = f"""
-                        SELECT link
-                        FROM travel_bot.airlines
-                        WHERE airline like '%{airline}%'
-                        LIMIT 1 \
-                        """
+                    SELECT link
+                    FROM travel_bot.airlines
+                    WHERE airline like '%{airline}%'
+                    LIMIT 1
+                """
                 result = await conn.fetchval(query)
                 return result or ""
         except Exception as e:
             logger.error(f"Error getting airline URL from travel_bot: {e}")
             return ""
-
 
     async def get_user_company(self, user_id: int) -> str:
         """Получить компанию пользователя"""
@@ -1545,10 +1571,9 @@ class Database:
             return []
 
     async def update_affiliate_booking_status(self, booking_id: int, status: str) -> bool:
-        """Обновить статус бронирования (добавляем колонку status если нет)"""
+        """Обновить статус бронирования"""
         try:
             async with self.pool.acquire() as conn:
-                # Добавляем колонку status если её нет
                 try:
                     await conn.execute(f"""
                         ALTER TABLE {self.db_schema_pr}.affil_bookings 
@@ -1568,10 +1593,9 @@ class Database:
             return False
 
     async def update_affiliate_report_status(self, report_id: int, status: str) -> bool:
-        """Обновить статус отчета (добавляем колонку status если нет)"""
+        """Обновить статус отчета"""
         try:
             async with self.pool.acquire() as conn:
-                # Добавляем колонку status если её нет
                 try:
                     await conn.execute(f"""
                         ALTER TABLE {self.db_schema_pr}.affil_reports 
@@ -1594,7 +1618,6 @@ class Database:
         """Сохранение данных регистрации пользователя"""
         try:
             async with self.pool.acquire() as conn:
-                # Создаем таблицу если нет
                 await conn.execute(f"""
                     CREATE TABLE IF NOT EXISTS {self.db_schema_config}.user_profiles (
                         user_id BIGINT PRIMARY KEY,
@@ -1608,7 +1631,6 @@ class Database:
                     )
                 """)
 
-                # Вставляем или обновляем данные
                 await conn.execute(f"""
                     INSERT INTO {self.db_schema_config}.user_profiles 
                     (user_id, username, language, full_name, position, company, updated_at)
@@ -1626,15 +1648,14 @@ class Database:
                    user_data.get('full_name'),
                    user_data.get('position'),
                    user_data.get('company')
-               )
-
+                )
                 return True
         except Exception as e:
             logger.error(f"Error saving user registration: {e}")
             return False
 
     async def get_user_data(self, user_id: int) -> dict:
-        """Получение данных пользователя с форматированием даты"""
+        """Получение данных пользователя"""
         try:
             async with self.pool.acquire() as conn:
                 row = await conn.fetchrow(f"""
@@ -1645,11 +1666,7 @@ class Database:
                 """, user_id)
 
                 if row:
-                    result = dict(row)
-                    # Форматируем даты для отображения
-                    if result.get('registered_at'):
-                        result['registered_at'] = result['registered_at']
-                    return result
+                    return dict(row)
                 return {}
         except Exception as e:
             logger.error(f"Error getting user data: {e}")
@@ -1659,8 +1676,6 @@ class Database:
         """Получить все вопросы из таблицы"""
         try:
             async with self.pool.acquire() as conn:
-                # table уже содержит полное имя таблицы (например travelconference_pr.pr_questions)
-                # Не нужно добавлять схему повторно
                 query = f'SELECT * FROM {table} ORDER BY created_at DESC'
                 rows = await conn.fetch(query)
                 return [dict(row) for row in rows]
@@ -1670,14 +1685,7 @@ class Database:
 
     async def sync_whitelist_from_google_sheets(self, spreadsheet_name: str = "Whitelist",
                                                 clear_existing: bool = True) -> bool:
-        """
-        Синхронизация whitelist и конференций из Google Sheets
-
-        Args:
-            spreadsheet_name: Название Google Sheets таблицы
-            clear_existing: Очищать ли существующие данные перед синхронизацией
-                           (True - полная перезагрузка, False - добавление новых)
-        """
+        """Синхронизация whitelist и конференций из Google Sheets"""
         if self.pool is None:
             logger.error("Database pool not initialized")
             return False
@@ -1694,7 +1702,6 @@ class Database:
             worksheets = sh.worksheets()
 
             async with self.pool.acquire() as conn:
-                # Очищаем старые данные только если нужно
                 if clear_existing:
                     await conn.execute(f"TRUNCATE TABLE {self.db_schema_config}.whitelist CASCADE")
                     await conn.execute(f"TRUNCATE TABLE {self.db_schema}.user_conferences CASCADE")
@@ -1708,13 +1715,9 @@ class Database:
                 for worksheet in worksheets:
                     sheet_name = worksheet.title
                     records = worksheet.get_all_records()
-
                     if not records:
                         continue
 
-                    # ============================================
-                    # ЛИСТ "Общая информация" - компании
-                    # ============================================
                     if sheet_name == "Общая информация":
                         for record in records:
                             company_name = None
@@ -1740,11 +1743,6 @@ class Database:
                         logger.info(f"✅ Synced {total_companies} companies from 'Общая информация'")
                         continue
 
-                    # ============================================
-                    # ОСТАЛЬНЫЕ ЛИСТЫ - конференции и пользователи
-                    # ============================================
-
-                    # Получаем информацию о конференции
                     conference_info = {}
                     for row in records:
                         if row.get('Название конференции'):
@@ -1779,36 +1777,34 @@ class Database:
                     except Exception as e:
                         logger.warning(f"Could not get hotel data for {sheet_name}: {e}")
 
-                    # Сохраняем конференцию
                     await conn.execute(f"""
-                                            INSERT INTO {self.db_schema_config}.conferences 
-                                            (conference_name, start_date, end_date, city, bot_link, additional_info, sheet_name, hotel, hotel_address, site_url)
-                                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                                            ON CONFLICT (conference_name) DO UPDATE
-                                            SET start_date = EXCLUDED.start_date,
-                                                end_date = EXCLUDED.end_date,
-                                                city = EXCLUDED.city,
-                                                bot_link = EXCLUDED.bot_link,
-                                                additional_info = EXCLUDED.additional_info,
-                                                sheet_name = EXCLUDED.sheet_name,
-                                                hotel = EXCLUDED.hotel,
-                                                hotel_address = EXCLUDED.hotel_address,
-                                                site_url = EXCLUDED.site_url
-                                        """,
-                                       conference_info['conference_name'],
-                                       conference_info['conf_start'],
-                                       conference_info['conf_end'],
-                                       conference_info['city'],
-                                       conference_info['bot_link'],
-                                       conference_info['additional_info'],
-                                       sheet_name,
-                                       hotel,
-                                       hotel_address,
-                                       site_url
-                                       )
+                        INSERT INTO {self.db_schema_config}.conferences 
+                        (conference_name, start_date, end_date, city, bot_link, additional_info, sheet_name, hotel, hotel_address, site_url)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                        ON CONFLICT (conference_name) DO UPDATE
+                        SET start_date = EXCLUDED.start_date,
+                            end_date = EXCLUDED.end_date,
+                            city = EXCLUDED.city,
+                            bot_link = EXCLUDED.bot_link,
+                            additional_info = EXCLUDED.additional_info,
+                            sheet_name = EXCLUDED.sheet_name,
+                            hotel = EXCLUDED.hotel,
+                            hotel_address = EXCLUDED.hotel_address,
+                            site_url = EXCLUDED.site_url
+                    """,
+                       conference_info['conference_name'],
+                       conference_info['conf_start'],
+                       conference_info['conf_end'],
+                       conference_info['city'],
+                       conference_info['bot_link'],
+                       conference_info['additional_info'],
+                       sheet_name,
+                       hotel,
+                       hotel_address,
+                       site_url
+                    )
                     total_conferences += 1
 
-                    # Обрабатываем пользователей
                     for record in records:
                         raw_username = record.get('TG_username', '').strip()
                         if not raw_username or raw_username.lower() == 'tg_username':
@@ -1818,7 +1814,6 @@ class Database:
                         if not username:
                             continue
 
-                        # Сохраняем в whitelist (только username и is_active)
                         await conn.execute(f"""
                             INSERT INTO {self.db_schema_config}.whitelist (username, is_active)
                             VALUES ($1, TRUE)
@@ -1826,7 +1821,6 @@ class Database:
                             SET is_active = TRUE
                         """, username)
 
-                        # Сохраняем конференцию пользователя
                         await conn.execute(f"""
                             INSERT INTO {self.db_schema}.user_conferences 
                             (username, conference_name, trip_start_date, trip_end_date, 
@@ -1841,34 +1835,19 @@ class Database:
                                 bot_link = EXCLUDED.bot_link,
                                 additional_info = EXCLUDED.additional_info
                         """,
-                                           username,
-                                           conference_info['conference_name'],
-                                           record.get('Дата начала поездки', ''),
-                                           record.get('Дата окончания поездки', ''),
-                                           conference_info['conf_start'],
-                                           conference_info['conf_end'],
-                                           conference_info['city'],
-                                           conference_info['bot_link'],
-                                           conference_info['additional_info']
-                                           )
+                           username,
+                           conference_info['conference_name'],
+                           record.get('Дата начала поездки', ''),
+                           record.get('Дата окончания поездки', ''),
+                           conference_info['conf_start'],
+                           conference_info['conf_end'],
+                           conference_info['city'],
+                           conference_info['bot_link'],
+                           conference_info['additional_info']
+                        )
                         total_users += 1
 
-                logger.info(
-                    f"✅ Synced {total_users} users, {total_conferences} conferences, {total_companies} companies")
-
-                # Логируем результат синхронизации
-                await self.log_user_action(
-                    user_id=0,
-                    username="system",
-                    action="whitelist_synced",
-                    details={
-                        "users": total_users,
-                        "conferences": total_conferences,
-                        "companies": total_companies,
-                        "clear_existing": clear_existing
-                    }
-                )
-
+                logger.info(f"✅ Synced {total_users} users, {total_conferences} conferences, {total_companies} companies")
                 return True
 
         except Exception as e:
@@ -1929,7 +1908,6 @@ class Database:
             logger.error(f"Error getting user active conferences: {e}")
             return []
 
-
     async def check_user_conference_access(self, username: str, conference: str) -> bool:
         """Проверить, имеет ли пользователь доступ к конкретной конференции"""
         if not username:
@@ -1950,17 +1928,7 @@ class Database:
         """Получить статус travel-заявки пользователя"""
         try:
             async with self.pool.acquire() as conn:
-                if request_type == "visa":
-                    table = f"{self.db_schema_travel}.travel_flight_request"
-                    status_col = "status"
-                elif request_type == "flight":
-                    table = f"{self.db_schema_travel}.travel_flight_request"  # временно, нужна отдельная таблица
-                    status_col = "status"
-                else:
-                    return {"status": "unknown", "details": {}}
-
-                # TODO: Добавить колонку status в таблицы
-                # Пока проверяем наличие записей
+                table = f"{self.db_schema_travel}.travel_flight_request"
                 record = await conn.fetchrow(
                     f"SELECT created_at FROM {table} WHERE username = $1 ORDER BY created_at DESC LIMIT 1",
                     username
@@ -1987,7 +1955,6 @@ class Database:
             password_hash = sha256(password.encode()).hexdigest()
 
             async with self.pool.acquire() as conn:
-                # Проверяем, существует ли уже
                 exists = await conn.fetchval(f"""
                     SELECT id FROM {self.db_schema_admin}.admin_users WHERE username = $1
                 """, username)
@@ -2002,10 +1969,10 @@ class Database:
                      can_manage_users, can_broadcast, can_view_stats, can_manage_conferences)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 """, username, password_hash, full_name, role,
-                                   perms.get('manage_users', False),
-                                   perms.get('broadcast', True),
-                                   perms.get('view_stats', True),
-                                   perms.get('manage_conferences', False))
+                   perms.get('manage_users', False),
+                   perms.get('broadcast', True),
+                   perms.get('view_stats', True),
+                   perms.get('manage_conferences', False))
 
                 return True
         except Exception as e:
@@ -2028,25 +1995,13 @@ class Database:
                 """, username, password_hash)
 
                 if admin:
-                    # Обновляем время последнего входа
                     await conn.execute(f"""
                         UPDATE {self.db_schema_admin}.admin_users 
                         SET last_login = NOW() 
                         WHERE id = $1
                     """, admin['id'])
 
-                    # Возвращаем словарь со всеми полями
-                    return {
-                        'id': admin['id'],
-                        'username': admin['username'],
-                        'full_name': admin['full_name'],
-                        'role': admin['role'],
-                        'can_manage_users': admin['can_manage_users'],
-                        'can_broadcast': admin['can_broadcast'],
-                        'can_view_stats': admin['can_view_stats'],
-                        'can_manage_conferences': admin['can_manage_conferences'],
-                        'is_active': admin['is_active']
-                    }
+                    return dict(admin)
                 return {}
         except Exception as e:
             logger.error(f"Error verifying admin: {e}")
@@ -2142,11 +2097,9 @@ class Database:
                 if not admin:
                     return False
 
-                # Админ имеет все права
                 if admin['role'] == 'admin':
                     return True
 
-                # Проверяем конкретное право
                 perm_map = {
                     'manage_users': 'can_manage_users',
                     'broadcast': 'can_broadcast',
@@ -2161,10 +2114,6 @@ class Database:
         except Exception as e:
             logger.error(f"Error checking admin permission: {e}")
             return False
-
-    # ===== МЕТОДЫ ДЛЯ УПРАВЛЕНИЯ ГРУППАМИ И ФУНКЦИЯМИ =====
-
-    # Добавить в класс Database:
 
     async def get_all_visa_requests(self) -> list:
         """Получить все визовые заявки"""
@@ -2191,7 +2140,6 @@ class Database:
         except Exception as e:
             logger.error(f"Error getting banner requests: {e}")
             return []
-
 
     async def get_all_companies_from_config(self) -> list:
         """Получить список всех компаний из конфига"""
@@ -2236,7 +2184,6 @@ class Database:
             logger.error(f"Error getting users basic: {e}")
             return []
 
-
     async def get_all_business_cards(self) -> list:
         """Получить все заявки на визитки"""
         try:
@@ -2254,16 +2201,11 @@ class Database:
         """Получить все заявки на авиабилеты"""
         try:
             async with self.pool.acquire() as conn:
-                # Если есть таблица flight_requests
-                try:
-                    rows = await conn.fetch(f"""
-                        SELECT * FROM {self.db_schema}.user_flights 
-                        ORDER BY created_at DESC
-                    """)
-                    return [dict(row) for row in rows]
-                except:
-                    # Если таблицы нет, возвращаем пустой список
-                    return []
+                rows = await conn.fetch(f"""
+                    SELECT * FROM {self.db_schema}.user_flights 
+                    ORDER BY created_at DESC
+                """)
+                return [dict(row) for row in rows]
         except Exception as e:
             logger.error(f"Error getting flight requests: {e}")
             return []
@@ -2282,13 +2224,10 @@ class Database:
             logger.error(f"Error updating visa status: {e}")
             return False
 
-    # database.py - добавить эти методы в класс Database
-
     async def get_stored_passport_data(self, user_id: int) -> dict:
         """Получить сохраненные паспортные данные пользователя"""
         try:
             async with self.pool.acquire() as conn:
-                # Создаем таблицу если нет
                 await conn.execute(f"""
                     CREATE TABLE IF NOT EXISTS {self.db_schema}.stored_passport_data (
                         id SERIAL PRIMARY KEY,
@@ -2323,17 +2262,16 @@ class Database:
         """Сохранить паспортные данные пользователя"""
         try:
             async with self.pool.acquire() as conn:
-                # Создаем таблицу если нет (уже создана в get_stored_passport_data)
                 await conn.execute(f"""
                     INSERT INTO {self.db_schema}.stored_passport_data 
                     (user_id, username, first_name, last_name, phone, passport_number, 
                      birth_date, passport_country, issue_date, expiry_date)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 """, user_id, username,
-                                   passport_data.get('first_name'), passport_data.get('last_name'),
-                                   passport_data.get('phone'), passport_data.get('passport_number'),
-                                   passport_data.get('birth_date'), passport_data.get('passport_country'),
-                                   passport_data.get('issue_date'), passport_data.get('expiry_date'))
+                   passport_data.get('first_name'), passport_data.get('last_name'),
+                   passport_data.get('phone'), passport_data.get('passport_number'),
+                   passport_data.get('birth_date'), passport_data.get('passport_country'),
+                   passport_data.get('issue_date'), passport_data.get('expiry_date'))
                 return True
         except Exception as e:
             logger.error(f"Error saving passport data: {e}")
@@ -2385,7 +2323,6 @@ class Database:
         """Обновить статус заявки на баннер"""
         try:
             async with self.pool.acquire() as conn:
-
                 await conn.execute(f"""
                     UPDATE {self.db_schema_pr}.pr_banner_requests 
                     SET status = $1, updated_at = NOW()
@@ -2400,7 +2337,6 @@ class Database:
         """Обновить статус заявки на визитки"""
         try:
             async with self.pool.acquire() as conn:
-
                 await conn.execute(f"""
                     UPDATE {self.db_schema_pr}.pr_business_cards 
                     SET status = $1, updated_at = NOW()
@@ -2410,7 +2346,6 @@ class Database:
         except Exception as e:
             logger.error(f"Error updating business card status: {e}")
             return False
-
 
     async def get_recent_broadcasts(self, limit=10) -> list:
         """Получить последние рассылки"""
@@ -2663,7 +2598,7 @@ class Database:
                 return dict(row) if row else {}
         except Exception as e:
             logger.error(f"Error getting ticket request by id: {e}")
-            return {}
+            return []
 
     async def get_all_users_with_details(self) -> list:
         """Получить всех пользователей с деталями"""
@@ -2715,21 +2650,16 @@ class Database:
             logger.error(f"Error getting all users: {e}")
             return []
 
-    # Добавьте эти методы в класс Database
-
     async def get_user_messages_by_department(self, manager_groups: list, limit: int = 100) -> list:
         """Получить сообщения пользователей, доступные для групп менеджера"""
         try:
             async with self.pool.acquire() as conn:
-                # Карта соответствия групп менеджеров и типов вопросов
-                # travel_questions, pr_questions, event_questions
                 department_map = {
                     'travel': 'travel_questions',
                     'pr': 'pr_questions',
                     'event': 'event_questions'
                 }
 
-                # Определяем, какие таблицы может видеть менеджер
                 visible_tables = []
                 for group in manager_groups:
                     if group in department_map:
@@ -2738,7 +2668,6 @@ class Database:
                 if not visible_tables:
                     return []
 
-                # Собираем вопросы из всех доступных таблиц
                 all_questions = []
                 for table in visible_tables:
                     rows = await conn.fetch(f"""
@@ -2757,7 +2686,6 @@ class Database:
                     """, limit)
                     all_questions.extend([dict(row) for row in rows])
 
-                # Также добавляем обычные сообщения из чатов
                 messages = await conn.fetch(f"""
                     SELECT 
                         m.id,
@@ -2781,10 +2709,7 @@ class Database:
                 """, limit)
 
                 all_questions.extend([dict(row) for row in messages])
-
-                # Сортируем по дате
                 all_questions.sort(key=lambda x: x['created_at'], reverse=True)
-
                 return all_questions
         except Exception as e:
             logger.error(f"Error getting messages by department: {e}")
@@ -2796,14 +2721,12 @@ class Database:
         """Переслать вопрос в другой отдел"""
         try:
             async with self.pool.acquire() as conn:
-                # Определяем таблицы
                 tables = {
                     'pr': f'{self.db_schema_pr}.pr_questions',
                     'event': f'{self.db_schema_event}.event_questions',
                     'travel': f'{self.db_schema_travel}.travel_questions'
                 }
 
-                # Получаем исходный вопрос
                 source_table = tables.get(source_department)
                 if not source_table:
                     return False
@@ -2817,7 +2740,6 @@ class Database:
                 if not question:
                     return False
 
-                # Создаем копию в таблице целевого отдела
                 target_table = tables.get(target_department)
                 if not target_table:
                     return False
@@ -2827,10 +2749,9 @@ class Database:
                     (username, user_id, category, question, created_at)
                     VALUES ($1, $2, $3, $4, NOW())
                 """, question['username'], question['user_id'],
-                                   f"shared_from_{source_department}",
-                                   f"[Переслано из {source_department}]\n\n{question['question']}")
+                   f"shared_from_{source_department}",
+                   f"[Переслано из {source_department}]\n\n{question['question']}")
 
-                # Логируем действие
                 await self.log_user_action(
                     user_id=0,
                     username=shared_by,
@@ -2841,7 +2762,6 @@ class Database:
                         "target": target_department
                     }
                 )
-
                 return True
         except Exception as e:
             logger.error(f"Error sharing question: {e}")
@@ -2889,7 +2809,6 @@ class Database:
 
                 result = dict(user)
 
-                # Конференции пользователя
                 confs = await conn.fetch(f"""
                     SELECT conference_name
                     FROM {self.db_schema}.user_conferences
@@ -2897,7 +2816,6 @@ class Database:
                 """, result['username'])
                 result['conferences'] = [c['conference_name'] for c in confs]
 
-                # Заявки на баннеры, визитки и визы
                 result['requests'] = []
                 request_tables = [
                     ('pr_banner_requests', 'Баннер'),
@@ -2931,7 +2849,6 @@ class Database:
                     except:
                         pass
 
-                # Подтягиваем полную Travel-информацию пользователя
                 travel_row = await conn.fetchrow(f"""
                     SELECT 
                         tfr.*,
@@ -2957,12 +2874,12 @@ class Database:
                 else:
                     passport_data = await self.get_stored_passport_data(user_id)
                     per_diem = await conn.fetchrow(f"""
-                                        SELECT payment_type, payment_details, status
-                                        FROM {self.db_schema_travel}.travel_per_diem_requests
-                                        WHERE user_id = $1
-                                        ORDER BY created_at DESC
-                                        LIMIT 1
-                                    """, user_id)
+                        SELECT payment_type, payment_details, status
+                        FROM {self.db_schema_travel}.travel_per_diem_requests
+                        WHERE user_id = $1
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    """, user_id)
 
                     result['travel'] = {
                         'first_name': passport_data.get('first_name'),
@@ -2987,44 +2904,37 @@ class Database:
         """Создание таблиц для менеджеров и групп"""
         try:
             async with self.pool.acquire() as conn:
-                # Таблица менеджеров
                 await conn.execute(f"""
-                                   CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.managers
-                                   (
-                                       id            SERIAL PRIMARY KEY,
-                                       username      TEXT UNIQUE NOT NULL,
-                                       password_hash TEXT        NOT NULL,
-                                       full_name     TEXT,
-                                       role          TEXT        NOT NULL DEFAULT 'manager',
-                                       is_active     BOOLEAN              DEFAULT TRUE,
-                                       created_at    TIMESTAMP            DEFAULT NOW(),
-                                       last_login    TIMESTAMP
-                                   )
-                                   """)
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.managers (
+                        id            SERIAL PRIMARY KEY,
+                        username      TEXT UNIQUE NOT NULL,
+                        password_hash TEXT        NOT NULL,
+                        full_name     TEXT,
+                        role          TEXT        NOT NULL DEFAULT 'manager',
+                        is_active     BOOLEAN              DEFAULT TRUE,
+                        created_at    TIMESTAMP            DEFAULT NOW(),
+                        last_login    TIMESTAMP
+                    )
+                """)
 
-                # Таблица групп
                 await conn.execute(f"""
-                                   CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.manager_groups
-                                   (
-                                       id          SERIAL PRIMARY KEY,
-                                       name        TEXT UNIQUE NOT NULL,
-                                       description TEXT,
-                                       created_at  TIMESTAMP DEFAULT NOW()
-                                   )
-                                   """)
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.manager_groups (
+                        id          SERIAL PRIMARY KEY,
+                        name        TEXT UNIQUE NOT NULL,
+                        description TEXT,
+                        created_at  TIMESTAMP DEFAULT NOW()
+                    )
+                """)
 
-                # Связь менеджеров с группами
                 await conn.execute(f"""
-                                   CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.manager_group_membership
-                                   (
-                                       manager_id  INTEGER REFERENCES {self.db_schema_admin}.managers (id) ON DELETE CASCADE,
-                                       group_id    INTEGER REFERENCES {self.db_schema_admin}.manager_groups (id) ON DELETE CASCADE,
-                                       assigned_at TIMESTAMP DEFAULT NOW(),
-                                       PRIMARY KEY (manager_id, group_id)
-                                   )
-                                   """)
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.manager_group_membership (
+                        manager_id  INTEGER REFERENCES {self.db_schema_admin}.managers (id) ON DELETE CASCADE,
+                        group_id    INTEGER REFERENCES {self.db_schema_admin}.manager_groups (id) ON DELETE CASCADE,
+                        assigned_at TIMESTAMP DEFAULT NOW(),
+                        PRIMARY KEY (manager_id, group_id)
+                    )
+                """)
 
-                # Добавляем базовые группы
                 base_groups = [
                     ('admin', 'Администраторы - полный доступ'),
                     ('pr', 'PR отдел - управление баннерами и визитками'),
@@ -3034,43 +2944,40 @@ class Database:
 
                 for name, desc in base_groups:
                     await conn.execute(f"""
-                                       INSERT INTO {self.db_schema_admin}.manager_groups (name, description)
-                                       VALUES ($1, $2)
-                                       ON CONFLICT (name) DO NOTHING
-                                       """, name, desc)
+                        INSERT INTO {self.db_schema_admin}.manager_groups (name, description)
+                        VALUES ($1, $2)
+                        ON CONFLICT (name) DO NOTHING
+                    """, name, desc)
 
-                # Создаем админа по умолчанию, если нет
                 from hashlib import sha256
                 admin_pass = os.getenv('ADMIN_PASSWORD', 'admin123')
                 admin_hash = sha256(admin_pass.encode()).hexdigest()
 
-                # Добавляем админа
                 admin_id = await conn.fetchval(f"""
-                                               INSERT INTO {self.db_schema_admin}.managers (username, password_hash, full_name, role)
-                                               VALUES ($1, $2, $3, $4)
-                                               ON CONFLICT (username) DO NOTHING
-                                               RETURNING id
-                                               """, 'admin', admin_hash, 'Главный администратор', 'admin')
+                    INSERT INTO {self.db_schema_admin}.managers (username, password_hash, full_name, role)
+                    VALUES ($1, $2, $3, $4)
+                    ON CONFLICT (username) DO NOTHING
+                    RETURNING id
+                """, 'admin', admin_hash, 'Главный администратор', 'admin')
 
-                # Если админ создан, добавляем его в группу admin
                 if admin_id:
                     admin_group_id = await conn.fetchval(f"""
-                                                         SELECT id
-                                                         FROM {self.db_schema_admin}.manager_groups
-                                                         WHERE name = 'admin'
-                                                         """)
+                        SELECT id
+                        FROM {self.db_schema_admin}.manager_groups
+                        WHERE name = 'admin'
+                    """)
                     if admin_group_id:
                         await conn.execute(f"""
-                                           INSERT INTO {self.db_schema_admin}.manager_group_membership (manager_id, group_id)
-                                           VALUES ($1, $2)
-                                           ON CONFLICT DO NOTHING
-                                           """, admin_id, admin_group_id)
+                            INSERT INTO {self.db_schema_admin}.manager_group_membership (manager_id, group_id)
+                            VALUES ($1, $2)
+                            ON CONFLICT DO NOTHING
+                        """, admin_id, admin_group_id)
 
-                print("✅ Managers tables created")
+                logger.info("Managers tables created")
                 return True
 
         except Exception as e:
-            print(f"Error creating managers tables: {e}")
+            logger.error(f"Error creating managers tables: {e}")
             return False
 
     async def verify_manager(self, username: str, password: str) -> dict:
@@ -3081,28 +2988,26 @@ class Database:
 
             async with self.pool.acquire() as conn:
                 manager = await conn.fetchrow(f"""
-                                              SELECT id, username, full_name, role, is_active
-                                              FROM {self.db_schema_admin}.managers
-                                              WHERE username = $1
-                                                AND password_hash = $2
-                                                AND is_active = TRUE
-                                              """, username, password_hash)
+                    SELECT id, username, full_name, role, is_active
+                    FROM {self.db_schema_admin}.managers
+                    WHERE username = $1
+                      AND password_hash = $2
+                      AND is_active = TRUE
+                """, username, password_hash)
 
                 if manager:
-                    # Получаем группы менеджера
                     groups = await conn.fetch(f"""
-                                              SELECT g.name, g.description
-                                              FROM {self.db_schema_admin}.manager_groups g
-                                                       JOIN {self.db_schema_admin}.manager_group_membership mgm ON g.id = mgm.group_id
-                                              WHERE mgm.manager_id = $1
-                                              """, manager['id'])
+                        SELECT g.name, g.description
+                        FROM {self.db_schema_admin}.manager_groups g
+                        JOIN {self.db_schema_admin}.manager_group_membership mgm ON g.id = mgm.group_id
+                        WHERE mgm.manager_id = $1
+                    """, manager['id'])
 
-                    # Обновляем время последнего входа
                     await conn.execute(f"""
-                                       UPDATE {self.db_schema_admin}.managers
-                                       SET last_login = NOW()
-                                       WHERE id = $1
-                                       """, manager['id'])
+                        UPDATE {self.db_schema_admin}.managers
+                        SET last_login = NOW()
+                        WHERE id = $1
+                    """, manager['id'])
 
                     return {
                         'id': manager['id'],
@@ -3114,9 +3019,8 @@ class Database:
                     }
                 return {}
         except Exception as e:
-            print(f"Error verifying manager: {e}")
+            logger.error(f"Error verifying manager: {e}")
             return {}
-
 
     async def add_manager(self, username: str, password: str, full_name: str = None, groups: list = None) -> bool:
         """Добавить нового менеджера"""
@@ -3125,57 +3029,54 @@ class Database:
             password_hash = sha256(password.encode()).hexdigest()
 
             async with self.pool.acquire() as conn:
-                # Добавляем менеджера
                 manager_id = await conn.fetchval(f"""
-                                                 INSERT INTO {self.db_schema_admin}.managers (username, password_hash, full_name, role)
-                                                 VALUES ($1, $2, $3, 'manager')
-                                                 RETURNING id
-                                                 """, username, password_hash, full_name)
+                    INSERT INTO {self.db_schema_admin}.managers (username, password_hash, full_name, role)
+                    VALUES ($1, $2, $3, 'manager')
+                    RETURNING id
+                """, username, password_hash, full_name)
 
                 if manager_id and groups:
-                    # Добавляем в группы
                     for group_name in groups:
                         group_id = await conn.fetchval(f"""
-                                                       SELECT id
-                                                       FROM {self.db_schema_admin}.manager_groups
-                                                       WHERE name = $1
-                                                       """, group_name)
+                            SELECT id
+                            FROM {self.db_schema_admin}.manager_groups
+                            WHERE name = $1
+                        """, group_name)
                         if group_id:
                             await conn.execute(f"""
-                                               INSERT INTO {self.db_schema_admin}.manager_group_membership (manager_id, group_id)
-                                               VALUES ($1, $2)
-                                               ON CONFLICT DO NOTHING
-                                               """, manager_id, group_id)
+                                INSERT INTO {self.db_schema_admin}.manager_group_membership (manager_id, group_id)
+                                VALUES ($1, $2)
+                                ON CONFLICT DO NOTHING
+                            """, manager_id, group_id)
 
                 return bool(manager_id)
         except Exception as e:
-            print(f"Error adding manager: {e}")
+            logger.error(f"Error adding manager: {e}")
             return False
 
     async def delete_manager(self, manager_id: int) -> bool:
         """Удалить менеджера"""
         try:
             async with self.pool.acquire() as conn:
-                # Не даем удалить последнего админа
                 admin_count = await conn.fetchval(f"""
-                                                  SELECT COUNT(*)
-                                                  FROM {self.db_schema_admin}.managers
-                                                  WHERE role = 'admin'
-                                                  """)
+                    SELECT COUNT(*)
+                    FROM {self.db_schema_admin}.managers
+                    WHERE role = 'admin'
+                """)
 
                 if admin_count <= 1:
                     manager = await conn.fetchval(f"""
-                                                  SELECT role
-                                                  FROM {self.db_schema_admin}.managers
-                                                  WHERE id = $1
-                                                  """, manager_id)
+                        SELECT role
+                        FROM {self.db_schema_admin}.managers
+                        WHERE id = $1
+                    """, manager_id)
                     if manager == 'admin':
                         return False
 
                 await conn.execute(f"DELETE FROM {self.db_schema_admin}.managers WHERE id = $1", manager_id)
                 return True
         except Exception as e:
-            print(f"Error deleting manager: {e}")
+            logger.error(f"Error deleting manager: {e}")
             return False
 
     async def get_manager_groups(self) -> list:
@@ -3183,13 +3084,13 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
-                                        SELECT *
-                                        FROM {self.db_schema_admin}.manager_groups
-                                        ORDER BY id
-                                        """)
+                    SELECT *
+                    FROM {self.db_schema_admin}.manager_groups
+                    ORDER BY id
+                """)
                 return [dict(row) for row in rows]
         except Exception as e:
-            print(f"Error getting manager groups: {e}")
+            logger.error(f"Error getting manager groups: {e}")
             return []
 
     async def update_manager_groups(self, manager_id: int, groups: list) -> bool:
@@ -3226,7 +3127,6 @@ class Database:
         """Обновление данных менеджера"""
         try:
             async with self.pool.acquire() as conn:
-                # Обновляем основные данные
                 if full_name is not None:
                     await conn.execute(f"""
                         UPDATE {self.db_schema_admin}.managers 
@@ -3241,15 +3141,12 @@ class Database:
                         WHERE id = $2
                     """, is_active, manager_id)
 
-                # Обновляем группы
                 if groups is not None:
-                    # Удаляем старые связи
                     await conn.execute(f"""
                         DELETE FROM {self.db_schema_admin}.manager_group_membership
                         WHERE manager_id = $1
                     """, manager_id)
 
-                    # Добавляем новые
                     for group_name in groups:
                         group_id = await conn.fetchval(f"""
                             SELECT id FROM {self.db_schema_admin}.manager_groups 
@@ -3300,59 +3197,19 @@ class Database:
             logger.error(f"Error getting managers: {e}")
             return []
 
-    # database.py - добавить в класс Database
-
     async def save_user_message(self, user_id: int, username: str,
                                 message_text: str = None, file_type: str = None,
                                 file_id: str = None, direction: str = 'incoming') -> int:
         """Сохранить сообщение пользователя"""
         try:
             async with self.pool.acquire() as conn:
-                # Проверяем, существует ли таблица
-                try:
-                    msg_id = await conn.fetchval(f"""
-                        INSERT INTO {self.db_schema}.user_messages 
-                        (user_id, username, direction, message_text, file_type, file_id, created_at)
-                        VALUES ($1, $2, $3, $4, $5, $6, NOW())
-                        RETURNING id
-                    """, user_id, username, direction, message_text, file_type, file_id)
-                    return msg_id
-                except Exception as e:
-                    # Если таблицы нет, создаем
-                    if 'relation' in str(e) and 'does not exist' in str(e):
-                        await conn.execute(f"""
-                            CREATE TABLE IF NOT EXISTS {self.db_schema}.user_messages (
-                                id SERIAL PRIMARY KEY,
-                                user_id BIGINT NOT NULL,
-                                username TEXT NOT NULL,
-                                manager_id INTEGER,
-                                direction TEXT NOT NULL,
-                                message_text TEXT,
-                                file_type TEXT,
-                                file_id TEXT,
-                                created_at TIMESTAMP DEFAULT NOW(),
-                                read_at TIMESTAMP,
-                                replied_at TIMESTAMP
-                            )
-                        """)
-                        await conn.execute(f"""
-                            CREATE INDEX IF NOT EXISTS idx_user_messages_user_id 
-                            ON {self.db_schema}.user_messages(user_id)
-                        """)
-                        await conn.execute(f"""
-                            CREATE INDEX IF NOT EXISTS idx_user_messages_created_at 
-                            ON {self.db_schema}.user_messages(created_at)
-                        """)
-                        # Повторная вставка
-                        msg_id = await conn.fetchval(f"""
-                            INSERT INTO {self.db_schema}.user_messages 
-                            (user_id, username, direction, message_text, file_type, file_id, created_at)
-                            VALUES ($1, $2, $3, $4, $5, $6, NOW())
-                            RETURNING id
-                        """, user_id, username, direction, message_text, file_type, file_id)
-                        return msg_id
-                    else:
-                        raise
+                msg_id = await conn.fetchval(f"""
+                    INSERT INTO {self.db_schema}.user_messages 
+                    (user_id, username, direction, message_text, file_type, file_id, created_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, NOW())
+                    RETURNING id
+                """, user_id, username, direction, message_text, file_type, file_id)
+                return msg_id
         except Exception as e:
             logger.error(f"Error saving user message: {e}")
             return 0
@@ -3361,7 +3218,6 @@ class Database:
         """Массовое сохранение сообщений за один запрос к БД"""
         if not messages_data:
             return True
-
         try:
             async with self.pool.acquire() as conn:
                 query = f"""
@@ -3375,12 +3231,10 @@ class Database:
             logger.error(f"Error bulk saving messages: {e}")
             return False
 
-    async def get_user_conversations(self) -> list:
-        """Получить список всех активных чатов (включая вопросы)"""
+    async def get_user_conversations(self, manager_id: int = None) -> list:
+        """Получить список всех активных чатов с привязкой папок текущего менеджера"""
         try:
             async with self.pool.acquire() as conn:
-
-                # Получаем последнее сообщение из чатов
                 messages = await conn.fetch(f"""
                     SELECT 
                         m.user_id,
@@ -3397,7 +3251,6 @@ class Database:
                     LEFT JOIN {self.db_schema_config}.user_profiles p ON m.user_id = p.user_id
                 """)
 
-                # Получаем последний вопрос PR
                 pr_questions = await conn.fetch(f"""
                     SELECT 
                         q.user_id,
@@ -3414,7 +3267,6 @@ class Database:
                     LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
                 """)
 
-                # Получаем последний вопрос EVENT
                 event_questions = await conn.fetch(f"""
                     SELECT 
                         q.user_id,
@@ -3431,7 +3283,6 @@ class Database:
                     LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
                 """)
 
-                # Получаем последний вопрос TRAVEL
                 travel_questions = await conn.fetch(f"""
                     SELECT 
                         q.user_id,
@@ -3448,15 +3299,22 @@ class Database:
                     LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
                 """)
 
+                folders_map = {}
+                if manager_id:
+                    folder_rows = await conn.fetch(f"""
+                        SELECT fi.user_id, fi.folder_id
+                        FROM {self.db_schema_admin}.manager_folder_items fi
+                        JOIN {self.db_schema_admin}.manager_folders f ON fi.folder_id = f.id
+                        WHERE f.manager_id = $1
+                    """, manager_id)
+                    for fr in folder_rows:
+                        folders_map.setdefault(fr['user_id'], []).append(fr['folder_id'])
+
                 all_users = {}
 
                 def update_user_dict(row, prefix=""):
                     user_id = row['user_id']
-
-                    # Берем именно последнее сообщение (а не склейку всех)
                     msg_text = row['last_message'] or ''
-
-                    # Отрезаем до 80 символов для превью
                     msg_preview = f"{prefix} {msg_text[:80]}" if prefix and msg_text else (
                         msg_text[:100] if msg_text else '')
 
@@ -3467,7 +3325,8 @@ class Database:
                             'full_name': row['full_name'],
                             'last_message_time': row['last_message_time'],
                             'last_message': msg_preview,
-                            'unread_count': row['unread_count']
+                            'unread_count': row['unread_count'],
+                            'folder_ids': folders_map.get(user_id, [])
                         }
                     else:
                         if row['last_message_time'] and (
@@ -3484,7 +3343,6 @@ class Database:
 
                 result = list(all_users.values())
                 result.sort(key=lambda x: x.get('last_message_time') or datetime.min, reverse=True)
-
                 return result
         except Exception as e:
             logger.error(f"Error getting conversations: {e}")
@@ -3494,7 +3352,6 @@ class Database:
         """Получить историю сообщений пользователя (включая вопросы)"""
         try:
             async with self.pool.acquire() as conn:
-                # Получаем обычные сообщения
                 messages = await conn.fetch(f"""
                     SELECT 
                         id, user_id, username, manager_id, direction, 
@@ -3504,7 +3361,6 @@ class Database:
                     WHERE user_id = $1
                 """, user_id)
 
-                # Получаем PR вопросы
                 pr_questions = await conn.fetch(f"""
                     SELECT 
                         id, user_id, username, NULL as manager_id,
@@ -3516,7 +3372,6 @@ class Database:
                     WHERE user_id = $1
                 """, user_id)
 
-                # Получаем EVENT вопросы
                 event_questions = await conn.fetch(f"""
                     SELECT 
                         id, user_id, username, NULL as manager_id,
@@ -3528,7 +3383,6 @@ class Database:
                     WHERE user_id = $1
                 """, user_id)
 
-                # Получаем TRAVEL вопросы
                 travel_questions = await conn.fetch(f"""
                     SELECT 
                         id, user_id, username, NULL as manager_id,
@@ -3540,7 +3394,6 @@ class Database:
                     WHERE user_id = $1
                 """, user_id)
 
-                # Объединяем все
                 all_messages = []
                 for row in messages:
                     msg = dict(row)
@@ -3553,9 +3406,7 @@ class Database:
                 for row in travel_questions:
                     all_messages.append(dict(row))
 
-                # Сортируем по времени
                 all_messages.sort(key=lambda x: x['created_at'], reverse=True)
-
                 return all_messages[:limit]
         except Exception as e:
             logger.error(f"Error getting messages: {e}")

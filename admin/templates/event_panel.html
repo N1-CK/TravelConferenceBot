@@ -261,11 +261,15 @@
         </div>
     </div>
 
-    <!-- Ticket Requests Table -->
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-ticket"></i> {{ get_text('ticket_requests') }}</span>
-            <div class="float-end">
+            <div class="float-end d-flex gap-2">
+                <!-- Кнопка экспорта в XLSX -->
+                <a href="{{ url_for('api_export_tickets') }}" class="btn btn-sm btn-outline-success" title="Выгрузить в Excel">
+                    <i class="bi bi-file-earmark-excel"></i> Экспорт в Excel
+                </a>
+
                 <div class="btn-group btn-group-sm" role="group">
                     <button type="button" class="btn btn-outline-secondary filter-btn active" data-status="all">{{ get_text('all_statuses') }}</button>
                     <button type="button" class="btn btn-outline-warning filter-btn" data-status="pending">{{ get_text('status_pending_event') }}</button>
@@ -315,7 +319,9 @@
                             <td class="t-col-hide">{{ req.email or '-' }}</td>
                             <td class="t-col-hide">{{ req.phone or '-' }}</td>
                             <td class="t-col-hide">{{ req.country or '-' }}</td>
-                            <td class="t-col-hide">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</td>
+                            <td class="t-col-hide" data-order="{{ req.created_at.strftime('%Y-%m-%d %H:%M:%S') if req.created_at else '' }}">
+                                {{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}
+                            </td>
 
                             <!-- Статус + Мобильный аккордеон с полями -->
                             <td class="t-col-status">

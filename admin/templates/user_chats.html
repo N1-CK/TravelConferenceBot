@@ -6,10 +6,77 @@
 <style>
     /* Десктопная разметка */
     .chat-container { display: flex; height: calc(100vh - 150px); background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.08); position: relative; }
-    .chat-sidebar { width: 320px; border-right: 1px solid #dee2e6; overflow-y: auto; background: #f8f9fa; }
+    .chat-sidebar { width: 340px; border-right: 1px solid #dee2e6; overflow-y: auto; background: #f8f9fa; display: flex; flex-direction: column; }
     .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; background: white; }
-    .chat-header { padding: 15px 20px; border-bottom: 1px solid #dee2e6; background: white; display: flex; align-items: center; justify-content: space-between; }
+    .chat-header { padding: 12px 20px; border-bottom: 1px solid #dee2e6; background: white; display: flex; align-items: center; justify-content: space-between; }
     .chat-messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px; background: #f8f9fa; }
+
+    /* Панель папок в стиле Telegram */
+    .telegram-folders-bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        background: #f1f5f9;
+        border-bottom: 1px solid #e2e8f0;
+        overflow-x: auto;
+        white-space: nowrap;
+        scrollbar-width: thin;
+        flex-shrink: 0;
+    }
+    .telegram-folders-bar::-webkit-scrollbar { height: 4px; }
+    .telegram-folders-bar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+    .folder-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        cursor: pointer;
+        background: #ffffff;
+        color: #475569;
+        border: 1px solid #cbd5e1;
+        transition: all 0.2s ease;
+        user-select: none;
+    }
+    .folder-pill:hover {
+        background: #e2e8f0;
+        color: #1e293b;
+    }
+    .folder-pill.active {
+        background: #667eea;
+        color: #ffffff;
+        border-color: #667eea;
+        box-shadow: 0 2px 6px rgba(102, 126, 234, 0.35);
+    }
+    .folder-pill .badge {
+        font-size: 0.68rem;
+        padding: 2px 6px;
+        border-radius: 10px;
+    }
+    .folder-pill.active .badge {
+        background: #ffffff !important;
+        color: #667eea !important;
+    }
+    .btn-add-folder {
+        padding: 4px 8px;
+        border-radius: 50%;
+        border: 1px dashed #94a3b8;
+        background: transparent;
+        color: #64748b;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+    }
+    .btn-add-folder:hover {
+        background: #e2e8f0;
+        color: #667eea;
+    }
 
     /* Поле ввода */
     .chat-input { padding: 14px 20px; border-top: 1px solid #dee2e6; background: #ffffff; }
@@ -276,7 +343,6 @@
 
     /* ПОЛНАЯ АДАПТАЦИЯ ДЛЯ СМАРТФОНОВ (<= 768px) */
     @media (max-width: 768px) {
-        /* Убираем fixed с body, фиксируем высоту экрана без поломки touch-событий */
         html, body {
             height: 100% !important;
             min-height: 100% !important;
@@ -284,7 +350,6 @@
             position: relative !important;
         }
 
-        /* Родительская колонка контента: ровно под высоту видимой области мобильного браузера */
         .main-content {
             padding: 0 !important;
             height: calc(100dvh - 56px) !important;
@@ -295,7 +360,6 @@
             flex-direction: column !important;
         }
 
-        /* Фиксируем шапку с вкладками вверху */
         .chat-nav-tabs-wrapper {
             flex-shrink: 0 !important;
             padding: 6px 8px 0 8px !important;
@@ -306,7 +370,6 @@
             border-bottom: none !important;
         }
 
-        /* Контейнер вкладки чата занимает всё оставшееся пространство */
         #chatsTab {
             flex: 1 1 0% !important;
             min-height: 0 !important;
@@ -316,7 +379,6 @@
             overflow: hidden !important;
         }
 
-        /* Контейнер чатов */
         .chat-container {
             flex: 1 1 0% !important;
             min-height: 0 !important;
@@ -330,7 +392,6 @@
             overflow: hidden !important;
         }
 
-        /* Сайдбар со списком чатов: включен touch-скролл и видимый скроллбар */
         .chat-sidebar {
             width: 100% !important;
             min-width: 100% !important;
@@ -352,7 +413,6 @@
             padding-bottom: 20px;
         }
 
-        /* Окно диалога */
         .chat-main {
             display: none !important;
             width: 100% !important;
@@ -364,7 +424,6 @@
             position: relative !important;
         }
 
-        /* Когда открыт чат: прячем список, показываем диалог */
         .chat-container.mobile-chat-open .chat-sidebar {
             display: none !important;
         }
@@ -386,7 +445,6 @@
             z-index: 10;
         }
 
-        /* Лента сообщений: жестко изолированный скроллируемый контейнер */
         .chat-messages {
             flex: 1 1 0% !important;
             min-height: 0 !important;
@@ -402,7 +460,6 @@
             padding: 8px 12px;
         }
 
-        /* Строка ввода сообщений: всегда зафиксирована внизу экрана */
         .chat-input {
             flex-shrink: 0 !important;
             padding: 8px 10px 12px 10px !important;
@@ -416,7 +473,7 @@
         }
 
         .chat-textarea {
-            font-size: 16px !important; /* Отключает принудительный зум в мобильных браузерах */
+            font-size: 16px !important;
             padding: 5px 4px !important;
         }
 
@@ -459,7 +516,6 @@
             padding: 8px;
         }
 
-        /* Принудительное включение отображения скроллбаров для мобилок */
         .chat-sidebar::-webkit-scrollbar,
         #conversationsList::-webkit-scrollbar,
         .chat-messages::-webkit-scrollbar {
@@ -490,15 +546,45 @@
 
 <div id="chatsTab">
     <div class="chat-container" id="chatContainer">
-        <!-- Список чатов -->
+        <!-- Список чатов с папками -->
         <div class="chat-sidebar" id="chatSidebar">
+            <!-- Telegram-панель папок -->
+            <div class="telegram-folders-bar" id="foldersBar">
+                <div class="folder-pill active" data-folder="all" onclick="selectFolder('all')">
+                    <span>Все</span>
+                    <span class="badge bg-secondary" id="count-all">{{ conversations|length }}</span>
+                </div>
+                <div class="folder-pill" data-folder="unread" onclick="selectFolder('unread')">
+                    <span>Непрочитанные</span>
+                    <span class="badge bg-danger" id="count-unread">0</span>
+                </div>
+
+                <!-- Пользовательские папки менеджера -->
+                <div id="customFoldersList" class="d-inline-flex gap-1">
+                    {% for f in folders %}
+                    <div class="folder-pill" data-folder="{{ f.id }}" onclick="selectFolder({{ f.id }})" oncontextmenu="handleFolderContextMenu(event, {{ f.id }}, '{{ f.name }}')">
+                        <span>{{ f.name }}</span>
+                        <span class="badge bg-secondary">{{ f.count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <button type="button" class="btn-add-folder" onclick="openCreateFolderModal()" title="Создать новую папку">
+                    <i class="bi bi-plus-lg"></i>
+                </button>
+            </div>
+
             <div class="p-3 border-bottom">
-                <h6 class="mb-2">{{ get_text('chats_tab') }}</h6>
                 <input type="text" id="chatSearch" class="form-control form-control-sm" placeholder="{{ get_text('search_chat_placeholder') }}" onkeyup="filterChats()">
             </div>
             <div id="conversationsList">
                 {% for conv in conversations %}
-                <div class="conversation-item" data-user-id="{{ conv.user_id }}" data-search="{{ conv.full_name or conv.username }}" onclick="loadChat({{ conv.user_id }})">
+                <div class="conversation-item"
+                     data-user-id="{{ conv.user_id }}"
+                     data-search="{{ conv.full_name or conv.username }}"
+                     data-unread="{{ conv.unread_count }}"
+                     data-folders='{{ conv.folder_ids | default([]) | tojson }}'
+                     onclick="loadChat({{ conv.user_id }})">
                     <div class="d-flex align-items-center">
                         <div class="conversation-avatar me-3">{{ (conv.full_name or conv.username or '?')[0]|upper }}</div>
                         <div class="flex-grow-1" style="min-width: 0;">
@@ -518,7 +604,6 @@
         <div class="chat-main" id="chatMain">
             <div class="chat-header" id="chatHeader">
                 <div class="d-flex align-items-center" style="min-width: 0;">
-                    <!-- Кнопка возврата назад к списку чатов на смартфонах -->
                     <button type="button" class="mobile-chat-back-btn" onclick="event.stopPropagation(); backToChatsList();" title="Назад к чатам">
                         <i class="bi bi-arrow-left"></i>
                     </button>
@@ -528,7 +613,10 @@
                         <small class="text-muted" id="currentUserInfo"></small>
                     </div>
                 </div>
-                <div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="btnManageChatFolders" style="display: none;" onclick="openChatFoldersModal()" title="Настроить папки чата">
+                        <i class="bi bi-folder-plus me-1"></i> <span class="d-none d-md-inline">Папки</span>
+                    </button>
                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" onclick="currentUserId && showUserCard(currentUserId)" title="{{ get_text('user_details') }}">
                         <i class="bi bi-info-lg"></i>
                     </button>
@@ -702,7 +790,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('close') }}</button>
-                <button type="button" class="btn btn-primary" onclick="sendMessageToCurrentUserInModal()">
+                <button type="button" class="btn btn-primary" onclick="submitAnswer()">
                     <i class="bi bi-chat"></i> {{ get_text('send_message') }}
                 </button>
             </div>
@@ -726,6 +814,45 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('btn_cancel') }}</button>
                 <button type="button" class="btn btn-primary" onclick="submitForward()">{{ get_text('forward_btn') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модалка создания папки -->
+<div class="modal fade" id="createFolderModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title">Создать папку</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label small text-muted">Название папки</label>
+                <input type="text" id="newFolderNameInput" class="form-control" placeholder="Например: VIP, Срочно, PR...">
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="submitCreateFolder()">Создать</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модалка добавления чата в папки -->
+<div class="modal fade" id="chatFoldersModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title">Папки чата</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-muted small mb-2">Выберите, в каких ваших папках будет находиться этот пользователь:</div>
+                <div id="chatFoldersCheckboxesList"></div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-primary w-100" data-bs-dismiss="modal">Готово</button>
             </div>
         </div>
     </div>
@@ -774,14 +901,15 @@
     let renderedMessageUids = new Set();
     let isPolling = false;
     let chatPollTimer = null;
-    let sidebarPollTimer = null;
     let isScrolledToBottom = true;
     let isUploadingFile = false;
-
     let selectedFilesQueue = [];
 
+    let currentActiveFolder = 'all';
+    let managerFoldersCache = [];
+
     const urlParams = new URLSearchParams(window.location.search);
-    const openUserId = urlParams.get('open');
+    const openUserId = urlParams.get('open') || urlParams.get('user');
 
     const messagesDiv = document.getElementById('chatMessages');
     const replyMessageInput = document.getElementById('replyMessage');
@@ -797,6 +925,180 @@
             loadChat(parseInt(openUserId));
         }, 500);
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        recalcUnreadCount();
+        fetchFolders();
+    });
+
+    function recalcUnreadCount() {
+        let unreadTotal = 0;
+        document.querySelectorAll('.conversation-item').forEach(item => {
+            const unread = parseInt(item.getAttribute('data-unread') || '0');
+            unreadTotal += unread;
+        });
+        const unreadBadge = document.getElementById('count-unread');
+        if (unreadBadge) unreadBadge.textContent = unreadTotal;
+    }
+
+    // ============================================
+    // ЛОГИКА ПАПОК В СТИЛЕ TELEGRAM
+    // ============================================
+
+    async function fetchFolders() {
+        try {
+            const resp = await fetch('/api/folders');
+            if (resp.ok) {
+                managerFoldersCache = await resp.json();
+                renderFoldersBar();
+            }
+        } catch (e) {
+            console.error('Error loading folders:', e);
+        }
+    }
+
+    function renderFoldersBar() {
+        const wrap = document.getElementById('customFoldersList');
+        if (!wrap) return;
+
+        wrap.innerHTML = managerFoldersCache.map(f => `
+            <div class="folder-pill ${currentActiveFolder == f.id ? 'active' : ''}"
+                 data-folder="${f.id}"
+                 onclick="selectFolder(${f.id})"
+                 oncontextmenu="handleFolderContextMenu(event, ${f.id}, '${escapeHtml(f.name)}')">
+                <span>${escapeHtml(f.name)}</span>
+                <span class="badge bg-secondary">${f.count || 0}</span>
+            </div>
+        `).join('');
+    }
+
+    function selectFolder(folderId) {
+        currentActiveFolder = folderId;
+        document.querySelectorAll('.telegram-folders-bar .folder-pill').forEach(el => {
+            const fid = el.getAttribute('data-folder');
+            el.classList.toggle('active', fid == folderId.toString());
+        });
+        filterChats();
+    }
+
+    function openCreateFolderModal() {
+        const input = document.getElementById('newFolderNameInput');
+        input.value = '';
+        const modal = new bootstrap.Modal(document.getElementById('createFolderModal'));
+        modal.show();
+        setTimeout(() => input.focus(), 300);
+    }
+
+    async function submitCreateFolder() {
+        const input = document.getElementById('newFolderNameInput');
+        const name = input.value.trim();
+        if (!name) return;
+
+        try {
+            const resp = await fetch('/api/folders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name })
+            });
+            if (resp.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('createFolderModal')).hide();
+                await fetchFolders();
+                if (managerFoldersCache.length > 0) {
+                    selectFolder(managerFoldersCache[managerFoldersCache.length - 1].id);
+                }
+            }
+        } catch (e) {
+            alert('Ошибка при создании папки');
+        }
+    }
+
+    function handleFolderContextMenu(event, folderId, folderName) {
+        event.preventDefault();
+        if (confirm(`Удалить папку "${folderName}"? Сами диалоги удалены не будут.`)) {
+            fetch(`/api/folders/${folderId}`, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(() => {
+                    if (currentActiveFolder == folderId) {
+                        selectFolder('all');
+                    }
+                    fetchFolders();
+                    updateSidebar();
+                });
+        }
+    }
+
+    function openChatFoldersModal() {
+        if (!currentUserId) return;
+        const listDiv = document.getElementById('chatFoldersCheckboxesList');
+        if (!managerFoldersCache.length) {
+            listDiv.innerHTML = '<div class="text-muted small">У вас пока нет папок. Создайте их кнопкой "+" в панели над чатами.</div>';
+            new bootstrap.Modal(document.getElementById('chatFoldersModal')).show();
+            return;
+        }
+
+        const convItem = document.querySelector(`.conversation-item[data-user-id="${currentUserId}"]`);
+        const userFolders = JSON.parse(convItem?.getAttribute('data-folders') || '[]');
+
+        listDiv.innerHTML = managerFoldersCache.map(f => {
+            const isChecked = userFolders.includes(f.id) ? 'checked' : '';
+            return `
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="chkFolder_${f.id}" ${isChecked} onchange="toggleFolderForCurrentUser(${f.id}, this.checked)">
+                    <label class="form-check-label small fw-semibold" for="chkFolder_${f.id}">
+                        ${escapeHtml(f.name)}
+                    </label>
+                </div>
+            `;
+        }).join('');
+
+        new bootstrap.Modal(document.getElementById('chatFoldersModal')).show();
+    }
+
+    async function toggleFolderForCurrentUser(folderId, isChecked) {
+        if (!currentUserId) return;
+        try {
+            const resp = await fetch(`/api/folders/${folderId}/toggle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: currentUserId })
+            });
+            const data = await resp.json();
+            if (data && data.user_folders !== undefined) {
+                const convItem = document.querySelector(`.conversation-item[data-user-id="${currentUserId}"]`);
+                if (convItem) {
+                    convItem.setAttribute('data-folders', JSON.stringify(data.user_folders));
+                }
+                await fetchFolders();
+                filterChats();
+            }
+        } catch (e) {
+            console.error('Error toggling folder item:', e);
+        }
+    }
+
+    function filterChats() {
+        const searchVal = document.getElementById('chatSearch').value.toLowerCase();
+
+        document.querySelectorAll('.conversation-item').forEach(item => {
+            const text = (item.getAttribute('data-search') || '').toLowerCase();
+            const unread = parseInt(item.getAttribute('data-unread') || '0');
+            const folders = JSON.parse(item.getAttribute('data-folders') || '[]');
+
+            let matchesFolder = true;
+            if (currentActiveFolder === 'unread') {
+                matchesFolder = unread > 0;
+            } else if (currentActiveFolder !== 'all') {
+                matchesFolder = folders.includes(Number(currentActiveFolder));
+            }
+
+            const matchesSearch = text.includes(searchVal);
+            item.style.display = (matchesFolder && matchesSearch) ? 'block' : 'none';
+        });
+    }
+
+    // ============================================
+    // ДИАЛОГИ, ФАЙЛЫ, ЧАТЫ
+    // ============================================
 
     function backToChatsList(e) {
         if (e) {
@@ -873,13 +1175,6 @@
         new bootstrap.Modal(document.getElementById('imageModal')).show();
     }
 
-    function getSelectionStart() { return replyMessageInput.selectionStart; }
-    function getSelectionEnd() { return replyMessageInput.selectionEnd; }
-    function setSelectionRange(start, end) {
-        replyMessageInput.setSelectionRange(start, end);
-        replyMessageInput.focus();
-    }
-
     function wrapChatText(openTag, closeTag) {
         const start = replyMessageInput.selectionStart;
         const end = replyMessageInput.selectionEnd;
@@ -911,7 +1206,8 @@
         const newText = replyMessageInput.value.substring(0, start) + linkText + replyMessageInput.value.substring(start);
         replyMessageInput.value = newText;
         const newPos = start + linkText.length;
-        setSelectionRange(newPos, newPos);
+        replyMessageInput.setSelectionRange(newPos, newPos);
+        replyMessageInput.focus();
         updateChatPreview();
     }
 
@@ -1104,11 +1400,9 @@
             header.dataset.hasUserCardListener = 'true';
             header.style.cursor = 'pointer';
             header.addEventListener('click', function(e) {
-                // Если кликнули по кнопке назад или внутри нее — игнорируем
-                if (e.target.closest('.mobile-chat-back-btn')) {
+                if (e.target.closest('.mobile-chat-back-btn') || e.target.closest('#btnManageChatFolders')) {
                     return;
                 }
-                // Если карточка уже открыта или клик был внутри самой карточки/кнопок внутри шапки
                 if (currentUserId && !document.getElementById('userInfoCard').contains(e.target)) {
                     showUserCard(currentUserId);
                 }
@@ -1143,7 +1437,6 @@
     function scrollToBottomForce(smooth = false) {
         if (!messagesDiv) return;
         requestAnimationFrame(() => {
-            // Листаем сам контейнер сообщений
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
             if (smooth) {
                 messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
@@ -1157,7 +1450,6 @@
             return;
         }
 
-        // Переключение экрана чата на смартфонах
         const chatContainer = document.getElementById('chatContainer');
         if (chatContainer) {
             chatContainer.classList.add('mobile-chat-open');
@@ -1180,6 +1472,7 @@
                 if (item.dataset.userId == userId) item.classList.add('active');
             });
 
+            document.getElementById('btnManageChatFolders').style.display = 'inline-block';
             restoreDraft(userId);
         }
 
@@ -1255,7 +1548,6 @@
                             const isSingle = msg.files.length === 1;
 
                             content += `<div class="tg-files-wrapper mb-1">`;
-
                             content += `<div class="tg-images-grid ${isSingle ? 'single' : 'multi'}">`;
                             msg.files.forEach((fId) => {
                                 content += `
@@ -1309,7 +1601,6 @@
 
             if (!isPollingReq) {
                 closeUserCard();
-
                 scrollToBottomForce(false);
                 setTimeout(() => scrollToBottomForce(false), 60);
                 setTimeout(() => scrollToBottomForce(false), 200);
@@ -1326,6 +1617,8 @@
                     if (convItem) {
                         const badge = convItem.querySelector('.unread-badge');
                         if (badge) badge.remove();
+                        convItem.setAttribute('data-unread', '0');
+                        recalcUnreadCount();
                     }
                 }
             }
@@ -1503,7 +1796,12 @@
                 let previewMsg = escapeHtml(cleanMsg);
 
                 html += `
-                <div class="conversation-item ${isActive}" data-user-id="${conv.user_id}" data-search="${displayName}" onclick="loadChat(${conv.user_id})">
+                <div class="conversation-item ${isActive}"
+                     data-user-id="${conv.user_id}"
+                     data-search="${displayName}"
+                     data-unread="${conv.unread_count}"
+                     data-folders='${JSON.stringify(conv.folder_ids || [])}'
+                     onclick="loadChat(${conv.user_id})">
                     <div class="d-flex align-items-center">
                         <div class="conversation-avatar me-3">${(conv.full_name || conv.username || '?')[0].toUpperCase()}</div>
                         <div class="flex-grow-1" style="min-width: 0;">
@@ -1520,6 +1818,7 @@
                 </div>`;
             });
             listDiv.innerHTML = html;
+            recalcUnreadCount();
             filterChats();
         } catch (e) {}
         setTimeout(updateSidebar, 5000);
@@ -1530,14 +1829,6 @@
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
-    }
-
-    function filterChats() {
-        const val = document.getElementById('chatSearch').value.toLowerCase();
-        document.querySelectorAll('.conversation-item').forEach(item => {
-            const text = item.getAttribute('data-search').toLowerCase();
-            item.style.display = text.includes(val) ? 'block' : 'none';
-        });
     }
 
     function switchTab(tab) {
@@ -1711,21 +2002,6 @@
             showToast(locales.networkError, 'danger');
         } finally {
             if (submitBtn) submitBtn.disabled = false;
-        }
-    }
-
-    if (window.location.search.includes('user=')) {
-        const urlParams = new URLSearchParams(window.location.search);
-        const userId = urlParams.get('user');
-        if (userId) {
-            window.location.href = `/user_chats?open=${userId}`;
-        }
-    }
-
-    function sendMessageToCurrentUserInModal() {
-        const userId = document.getElementById('replyUserId').value;
-        if (userId) {
-            window.location.href = `/user_chats?user=${userId}`;
         }
     }
 
