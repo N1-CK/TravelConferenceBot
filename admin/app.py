@@ -1171,6 +1171,14 @@ def api_toggle_chat_archive(user_id):
     is_archived = run_async(db.toggle_chat_archive(manager_id, user_id))
     return jsonify({'success': True, 'is_archived': is_archived})
 
+@app.route('/api/chat/<int:user_id>/toggle_mute', methods=['POST'])
+@login_required
+def api_toggle_chat_mute(user_id):
+    manager_id = session.get('manager_id', 0)
+    is_muted = run_async(db.toggle_chat_mute(manager_id, user_id))
+    return jsonify({'success': True, 'is_muted': is_muted})
+
+
 @app.route('/api/folders', methods=['GET'])
 @login_required
 def api_get_folders():

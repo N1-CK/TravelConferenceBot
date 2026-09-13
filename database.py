@@ -450,6 +450,15 @@ class Database:
                         archived_at TIMESTAMP DEFAULT NOW(),
                         PRIMARY KEY (manager_id, user_id)
                     );
+                    ''',
+
+                    f'''
+                    CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.manager_muted_chats (
+                        manager_id INTEGER NOT NULL,
+                        user_id BIGINT NOT NULL,
+                        muted_at TIMESTAMP DEFAULT NOW(),
+                        PRIMARY KEY (manager_id, user_id)
+                    );
                     '''
                 ]
 
@@ -3308,6 +3317,31 @@ class Database:
             logger.error(f"Error bulk saving messages: {e}")
             return False
 
+    async def toggle_chat_mute(self, manager_id: int, user_id: int) -> bool:
+        """Переключить статус отключения уведомлений (mute/unmute) для менеджера"""
+        try:
+            async with self.pool.acquire() as conn:
+                exists = await conn.fetchval(f"""
+                    SELECT 1 FROM {self.db_schema_admin}.manager_muted_chats
+                    WHERE manager_id = $1 AND user_id = $2
+                """, manager_id, user_id)
+                if exists:
+                    await conn.execute(f"""
+                        DELETE FROM {self.db_schema_admin}.manager_muted_chats
+                        WHERE manager_id = $1 AND user_id = $2
+                    """, manager_id, user_id)
+                    return False
+                else:
+                    await conn.execute(f"""
+                        INSERT INTO {self.db_schema_admin}.manager_muted_chats (manager_id, user_id)
+                        VALUES ($1, $2)
+                        ON CONFLICT DO NOTHING
+                    """, manager_id, user_id)
+                    return True
+        except Exception as e:
+            logger.error(f"Error toggling chat mute: {e}")
+            return False
+
     async def get_user_conversations(self, manager_id: int = None) -> list:
         """Получить список всех активных чатов с привязкой папок текущего менеджера"""
         try:
@@ -3390,6 +3424,7 @@ class Database:
                 all_users = {}
                 archived_set = set()
                 manual_unread_set = set()
+                muted_set = set()
                 if manager_id:
                     # Загружаем архивированные чаты менеджера
                     arch_rows = await conn.fetch(f"""
@@ -3402,6 +3437,11 @@ class Database:
                         SELECT user_id FROM {self.db_schema_admin}.manager_unread_chats WHERE manager_id = $1
                     """, manager_id)
                     manual_unread_set = {r['user_id'] for r in unr_rows}
+
+                    mute_rows = await conn.fetch(f"""
+                            SELECT user_id FROM {self.db_schema_admin}.manager_muted_chats WHERE manager_id = $1
+                        """, manager_id)
+                    muted_set = {r['user_id'] for r in mute_rows}
 
                 def update_user_dict(row, prefix=""):
                     user_id = row['user_id']
@@ -3422,6 +3462,7 @@ class Database:
                             'unread_count': calculated_unread,
                             'is_manual_unread': is_manual_unread,
                             'is_archived': user_id in archived_set,
+                            'is_muted': user_id in muted_set,
                             'folder_ids': folders_map.get(user_id, [])
                         }
                     else:

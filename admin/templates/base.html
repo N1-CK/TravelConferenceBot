@@ -528,7 +528,7 @@
                     if (!isInitialNotificationsLoad && conv.unread_count > prevCount) {
                         const isCurrentlyChatting = (typeof currentUserId !== 'undefined' && currentUserId === conv.user_id && !document.hidden);
 
-                        if (!isCurrentlyChatting) {
+                        if (!isCurrentlyChatting && !conv.is_muted) {
                             showToast(`Новое сообщение от @${conv.username}`, 'info');
                             playNotificationBeep();
 
