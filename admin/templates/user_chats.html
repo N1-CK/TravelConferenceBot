@@ -331,28 +331,163 @@
 
     /* Адаптив для смартфонов */
     @media (max-width: 768px) {
-        html, body { height: 100% !important; min-height: 100% !important; overflow: hidden !important; position: relative !important; }
-        .main-content { padding: 0 !important; height: calc(100vh - 56px) !important; min-height: 0 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; }
-        .chat-nav-tabs-wrapper { flex-shrink: 0 !important; padding: 6px 8px 0 8px !important; background: #f0f2f5 !important; margin-bottom: 0 !important; }
-        .chat-nav-tabs-wrapper .nav-tabs { border-bottom: none !important; }
-        #chatsTab { flex: 1 1 0% !important; min-height: 0 !important; height: 100% !important; display: flex !important; flex-direction: column !important; overflow: hidden !important; }
-        .chat-container { flex: 1 1 0% !important; min-height: 0 !important; height: 100% !important; border-radius: 0 !important; box-shadow: none !important; display: flex !important; position: relative !important; overflow: hidden !important; }
-        .chat-sidebar { width: 100% !important; min-width: 100% !important; border-right: none !important; height: 100% !important; display: flex !important; flex-direction: column !important; overflow-y: scroll !important; -webkit-overflow-scrolling: touch !important; }
-        #conversationsList { flex: 1 1 0% !important; min-height: 0 !important; overflow-y: scroll !important; -webkit-overflow-scrolling: touch !important; padding-bottom: 20px; }
-        .chat-main { display: none !important; width: 100% !important; min-width: 100% !important; height: 100% !important; flex: 1 1 0% !important; min-height: 0 !important; flex-direction: column !important; position: relative !important; }
+        /* Общая высота страницы — dynamic viewport */
+        html, body {
+            height: 100dvh !important;
+            max-height: 100dvh !important;
+            overflow: hidden !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        /* Вкладки сверху — фиксированной высоты */
+        .chat-nav-tabs-wrapper {
+            flex-shrink: 0 !important;
+            padding: 4px 8px 0 8px !important;
+            background: #f0f2f5 !important;
+            margin-bottom: 0 !important;
+        }
+        .chat-nav-tabs-wrapper .nav-tabs {
+            border-bottom: none !important;
+            margin-bottom: 0 !important;
+        }
+
+        /* Главный контейнер вкладки Чаты — вычитаем навбар (56px) и табы (44px) */
+        #chatsTab {
+            display: flex !important;
+            flex-direction: column !important;
+            height: calc(100dvh - 56px - 44px) !important;
+            max-height: calc(100dvh - 56px - 44px) !important;
+            min-height: 0 !important;
+            overflow: hidden !important;
+        }
+
+        .chat-container {
+            flex: 1 1 0 !important;
+            min-height: 0 !important;
+            height: 100% !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            display: flex !important;
+            position: relative !important;
+            overflow: hidden !important;
+        }
+
+        /* Сайдбар — фиксированные шапки, скроллится только список */
+        .chat-sidebar {
+            width: 100% !important;
+            min-width: 100% !important;
+            border-right: none !important;
+            height: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+        }
+
+        .telegram-folders-bar { flex-shrink: 0 !important; }
+        .chat-sidebar > .p-3.border-bottom { flex-shrink: 0 !important; }
+        .archive-banner-item { flex-shrink: 0 !important; }
+        .archive-view-header { flex-shrink: 0 !important; }
+
+        #conversationsList {
+            flex: 1 1 0 !important;
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            padding-bottom: 12px;
+        }
+
+        /* Окно чата */
+        .chat-main {
+            display: none !important;
+            width: 100% !important;
+            min-width: 100% !important;
+            height: 100% !important;
+            flex: 1 1 0 !important;
+            min-height: 0 !important;
+            flex-direction: column !important;
+            position: relative !important;
+            overflow: hidden !important;
+        }
         .chat-container.mobile-chat-open .chat-sidebar { display: none !important; }
         .chat-container.mobile-chat-open .chat-main { display: flex !important; }
-        .mobile-chat-back-btn { display: inline-flex !important; align-items: center; justify-content: center; }
-        .chat-header { padding: 8px 12px !important; flex-shrink: 0 !important; background: #ffffff !important; border-bottom: 1px solid #dee2e6 !important; z-index: 10; }
-        .chat-messages { flex: 1 1 0% !important; min-height: 0 !important; overflow-y: scroll !important; -webkit-overflow-scrolling: touch !important; padding: 10px !important; }
+
+        .mobile-chat-back-btn {
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Шапка чата — не сжимается */
+        .chat-header {
+            padding: 8px 12px !important;
+            flex-shrink: 0 !important;
+            background: #ffffff !important;
+            border-bottom: 1px solid #dee2e6 !important;
+            z-index: 10;
+        }
+
+        /* Сообщения — скроллятся, занимают всё оставшееся место */
+        .chat-messages {
+            flex: 1 1 0 !important;
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            padding: 10px !important;
+        }
+
         .message-bubble { max-width: 88% !important; padding: 8px 12px; }
-        .chat-input { flex-shrink: 0 !important; padding: 8px 10px 12px 10px !important; background: #ffffff !important; border-top: 1px solid #dee2e6 !important; z-index: 20; }
+
+        /* Панель ввода — фиксированной высоты внизу, с учётом safe-area */
+        .chat-input {
+            flex-shrink: 0 !important;
+            padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0px)) 10px !important;
+            background: #ffffff !important;
+            border-top: 1px solid #dee2e6 !important;
+            z-index: 20;
+            position: relative;
+        }
+
         .chat-input-wrapper { padding: 4px 8px 4px 10px !important; }
         .chat-textarea { font-size: 16px !important; padding: 5px 4px !important; }
-        .format-toolbar { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; padding: 2px 6px; margin-bottom: 6px !important; gap: 4px; width: 100%; }
-        #chatEmojiPicker { position: fixed !important; bottom: 70px !important; left: 10px !important; right: 10px !important; width: auto !important; max-width: none !important; z-index: 1100; }
-        .user-info-card { top: 0 !important; right: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; max-height: 100% !important; border-radius: 0 !important; z-index: 1050; }
-        #questionsTab { height: 100% !important; overflow-y: auto !important; padding: 8px; }
+
+        .format-toolbar {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            padding: 2px 6px;
+            margin-bottom: 6px !important;
+            gap: 4px;
+            width: 100%;
+        }
+
+        #chatEmojiPicker {
+            position: fixed !important;
+            bottom: 70px !important;
+            left: 10px !important;
+            right: 10px !important;
+            width: auto !important;
+            max-width: none !important;
+            z-index: 1100;
+        }
+
+        .user-info-card {
+            top: 0 !important;
+            right: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100dvh !important;
+            max-height: 100dvh !important;
+            border-radius: 0 !important;
+            z-index: 1050;
+        }
+
+        #questionsTab {
+            height: calc(100dvh - 56px - 44px) !important;
+            overflow-y: auto !important;
+            padding: 8px;
+            -webkit-overflow-scrolling: touch !important;
+        }
     }
 </style>
 {% endblock %}
@@ -371,9 +506,7 @@
 
 <div id="chatsTab">
     <div class="chat-container" id="chatContainer">
-        <!-- Список чатов с папками -->
         <div class="chat-sidebar" id="chatSidebar">
-            <!-- Telegram-панель папок -->
             <div class="telegram-folders-bar" id="foldersBar">
                 <div class="folder-pill active" data-folder="all" onclick="selectFolder('all')">
                     <span>Все</span>
@@ -384,7 +517,6 @@
                     <span class="badge bg-danger" id="count-unread">0</span>
                 </div>
 
-                <!-- Пользовательские папки менеджера -->
                 <div id="customFoldersList" class="d-inline-flex gap-1">
                     {% for f in folders %}
                     <div class="folder-pill" data-folder="{{ f.id }}" onclick="selectFolder({{ f.id }})" oncontextmenu="handleFolderContextMenu(event, {{ f.id }}, '{{ f.name }}')">
@@ -399,7 +531,6 @@
                 </button>
             </div>
 
-            <!-- Шапка режима просмотра архива (со стрелкой возврата) -->
             <div id="archiveViewHeader" class="archive-view-header" style="display: none;">
                 <span class="archive-back-btn" onclick="exitArchiveMode()" title="Вернуться ко всем чатам">
                     <i class="bi bi-arrow-left"></i>
@@ -411,7 +542,6 @@
                 <input type="text" id="chatSearch" class="form-control form-control-sm" placeholder="{{ get_text('search_chat_placeholder') }}" onkeyup="filterChats()">
             </div>
 
-            <!-- Плашка архива над списком (в стиле Telegram) -->
             <div id="archiveBanner" class="archive-banner-item" onclick="enterArchiveMode()">
                 <div class="archive-banner-icon">
                     <i class="bi bi-archive"></i>
@@ -455,7 +585,6 @@
             </div>
         </div>
 
-        <!-- Окно чата -->
         <div class="chat-main" id="chatMain">
             <div class="chat-header" id="chatHeader">
                 <div class="d-flex align-items-center" style="min-width: 0;">
@@ -478,7 +607,6 @@
                 </div>
             </div>
 
-            <!-- Карточка пользователя -->
             <div id="userInfoCard" class="user-info-card">
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
@@ -523,7 +651,6 @@
             </div>
 
             <div class="chat-input" id="chatInput" style="display: none;">
-                <!-- Панель форматирования текста -->
                 <div class="format-toolbar mb-2">
                     <button type="button" class="btn btn-outline-secondary" onclick="wrapChatText('<b>', '</b>')" title="{{ get_text('formatting_bold') }} (Ctrl+B)"><i class="bi bi-type-bold"></i></button>
                     <button type="button" class="btn btn-outline-secondary" onclick="wrapChatText('<i>', '</i>')" title="{{ get_text('formatting_italic') }} (Ctrl+I)"><i class="bi bi-type-italic"></i></button>
@@ -661,7 +788,6 @@
     </div>
 </div>
 
-<!-- Модалка создания папки -->
 <div class="modal fade" id="createFolderModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content">
@@ -681,7 +807,6 @@
     </div>
 </div>
 
-<!-- Модалка добавления чата в папки -->
 <div class="modal fade" id="chatFoldersModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content">
@@ -700,7 +825,6 @@
     </div>
 </div>
 
-<!-- Контекстное меню чата (ПКМ) -->
 <div id="chatContextMenu" class="chat-context-menu">
     <div class="chat-context-menu-item" id="ctxToggleUnread" onclick="executeContextAction('unread')">
         <i class="bi bi-envelope"></i> <span>Пометить как непрочитанное</span>
@@ -2011,6 +2135,28 @@
 
     loadAllQuestions();
     updateSidebar();
+
+    if (window.visualViewport) {
+        const vv = window.visualViewport;
+        const applyKeyboardFix = () => {
+            const isMobile = window.matchMedia('(max-width: 768px)').matches;
+            if (!isMobile) return;
+            const keyboardHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+            document.documentElement.style.setProperty('--kb-height', keyboardHeight + 'px');
+            if (keyboardHeight > 50) {
+                document.querySelectorAll('.chat-input').forEach(el => {
+                    el.style.paddingBottom = `calc(10px + ${keyboardHeight}px + env(safe-area-inset-bottom, 0px))`;
+                });
+                scrollToBottomForce(false);
+            } else {
+                document.querySelectorAll('.chat-input').forEach(el => {
+                    el.style.paddingBottom = '';
+                });
+            }
+        };
+        vv.addEventListener('resize', applyKeyboardFix);
+        vv.addEventListener('scroll', applyKeyboardFix);
+    }
 </script>
 
 <div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true" style="background: rgba(0,0,0,0.85);">
