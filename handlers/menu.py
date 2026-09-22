@@ -1,6 +1,7 @@
 # handlers/menu.py - ИСПРАВЛЕННАЯ ВЕРСИЯ
 
 from aiogram import Router, F
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -48,12 +49,22 @@ async def show_main_menu(callback: CallbackQuery, state: FSMContext):
     text = f"{welcome_text}\n\nВыбранная конференция: *{conf_text}*"
 
     from keyboards import get_main_menu_keyboard
-    await callback.message.edit_text(
-        text,
-        reply_markup=await get_main_menu_keyboard(user_id),
-        parse_mode="Markdown"
-    )
-    await callback.answer()
+
+    markup = await get_main_menu_keyboard(user_id)
+    try:
+        await callback.message.edit_text(
+            text,
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+        await callback.answer()
+    except TelegramBadRequest:
+        await callback.message.delete()
+        await callback.message.answer(
+            text,
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
 
 
 @router.callback_query(F.data == "change_conference")
@@ -101,11 +112,21 @@ async def show_event_menu(callback: CallbackQuery, state: FSMContext):
     selected_conf = await db.get_selected_conference(user_id)
 
     conf_text = f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}" if selected_conf else ""
+    text = f"{await t(user_id, 'event_title')}{conf_text}"
+    reply_markup = await get_event_menu_keyboard(user_id)
 
-    await callback.message.edit_text(
-        f"{await t(user_id, 'event_title')}{conf_text}",
-        reply_markup=await get_event_menu_keyboard(user_id)
-    )
+    try:
+        await callback.message.edit_text(
+            text,
+            reply_markup=reply_markup
+        )
+    except TelegramBadRequest:
+        # Если редактирование текста невозможно (например, предыдущее сообщение было с фото стенда)
+        await callback.message.delete()
+        await callback.message.answer(
+            text,
+            reply_markup=reply_markup
+        )
 
 
 @router.callback_query(F.data == "menu_travel")

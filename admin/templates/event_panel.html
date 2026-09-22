@@ -29,9 +29,40 @@
     .status-in_progress { background: #cfe2ff; color: #084298; }
     .status-ready { background: #d4edda; color: #155724; }
 
+    /* Стили вкладок */
+    .nav-tabs .nav-link {
+        color: #6c757d;
+        border: none;
+        border-bottom: 3px solid transparent;
+        font-weight: 600;
+        padding: 10px 20px;
+        transition: all 0.2s;
+    }
+    .nav-tabs .nav-link.active {
+        color: #667eea;
+        border-color: transparent transparent #667eea transparent;
+        background: transparent;
+    }
+    .nav-tabs .nav-link:hover:not(.active) {
+        border-color: transparent;
+        color: #495057;
+    }
+
     .mobile-expand-toggle,
     .mobile-extra-info {
         display: none;
+    }
+
+    .stand-thumb {
+        width: 48px;
+        height: 36px;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 1px solid #dee2e6;
+        transition: transform 0.2s;
+    }
+    .stand-thumb:hover {
+        transform: scale(1.1);
     }
 
     /* Адаптив для смартфонов (≤ 768px) */
@@ -234,179 +265,383 @@
 
 {% block content %}
 <div class="fade-in">
-    <h2 class="mb-4"><i class="bi bi-ticket-perforated"></i> {{ get_text('event_panel_title') }}</h2>
-
-    <!-- Stats Cards (2x2 на мобилке) -->
-    <div class="row mb-4">
-        <div class="col-md-4 mb-3">
-            <div class="stat-card" onclick="filterByCard('pending')">
-                <div class="stat-number text-warning">{{ stats.ticket_stats.pending }}</div>
-                <div class="stat-label">{{ get_text('tickets_pending') }}</div>
-                <small class="text-muted d-none d-md-block">{{ get_text('awaiting_processing') }}</small>
-            </div>
-        </div>
-        <div class="col-md-4 mb-3">
-            <div class="stat-card" onclick="filterByCard('in_progress')">
-                <div class="stat-number text-info">{{ stats.ticket_stats.in_progress }}</div>
-                <div class="stat-label">{{ get_text('tickets_in_progress') }}</div>
-                <small class="text-muted d-none d-md-block">{{ get_text('in_processing') }}</small>
-            </div>
-        </div>
-        <div class="col-md-4 mb-3">
-            <div class="stat-card" onclick="filterByCard('ready')">
-                <div class="stat-number text-success">{{ stats.ticket_stats.ready }}</div>
-                <div class="stat-label">{{ get_text('tickets_ready') }}</div>
-                <small class="text-muted d-none d-md-block">{{ get_text('ready_to_send') }}</small>
-            </div>
-        </div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><i class="bi bi-calendar-event"></i> {{ get_text('event_panel_title') }}</h2>
     </div>
 
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-ticket"></i> {{ get_text('ticket_requests') }}</span>
-            <div class="float-end d-flex gap-2">
-                <!-- Кнопка экспорта в XLSX -->
-                <a href="{{ url_for('api_export_tickets') }}" class="btn btn-sm btn-outline-success" title="Выгрузить в Excel">
-                    <i class="bi bi-file-earmark-excel"></i> Экспорт в Excel
-                </a>
+    <!-- Навигационные вкладки -->
+    <ul class="nav nav-tabs mb-4" id="eventPanelsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tickets-tab" data-bs-toggle="tab" data-bs-target="#tickets-pane" type="button" role="tab">
+                <i class="bi bi-ticket-perforated me-1"></i> {{ get_text('ticket_requests') }}
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="stands-tab" data-bs-toggle="tab" data-bs-target="#stands-pane" type="button" role="tab">
+                <i class="bi bi-shop me-1"></i> {{ get_text('booths_tab_title') }}
+            </button>
+        </li>
+    </ul>
 
-                <div class="btn-group btn-group-sm" role="group">
-                    <button type="button" class="btn btn-outline-secondary filter-btn active" data-status="all">{{ get_text('all_statuses') }}</button>
-                    <button type="button" class="btn btn-outline-warning filter-btn" data-status="pending">{{ get_text('status_pending_event') }}</button>
-                    <button type="button" class="btn btn-outline-info filter-btn" data-status="in_progress">{{ get_text('status_in_progress') }}</button>
-                    <button type="button" class="btn btn-outline-success filter-btn" data-status="ready">{{ get_text('status_ready') }}</button>
+    <div class="tab-content" id="eventPanelsContent">
+        <!-- ==================== ВКЛАДКА 1: БИЛЕТЫ ==================== -->
+        <div class="tab-pane fade show active" id="tickets-pane" role="tabpanel">
+            <!-- Stats Cards (2x2 на мобилке) -->
+            <div class="row mb-4">
+                <div class="col-md-4 mb-3">
+                    <div class="stat-card" onclick="filterByCard('pending')">
+                        <div class="stat-number text-warning">{{ stats.ticket_stats.pending }}</div>
+                        <div class="stat-label">{{ get_text('tickets_pending') }}</div>
+                        <small class="text-muted d-none d-md-block">{{ get_text('awaiting_processing') }}</small>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="stat-card" onclick="filterByCard('in_progress')">
+                        <div class="stat-number text-info">{{ stats.ticket_stats.in_progress }}</div>
+                        <div class="stat-label">{{ get_text('tickets_in_progress') }}</div>
+                        <small class="text-muted d-none d-md-block">{{ get_text('in_processing') }}</small>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="stat-card" onclick="filterByCard('ready')">
+                        <div class="stat-number text-success">{{ stats.ticket_stats.ready }}</div>
+                        <div class="stat-label">{{ get_text('tickets_ready') }}</div>
+                        <small class="text-muted d-none d-md-block">{{ get_text('ready_to_send') }}</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-ticket"></i> {{ get_text('ticket_requests') }}</span>
+                    <div class="float-end d-flex gap-2">
+                        <!-- Кнопка экспорта в XLSX -->
+                        <a href="{{ url_for('api_export_tickets') }}" class="btn btn-sm btn-outline-success" title="{{ get_text('export_excel_title') }}">
+                            <i class="bi bi-file-earmark-excel"></i> {{ get_text('export_excel') }}
+                        </a>
+
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary filter-btn active" data-status="all">{{ get_text('all_statuses') }}</button>
+                            <button type="button" class="btn btn-outline-warning filter-btn" data-status="pending">{{ get_text('status_pending_event') }}</button>
+                            <button type="button" class="btn btn-outline-info filter-btn" data-status="in_progress">{{ get_text('status_in_progress') }}</button>
+                            <button type="button" class="btn btn-outline-success filter-btn" data-status="ready">{{ get_text('status_ready') }}</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="ticketsTable" class="table table-hover align-middle">
+                            <thead class="table-header">
+                                <tr>
+                                    <th>{{ get_text('id') }}</th>
+                                    <th>{{ get_text('username') }}</th>
+                                    <th>{{ get_text('full_name') }}</th>
+                                    <th>{{ get_text('position') }}</th>
+                                    <th>{{ get_text('company') }}</th>
+                                    <th>{{ get_text('email') }}</th>
+                                    <th>{{ get_text('phone') }}</th>
+                                    <th>{{ get_text('country') }}</th>
+                                    <th>{{ get_text('created_at') }}</th>
+                                    <th>{{ get_text('status') }}</th>
+                                    <th>{{ get_text('actions') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in ticket_requests %}
+                                <tr data-status="{{ req.status }}">
+                                    <!-- ID (На вебе только чистый ID, на мобилке шапка карточки) -->
+                                    <td class="t-col-header">
+                                        <span class="d-none d-md-inline">{{ req.id }}</span>
+                                        <div class="d-md-none">
+                                            <span class="badge bg-light text-dark border me-1">#{{ req.id }}</span>
+                                            <strong>@{{ req.username }}</strong>
+                                        </div>
+                                        <div class="d-md-none text-end">
+                                            <span class="text-secondary fw-bold">{{ req.full_name or '' }}</span>
+                                        </div>
+                                    </td>
+
+                                    <!-- Десктопные колонки -->
+                                    <td class="t-col-hide"><strong>@{{ req.username }}</strong></td>
+                                    <td class="t-col-hide">{{ req.full_name or '-' }}</td>
+                                    <td class="t-col-hide">{{ req.position or '-' }}</td>
+                                    <td class="t-col-hide">{{ req.company or '-' }}</td>
+                                    <td class="t-col-hide">{{ req.email or '-' }}</td>
+                                    <td class="t-col-hide">{{ req.phone or '-' }}</td>
+                                    <td class="t-col-hide">{{ req.country or '-' }}</td>
+                                    <td class="t-col-hide" data-order="{{ req.created_at.strftime('%Y-%m-%d %H:%M:%S') if req.created_at else '' }}">
+                                        {{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}
+                                    </td>
+
+                                    <!-- Статус + Мобильный аккордеон с полями -->
+                                    <td class="t-col-status">
+                                        <div>
+                                            <span class="status-badge status-{{ req.status }}">
+                                                {% if req.status == 'pending' %}
+                                                    <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_event') }}
+                                                {% elif req.status == 'in_progress' %}
+                                                    <i class="bi bi-arrow-repeat"></i> {{ get_text('status_in_progress') }}
+                                                {% elif req.status == 'ready' %}
+                                                    <i class="bi bi-check-lg"></i> {{ get_text('status_ready') }}
+                                                {% endif %}
+                                            </span>
+                                        </div>
+
+                                        <div class="mobile-expand-toggle w-100">
+                                            <details>
+                                                <summary>
+                                                    <span>{{ get_text('more_info') }}</span> <i class="bi bi-chevron-down"></i>
+                                                </summary>
+                                                <div class="mobile-extra-info">
+                                                    <div class="info-row">
+                                                        <span class="info-label">{{ get_text('position') }}:</span>
+                                                        <span>{{ req.position or '-' }}</span>
+                                                    </div>
+                                                    <div class="info-row">
+                                                        <span class="info-label">{{ get_text('company') }}:</span>
+                                                        <span>{{ req.company or '-' }}</span>
+                                                    </div>
+                                                    <div class="info-row">
+                                                        <span class="info-label">{{ get_text('email') }}:</span>
+                                                        <span class="text-truncate" style="max-width: 180px;">{{ req.email or '-' }}</span>
+                                                    </div>
+                                                    <div class="info-row">
+                                                        <span class="info-label">{{ get_text('phone') }}:</span>
+                                                        <span>{{ req.phone or '-' }}</span>
+                                                    </div>
+                                                    <div class="info-row">
+                                                        <span class="info-label">{{ get_text('country') }}:</span>
+                                                        <span>{{ req.country or '-' }}</span>
+                                                    </div>
+                                                    <div class="info-row">
+                                                        <span class="info-label">{{ get_text('created_at') }}:</span>
+                                                        <span class="text-muted">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</span>
+                                                    </div>
+                                                </div>
+                                            </details>
+                                        </div>
+                                    </td>
+
+                                    <!-- Кнопки действий -->
+                                    <td class="t-col-actions">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button class="btn btn-outline-warning"
+                                                    onclick="updateTicketStatus({{ req.id }}, 'pending')"
+                                                    {% if req.status == 'pending' %}disabled{% endif %}
+                                                    title="{{ get_text('set_pending') }}">
+                                                <i class="bi bi-hourglass-split"></i> <span class="d-md-none ms-1">{{ get_text('status_pending_short') }}</span>
+                                            </button>
+                                            <button class="btn btn-outline-info"
+                                                    onclick="updateTicketStatus({{ req.id }}, 'in_progress')"
+                                                    {% if req.status == 'in_progress' %}disabled{% endif %}
+                                                    title="{{ get_text('set_in_progress') }}">
+                                                <i class="bi bi-arrow-repeat"></i> <span class="d-md-none ms-1">{{ get_text('status_in_progress_short') }}</span>
+                                            </button>
+                                            <button class="btn btn-outline-success"
+                                                    onclick="updateTicketStatus({{ req.id }}, 'ready')"
+                                                    {% if req.status == 'ready' %}disabled{% endif %}
+                                                    title="{{ get_text('set_ready') }}">
+                                                <i class="bi bi-check-lg"></i> <span class="d-md-none ms-1">{{ get_text('status_ready_short') }}</span>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="11" class="text-center text-muted py-4">
+                                        <i class="bi bi-ticket fs-1"></i>
+                                        <p class="mt-2">{{ get_text('no_ticket_requests') }}</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table id="ticketsTable" class="table table-hover align-middle">
-                    <thead class="table-header">
-                        <tr>
-                            <th>{{ get_text('id') }}</th>
-                            <th>{{ get_text('username') }}</th>
-                            <th>{{ get_text('full_name') }}</th>
-                            <th>{{ get_text('position') }}</th>
-                            <th>{{ get_text('company') }}</th>
-                            <th>{{ get_text('email') }}</th>
-                            <th>{{ get_text('phone') }}</th>
-                            <th>{{ get_text('country') }}</th>
-                            <th>{{ get_text('created_at') }}</th>
-                            <th>{{ get_text('status') }}</th>
-                            <th>{{ get_text('actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for req in ticket_requests %}
-                        <tr data-status="{{ req.status }}">
-                            <!-- ID (На вебе только чистый ID, на мобилке шапка карточки) -->
-                            <td class="t-col-header">
-                                <span class="d-none d-md-inline">{{ req.id }}</span>
-                                <div class="d-md-none">
-                                    <span class="badge bg-light text-dark border me-1">#{{ req.id }}</span>
-                                    <strong>@{{ req.username }}</strong>
-                                </div>
-                                <div class="d-md-none text-end">
-                                    <span class="text-secondary fw-bold">{{ req.full_name or '' }}</span>
-                                </div>
-                            </td>
 
-                            <!-- Десктопные колонки -->
-                            <td class="t-col-hide"><strong>@{{ req.username }}</strong></td>
-                            <td class="t-col-hide">{{ req.full_name or '-' }}</td>
-                            <td class="t-col-hide">{{ req.position or '-' }}</td>
-                            <td class="t-col-hide">{{ req.company or '-' }}</td>
-                            <td class="t-col-hide">{{ req.email or '-' }}</td>
-                            <td class="t-col-hide">{{ req.phone or '-' }}</td>
-                            <td class="t-col-hide">{{ req.country or '-' }}</td>
-                            <td class="t-col-hide" data-order="{{ req.created_at.strftime('%Y-%m-%d %H:%M:%S') if req.created_at else '' }}">
-                                {{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}
-                            </td>
-
-                            <!-- Статус + Мобильный аккордеон с полями -->
-                            <td class="t-col-status">
-                                <div>
-                                    <span class="status-badge status-{{ req.status }}">
-                                        {% if req.status == 'pending' %}
-                                            <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_event') }}
-                                        {% elif req.status == 'in_progress' %}
-                                            <i class="bi bi-arrow-repeat"></i> {{ get_text('status_in_progress') }}
-                                        {% elif req.status == 'ready' %}
-                                            <i class="bi bi-check-lg"></i> {{ get_text('status_ready') }}
-                                        {% endif %}
-                                    </span>
-                                </div>
-
-                                <div class="mobile-expand-toggle w-100">
-                                    <details>
-                                        <summary>
-                                            <span>{{ get_text('more_info', default='Подробнее') }}</span> <i class="bi bi-chevron-down"></i>
-                                        </summary>
-                                        <div class="mobile-extra-info">
-                                            <div class="info-row">
-                                                <span class="info-label">{{ get_text('position') }}:</span>
-                                                <span>{{ req.position or '-' }}</span>
-                                            </div>
-                                            <div class="info-row">
-                                                <span class="info-label">{{ get_text('company') }}:</span>
-                                                <span>{{ req.company or '-' }}</span>
-                                            </div>
-                                            <div class="info-row">
-                                                <span class="info-label">{{ get_text('email') }}:</span>
-                                                <span class="text-truncate" style="max-width: 180px;">{{ req.email or '-' }}</span>
-                                            </div>
-                                            <div class="info-row">
-                                                <span class="info-label">{{ get_text('phone') }}:</span>
-                                                <span>{{ req.phone or '-' }}</span>
-                                            </div>
-                                            <div class="info-row">
-                                                <span class="info-label">{{ get_text('country') }}:</span>
-                                                <span>{{ req.country or '-' }}</span>
-                                            </div>
-                                            <div class="info-row">
-                                                <span class="info-label">{{ get_text('created_at') }}:</span>
-                                                <span class="text-muted">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</span>
-                                            </div>
-                                        </div>
-                                    </details>
-                                </div>
-                            </td>
-
-                            <!-- Кнопки действий -->
-                            <td class="t-col-actions">
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <button class="btn btn-outline-warning"
-                                            onclick="updateTicketStatus({{ req.id }}, 'pending')"
-                                            {% if req.status == 'pending' %}disabled{% endif %}
-                                            title="{{ get_text('set_pending') }}">
-                                        <i class="bi bi-hourglass-split"></i> <span class="d-md-none ms-1">Ожидание</span>
-                                    </button>
-                                    <button class="btn btn-outline-info"
-                                            onclick="updateTicketStatus({{ req.id }}, 'in_progress')"
-                                            {% if req.status == 'in_progress' %}disabled{% endif %}
-                                            title="{{ get_text('set_in_progress') }}">
-                                        <i class="bi bi-arrow-repeat"></i> <span class="d-md-none ms-1">В процессе</span>
-                                    </button>
-                                    <button class="btn btn-outline-success"
-                                            onclick="updateTicketStatus({{ req.id }}, 'ready')"
-                                            {% if req.status == 'ready' %}disabled{% endif %}
-                                            title="{{ get_text('set_ready') }}">
-                                        <i class="bi bi-check-lg"></i> <span class="d-md-none ms-1">Готово</span>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="11" class="text-center text-muted py-4">
-                                <i class="bi bi-ticket fs-1"></i>
-                                <p class="mt-2">{{ get_text('no_ticket_requests') }}</p>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <!-- ==================== ВКЛАДКА 2: СТЕНДЫ КОМПАНИЙ ==================== -->
+        <div class="tab-pane fade" id="stands-pane" role="tabpanel">
+            <!-- Карточка добавления стенда -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-plus-circle me-1"></i> {{ get_text('add_edit_stand') }}</span>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('api_save_stand') }}" method="POST" enctype="multipart/form-data">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">{{ get_text('conference') }} <span class="text-danger">*</span></label>
+                                <select name="conference" class="form-select" required>
+                                    <option value="" disabled selected>{{ get_text('select_conference_placeholder') }}</option>
+                                    {% for conf in conferences %}
+                                        <option value="{{ conf.name }}">{{ conf.name }} ({{ conf.city or '—' }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">{{ get_text('company') }} <span class="text-danger">*</span></label>
+                                <select name="company" class="form-select" required>
+                                    <option value="" disabled selected>{{ get_text('select_company_placeholder') }}</option>
+                                    {% for comp in companies %}
+                                        <option value="{{ comp }}">{{ comp }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">{{ get_text('stand_number') }}</label>
+                                <input type="text" name="stand_number" class="form-control" placeholder="{{ get_text('stand_number_placeholder') }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">{{ get_text('stand_style') }}</label>
+                                <input type="text" name="stand_style" class="form-control" placeholder="{{ get_text('stand_style_placeholder') }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">{{ get_text('working_hours') }}</label>
+                                <input type="text" name="working_hours" class="form-control" placeholder="{{ get_text('working_hours_placeholder') }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">{{ get_text('dress_code') }}</label>
+                                <input type="text" name="dress_code" class="form-control" placeholder="{{ get_text('dress_code_placeholder') }}">
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold">
+                                    <i class="bi bi-image me-1"></i> {{ get_text('stand_photo_label') }}
+                                </label>
+                                <input type="file" name="photo" class="form-control" accept="image/png, image/jpeg, image/webp">
+                                <div class="form-text text-muted">{{ get_text('photo_help_text') }}</div>
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-save me-1"></i> {{ get_text('save_stand') }}
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
+
+            <!-- Список созданных стендов -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-card-list me-1"></i> {{ get_text('stands_list_title') }}</span>
+                    <span class="badge bg-secondary">{{ stands|length if stands else 0 }} {{ get_text('stands_count_unit') }}</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table id="standsTable" class="table table-hover align-middle">
+                            <thead class="table-header">
+                                <tr>
+                                    <th>{{ get_text('conference') }}</th>
+                                    <th>{{ get_text('company') }}</th>
+                                    <th>{{ get_text('stand_number') }}</th>
+                                    <th>{{ get_text('stand_style') }}</th>
+                                    <th>{{ get_text('working_hours') }}</th>
+                                    <th>{{ get_text('dress_code') }}</th>
+                                    <th>{{ get_text('photos') }}</th>
+                                    <th>{{ get_text('actions') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stand in stands %}
+                                <tr>
+                                    <td><strong>{{ stand.conference }}</strong></td>
+                                    <td><span class="badge bg-light text-dark border">{{ stand.company }}</span></td>
+                                    <td>{{ stand.stand_number or '-' }}</td>
+                                    <td>{{ stand.stand_style or '-' }}</td>
+                                    <td>{{ stand.working_hours or '-' }}</td>
+                                    <td>{{ stand.dress_code or '-' }}</td>
+                                    <td>
+                                        {% if stand.photo_path %}
+                                            <a href="/static/uploads/stands/{{ stand.photo_path }}" target="_blank" title="{{ get_text('open_full_size') }}">
+                                                <img src="/static/uploads/stands/{{ stand.photo_path }}" alt="stand preview" class="stand-thumb">
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted"><i class="bi bi-image"></i> {{ get_text('no_photo') }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <!-- Красивая кнопка редактирования в едином стиле с кнопкой удаления -->
+                                            <button type="button" class="btn btn-outline-warning"
+                                                    onclick='openEditStandModal({{ stand|tojson|safe }})'
+                                                    title="{{ get_text('edit') }}">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <form action="{{ url_for('api_delete_stand', stand_id=stand.id) }}" method="POST" class="d-inline" onsubmit="return confirm('{{ get_text('confirm_delete_stand') }} {{ stand.company }}?');">
+                                                <button type="submit" class="btn btn-outline-danger" title="{{ get_text('delete') }}">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">
+                                        <i class="bi bi-shop fs-1"></i>
+                                        <p class="mt-2">{{ get_text('no_stands_added') }}</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно редактирования стенда -->
+<div class="modal fade" id="editStandModal" tabindex="-1" aria-labelledby="editStandModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form action="{{ url_for('api_save_stand') }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editStandModalLabel"><i class="bi bi-pencil-square me-2"></i>{{ get_text('edit_stand_title') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">{{ get_text('conference') }}</label>
+                            <input type="text" name="conference" id="edit_conference" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">{{ get_text('company') }}</label>
+                            <input type="text" name="company" id="edit_company" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">{{ get_text('stand_number') }}</label>
+                            <input type="text" name="stand_number" id="edit_stand_number" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">{{ get_text('stand_style') }}</label>
+                            <input type="text" name="stand_style" id="edit_stand_style" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">{{ get_text('working_hours') }}</label>
+                            <input type="text" name="working_hours" id="edit_working_hours" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">{{ get_text('dress_code') }}</label>
+                            <input type="text" name="dress_code" id="edit_dress_code" class="form-control">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold">{{ get_text('replace_photo_label') }}</label>
+                            <input type="file" name="photo" class="form-control" accept="image/png, image/jpeg, image/webp">
+                            <div class="form-text text-muted">{{ get_text('replace_photo_hint') }}</div>
+                            <div id="edit_photo_preview" class="mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('cancel') }}</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i> {{ get_text('save_changes') }}</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -415,9 +650,12 @@
 {% block extra_js %}
 <script>
     let ticketsTable;
+    let standsTable;
 
     $(document).ready(function() {
         const lang = '{{ session.get("lang", "ru") }}';
+
+        // Таблица билетов
         ticketsTable = $('#ticketsTable').DataTable({
             language: {
                 url: `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`
@@ -425,7 +663,22 @@
             pageLength: 25,
             order: [[0, 'desc']]
         });
+
+        // Таблица стендов
+        standsTable = $('#standsTable').DataTable({
+            language: {
+                url: `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`
+            },
+            pageLength: 25,
+            order: [[0, 'asc'], [1, 'asc']]
+        });
+
+        // Пересчет ширины колонок DataTables при смене вкладки
+        $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+            $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
+        });
     });
+
 
     function updateTicketStatus(requestId, status) {
         const statusNames = {
@@ -456,7 +709,7 @@
         }
     }
 
-    // Рабочая фильтрация DataTables по статусам
+    // Фильтрация DataTables по статусам заявок на билеты
     $.fn.dataTable.ext.search.push(
         function(settings, data, dataIndex) {
             if (settings.nTable.id !== 'ticketsTable') return true;
@@ -483,6 +736,29 @@
         if (targetBtn) {
             targetBtn.click();
         }
+    }
+
+    function openEditStandModal(stand) {
+        $('#edit_conference').val(stand.conference);
+        $('#edit_company').val(stand.company);
+        $('#edit_stand_number').val(stand.stand_number || '');
+        $('#edit_stand_style').val(stand.stand_style || '');
+        $('#edit_working_hours').val(stand.working_hours || '');
+        $('#edit_dress_code').val(stand.dress_code || '');
+
+        const previewContainer = $('#edit_photo_preview');
+        previewContainer.empty();
+
+        if (stand.photo_path) {
+            previewContainer.append(`
+                <div class="d-inline-flex align-items-center gap-2 border p-1 rounded">
+                    <img src="/static/uploads/stands/${stand.photo_path}" alt="stand" style="height: 45px; border-radius: 6px;">
+                </div>
+            `);
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('editStandModal'));
+        modal.show();
     }
 
     function showToast(message, type) {

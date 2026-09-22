@@ -6,7 +6,6 @@ import os
 from datetime import datetime, timedelta
 import secrets
 import hashlib
-import asyncpg
 from dotenv import load_dotenv
 import io
 import csv
@@ -17,6 +16,7 @@ import mimetypes
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+import uuid
 
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -42,6 +42,12 @@ app.config['UPLOAD_FOLDER'] = '/tmp'
 FORBIDDEN_EXTENSIONS = {
     'exe', 'bat', 'cmd', 'sh', 'bash', 'bin', 'msi', 'vbs', 'ps1', 'jar', 'apk', 'com', 'scr'
 }
+STANDS_UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads', 'stands')
+os.makedirs(STANDS_UPLOAD_FOLDER, exist_ok=True)
+ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+
+def allowed_image(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
 
 def allowed_file(filename):
     if '.' not in filename:
@@ -704,8 +710,19 @@ def api_users_count():
 def event_panel():
     ticket_requests = run_async(db.get_all_ticket_requests())
     ticket_stats = run_async(db.get_ticket_request_stats())
-    return render_template('event_panel.html', ticket_requests=ticket_requests, stats={'ticket_stats': ticket_stats}, username=session.get('username'))
+    stands = run_async(db.get_all_event_stands()) or []
+    companies = run_async(db.get_all_companies_from_config()) or []
+    conferences = run_async(db.get_conferences_list()) or []
 
+    return render_template(
+        'event_panel.html',
+        ticket_requests=ticket_requests,
+        stats={'ticket_stats': ticket_stats},
+        stands=stands,
+        companies=companies,
+        conferences=conferences,
+        username=session.get('username')
+    )
 @app.route('/travel')
 @login_required
 @group_required(['travel', 'admin'])
@@ -1063,6 +1080,63 @@ def get_conference_details(conference_name):
     except Exception as e:
         logger.error(f"Error getting conference details for '{decoded_name}': {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/stands/save', methods=['POST'])
+@login_required
+@group_required(['event', 'admin'])
+def api_save_stand():
+    company = request.form.get('company', '').strip()
+    conference = request.form.get('conference', '').strip()
+
+    if not company or not conference:
+        flash('Компания и конференция обязательны для заполнения', 'danger')
+        return redirect(url_for('event_panel'))
+
+    photo = request.files.get('photo')
+    saved_filename = None
+
+    if photo and photo.filename:
+        if allowed_image(photo.filename):
+            ext = photo.filename.rsplit('.', 1)[1].lower()
+            saved_filename = f"stand_{uuid.uuid4().hex}.{ext}"
+            photo_save_path = os.path.join(STANDS_UPLOAD_FOLDER, saved_filename)
+            photo.save(photo_save_path)
+        else:
+            flash('Недопустимый формат изображения (разрешены png, jpg, jpeg, webp)', 'danger')
+            return redirect(url_for('event_panel'))
+
+    stand_data = {
+        'company': company,
+        'conference': conference,
+        'stand_style': request.form.get('stand_style', '').strip(),
+        'stand_number': request.form.get('stand_number', '').strip(),
+        'working_hours': request.form.get('working_hours', '').strip(),
+        'dress_code': request.form.get('dress_code', '').strip(),
+        'photo_path': saved_filename
+    }
+
+    success = run_async(db.upsert_event_stand(stand_data))
+    if success:
+        flash('Информация о стенде сохранена', 'success')
+    else:
+        flash('Ошибка при сохранении стенда', 'danger')
+
+    return redirect(url_for('event_panel'))
+
+@app.route('/api/stands/delete/<int:stand_id>', methods=['POST'])
+@login_required
+@group_required(['event', 'admin'])
+def api_delete_stand(stand_id):
+    photo_file = run_async(db.delete_event_stand(stand_id))
+    if photo_file:
+        full_path = os.path.join(STANDS_UPLOAD_FOLDER, photo_file)
+        if os.path.exists(full_path):
+            try:
+                os.remove(full_path)
+            except Exception as e:
+                logger.error(f"Error removing stand photo file {photo_file}: {e}")
+    flash('Стенд успешно удален', 'success')
+    return redirect(url_for('event_panel'))
 
 @app.route('/admin_managers')
 @login_required

@@ -518,22 +518,19 @@ async def process_event_question_too_long(message: Message):
 
 @router.callback_query(F.data == "event_booth")
 async def show_booth_info(callback: CallbackQuery):
-    """Показать информацию о стенде для конкретной компании и конференции"""
+    """Показать информацию о стенде компании для текущей конференции"""
     user_id = callback.from_user.id
     username = callback.from_user.username
 
-    # Получаем компанию пользователя
     user_data = await db.get_user_data(user_id)
     company = user_data.get('company')
 
-    # Получаем выбранную конференцию
     conference = await db.get_selected_conference(user_id)
     if not conference:
         confs = await db.get_user_active_conferences(username)
         if confs:
             conference = confs[0].get('conference_name')
 
-    # Запрашиваем информацию о стенде
     stand_info = None
     if company and conference:
         stand_info = await db.get_event_stand(company, conference)
@@ -544,17 +541,42 @@ async def show_booth_info(callback: CallbackQuery):
         InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")
     )
 
-    # Используем HTML разметку вместо Markdown для защиты от спецсимволов в названиях
-    if stand_info:
-        text = (
-            f"ℹ️ <b>Информация о вашем стенде на {conference}</b>\n\n"
-            f"<b>Компания:</b> {company}\n"
-            f"<b>Стиль стенда:</b> {stand_info.get('stand_style', 'Не указан')}\n"
-            f"<b>Номер стенда:</b> {stand_info.get('stand_number', 'Не указан')}\n"
-            f"<b>Время работы:</b> {stand_info.get('working_hours', 'Не указано')}\n"
-            f"<b>Дресс-код:</b> {stand_info.get('dress_code', 'Не указан')}"
+    if not stand_info:
+        text = f"К сожалению, у вашей компании (<b>{company or 'не указана'}</b>) нет стенда на конференцию «<b>{conference or 'не выбрана'}</b>»."
+        await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        return
+
+    text = (
+        f"ℹ️ <b>Информация о стенде на {conference}</b>\n\n"
+        f"🏢 <b>Компания:</b> {company}\n"
+        f"<b>Номер стенда:</b> {stand_info.get('stand_number') or 'Не указан'}\n"
+        f"<b>Стиль стенда:</b> {stand_info.get('stand_style') or 'Не указан'}\n"
+        f"<b>Время работы:</b> {stand_info.get('working_hours') or 'Не указано'}\n"
+        f"<b>Дресс-код:</b> {stand_info.get('dress_code') or 'Не указан'}"
+    )
+
+    photo_filename = stand_info.get('photo_path')
+    photo_file = None
+
+    if photo_filename:
+        photo_disk_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'admin', 'static', 'uploads', 'stands', photo_filename)
+        if os.path.exists(photo_disk_path):
+            photo_file = FSInputFile(photo_disk_path)
+
+    if photo_file:
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
+        await callback.message.answer_photo(
+            photo=photo_file,
+            caption=text,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
         )
     else:
-        text = f"К сожалению, у вашей компании (<b>{company or 'не указана'}</b>) нет стенда на конференцию «<b>{conference or 'не выбрана'}</b>»."
-
-    await callback.message.edit_text(text, reply_markup=builder.as_markup(), parse_mode="HTML")
+        await callback.message.edit_text(
+            text=text,
+            reply_markup=builder.as_markup(),
+            parse_mode="HTML"
+        )

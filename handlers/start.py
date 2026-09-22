@@ -1,5 +1,6 @@
 from aiogram import Router, F
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
@@ -361,7 +362,14 @@ async def return_to_main_menu(callback: CallbackQuery, state: FSMContext):
     user_data = await db.get_user_data(callback.from_user.id)
     lang = user_data.get('language', 'ru') if user_data else 'ru'
 
-    await callback.message.edit_text(
-        await t(callback.from_user.id, 'welcome'),
-        reply_markup=await get_main_menu_keyboard(callback.from_user.id)
-    )
+    text = await t(callback.from_user.id, 'welcome')
+    markup = await get_main_menu_keyboard(callback.from_user.id)
+
+    try:
+        await callback.message.edit_text(text, reply_markup=markup)
+    except TelegramBadRequest:
+        try:
+            await callback.message.delete()
+        except Exception:
+            pass
+        await callback.message.answer(text, reply_markup=markup)

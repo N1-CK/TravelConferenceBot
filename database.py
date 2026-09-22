@@ -282,7 +282,9 @@ class Database:
                         stand_number TEXT,
                         working_hours TEXT,
                         dress_code TEXT,
+                        photo_path TEXT,
                         created_at TIMESTAMP DEFAULT NOW(),
+                        updated_at TIMESTAMP DEFAULT NOW(),
                         UNIQUE(company, conference)
                     )
                     ''',
@@ -919,12 +921,70 @@ class Database:
             logger.error(f"Error saving event question: {e}")
             return False
 
+    async def get_all_event_stands(self) -> list:
+        """Получить список всех стендов для панели управления"""
+        try:
+            async with self.pool.acquire() as conn:
+                rows = await conn.fetch(f"""
+                    SELECT id, company, conference, stand_style, stand_number, 
+                           working_hours, dress_code, photo_path, created_at, updated_at
+                    FROM {self.db_schema_event}.event_stands
+                    ORDER BY conference, company
+                """)
+                return [dict(r) for r in rows]
+        except Exception as e:
+            logger.error(f"Error getting event stands: {e}")
+            return []
+
+    async def upsert_event_stand(self, data: dict) -> bool:
+        """Создать или обновить стенд компании на конференции"""
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(f"""
+                    INSERT INTO {self.db_schema_event}.event_stands 
+                    (company, conference, stand_style, stand_number, working_hours, dress_code, photo_path, updated_at)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                    ON CONFLICT (company, conference) DO UPDATE SET
+                        stand_style = EXCLUDED.stand_style,
+                        stand_number = EXCLUDED.stand_number,
+                        working_hours = EXCLUDED.working_hours,
+                        dress_code = EXCLUDED.dress_code,
+                        photo_path = COALESCE(EXCLUDED.photo_path, {self.db_schema_event}.event_stands.photo_path),
+                        updated_at = NOW()
+                """,
+                                   data['company'],
+                                   data['conference'],
+                                   data.get('stand_style'),
+                                   data.get('stand_number'),
+                                   data.get('working_hours'),
+                                   data.get('dress_code'),
+                                   data.get('photo_path')
+                                   )
+                return True
+        except Exception as e:
+            logger.error(f"Error upserting event stand: {e}")
+            return False
+
+    async def delete_event_stand(self, stand_id: int) -> str:
+        """Удалить стенд и вернуть photo_path для удаления файла с диска"""
+        try:
+            async with self.pool.acquire() as conn:
+                photo_path = await conn.fetchval(f"""
+                    DELETE FROM {self.db_schema_event}.event_stands
+                    WHERE id = $1
+                    RETURNING photo_path
+                """, stand_id)
+                return photo_path
+        except Exception as e:
+            logger.error(f"Error deleting event stand: {e}")
+            return None
+
     async def get_event_stand(self, company: str, conference: str) -> dict:
-        """Получить информацию о стенде компании на конференции"""
+        """Получить информацию о стенде компании на конференции (включая фото)"""
         try:
             async with self.pool.acquire() as conn:
                 row = await conn.fetchrow(f"""
-                    SELECT stand_style, stand_number, working_hours, dress_code 
+                    SELECT id, stand_style, stand_number, working_hours, dress_code, photo_path 
                     FROM {self.db_schema_event}.event_stands 
                     WHERE company = $1 AND conference = $2
                 """, company, conference)
