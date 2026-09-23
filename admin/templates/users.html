@@ -466,29 +466,30 @@
     }
 
     function editCompanyPrompt(userId, currentCompany) {
-        const newCompany = prompt("Введите новую организацию:", currentCompany || '');
-        if (newCompany !== null && newCompany !== currentCompany) {
-            fetch(`/api/users/${userId}`)
+    const promptText = "{{ get_text('enter_new_company') }}";
+    const newCompany = prompt(promptText, currentCompany || '');
+    if (newCompany !== null && newCompany !== currentCompany) {
+        fetch(`/api/users/${userId}`)
+        .then(r => r.json())
+        .then(user => {
+            user.company = newCompany;
+            fetch(`/api/users/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(user)
+            })
             .then(r => r.json())
-            .then(user => {
-                user.company = newCompany;
-                fetch(`/api/users/${userId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(user)
-                })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.success) {
-                        alert("Организация успешно изменена!");
-                        location.reload();
-                    } else {
-                        alert("Ошибка при обновлении организации");
-                    }
-                });
+            .then(res => {
+                if (res.success) {
+                    alert("{{ get_text('company_changed_success') }}");
+                    location.reload();
+                } else {
+                    alert("{{ get_text('company_changed_error') }}");
+                }
             });
-        }
+        });
     }
+}
 
     function sendMessageToCurrentUser() {
         if (currentUserId) {

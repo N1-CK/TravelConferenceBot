@@ -595,7 +595,7 @@
                                 ${u.user_id ? `<small class="text-muted ms-1">(ID: ${u.user_id})</small>` : ''}
                             </div>
                             <span class="badge bg-danger text-wrap" style="max-width: 50%; font-weight: normal;">
-                                <i class="bi bi-exclamation-triangle"></i> ${u.reason || 'Error'}
+                                <i class="bi bi-exclamation-triangle"></i> ${u.reason || '{{ get_text("error_occurred") }}'}
                             </span>
                         </div>
                     `;

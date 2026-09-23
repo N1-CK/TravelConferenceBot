@@ -467,7 +467,12 @@
         function showToast(message, type = 'info') {
             const toastContainer = document.querySelector('.toast-container');
             const typeMap = { success: 'check-circle-fill text-success', danger: 'exclamation-triangle-fill text-danger', warning: 'exclamation-triangle-fill text-warning', info: 'info-circle-fill text-info' };
-            const typeText = { success: 'Успешно', danger: 'Ошибка', warning: 'Внимание', info: 'Информация' };
+            const typeText = {
+                success: '{{ get_text("operation_success") }}',
+                danger: '{{ get_text("error") }}',
+                warning: '{{ get_text("warning") }}',
+                info: '{{ get_text("info") }}'
+            };
             const toastHtml = `<div class="toast show" role="alert" data-bs-autohide="true" data-bs-delay="5000">
                     <div class="toast-header">
                         <i class="bi ${typeMap[type] || typeMap.info} me-2"></i>
@@ -529,12 +534,12 @@
                         const isCurrentlyChatting = (typeof currentUserId !== 'undefined' && currentUserId === conv.user_id && !document.hidden);
 
                         if (!isCurrentlyChatting && !conv.is_muted) {
-                            showToast(`Новое сообщение от @${conv.username}`, 'info');
+                            showToast(`{{ get_text('new_message_from') }} @${conv.username}`, 'info');
                             playNotificationBeep();
 
                             if ("Notification" in window && Notification.permission === "granted") {
-                                new Notification("Новое сообщение", {
-                                    body: `От: @${conv.username}\n${conv.last_message ? conv.last_message.replace(/<[^>]*>/g, '') : ''}`,
+                                new Notification("{{ get_text('new_message_title') }}", {
+                                    body: `{{ get_text('new_message_from') }} @${conv.username}\n${conv.last_message ? conv.last_message.replace(/<[^>]*>/g, '') : ''}`,
                                     icon: '/static/img/favicon.png'
                                 });
                             }

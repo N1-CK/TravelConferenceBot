@@ -397,7 +397,7 @@
                     <div id="companyRecipientPreview" class="recipient-preview" style="display: none;">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="stats-badge"><i class="bi bi-people-fill"></i> <span id="companyCount">0</span> {{ get_text('recipients') }}</span>
-                            <button type="button" class="btn-soft btn-sm" onclick="toggleCompanyPreview()"><i class="bi bi-eye-slash"></i> Скрыть</button>
+                            <button type="button" class="btn-soft btn-sm" onclick="toggleCompanyPreview()"><i class="bi bi-eye-slash"></i> {{ get_text('hide') }}</button>
                         </div>
                         <div id="companyRecipientList" class="recipient-list"></div>
                     </div>
@@ -455,7 +455,7 @@
                     <div id="conferenceRecipientPreview" class="recipient-preview" style="display: none;">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="stats-badge"><i class="bi bi-people-fill"></i> <span id="conferenceCount">0</span> {{ get_text('participants_count') }}</span>
-                            <button type="button" class="btn-soft btn-sm" onclick="toggleConferencePreview()"><i class="bi bi-eye-slash"></i> Скрыть</button>
+                            <button type="button" class="btn-soft btn-sm" onclick="toggleConferencePreview()"><i class="bi bi-eye-slash"></i> {{ get_text('hide') }}</button>
                         </div>
                         <div id="conferenceRecipientList" class="recipient-list"></div>
                     </div>
@@ -468,11 +468,11 @@
 
                 <!-- Formatting Toolbar -->
                 <div class="format-toolbar position-relative">
-                    <button type="button" class="format-btn" onclick="wrapText('<b>', '</b>')" title="Жирный (Ctrl+B)"><i class="bi bi-type-bold"></i> <b>Жирный</b></button>
-                    <button type="button" class="format-btn" onclick="wrapText('<i>', '</i>')" title="Курсив (Ctrl+I)"><i class="bi bi-type-italic"></i> <i>Курсив</i></button>
-                    <button type="button" class="format-btn" onclick="wrapText('```\n', '\n```')" title="Моноширинный код"><i class="bi bi-code-slash"></i> Код</button>
-                    <button type="button" class="format-btn" onclick="insertLink()" title="Вставить ссылку"><i class="bi bi-link-45deg"></i> Ссылка</button>
-                    <button type="button" class="format-btn emoji-picker-btn" onclick="toggleEmojiPicker()" title="Смайлики"><i class="bi bi-emoji-smile"></i> Смайлик</button>
+                    <button type="button" class="format-btn" onclick="wrapText('<b>', '</b>')" title="{{ get_text('tooltip_bold') }}"><i class="bi bi-type-bold"></i> <b>{{ get_text('bold') }}</b></button>
+                    <button type="button" class="format-btn" onclick="wrapText('<i>', '</i>')" title="{{ get_text('tooltip_italic') }}"><i class="bi bi-type-italic"></i> <i>{{ get_text('italic') }}</i></button>
+                    <button type="button" class="format-btn" onclick="wrapText('```\n', '\n```')" title="{{ get_text('tooltip_code') }}"><i class="bi bi-code-slash"></i> {{ get_text('code') }}</button>
+                    <button type="button" class="format-btn" onclick="insertLink()" title="{{ get_text('tooltip_link') }}"><i class="bi bi-link-45deg"></i> {{ get_text('link') }}</button>
+                    <button type="button" class="format-btn emoji-picker-btn" onclick="toggleEmojiPicker()" title="{{ get_text('tooltip_emoji') }}"><i class="bi bi-emoji-smile"></i> {{ get_text('emoji') }}</button>
                     <div id="emojiPicker" class="emoji-dropdown">
                         <div class="emoji-grid">
                             <div class="emoji-item" onclick="insertEmoji('👍')">👍</div>
@@ -502,10 +502,9 @@
                     </div>
                 </div>
 
-                <textarea class="form-control modern-textarea" name="message" rows="8" placeholder="{{ get_text('type_message') }} ({{ get_text('html_supported') }})" id="messageInput"></textarea>
+                <textarea class="form-control modern-textarea" name="message" rows="8" placeholder="{{ get_text('type_message') }}" id="messageInput"></textarea>
                 <div class="d-flex justify-content-between mt-2">
                     <div class="counter" id="charCounter">0 / 4000 {{ get_text('characters') }}</div>
-                    <div class="text-muted small"><i class="bi bi-markdown"></i> {{ get_text('html_supported') }}</div>
                 </div>
             </div>
 
@@ -544,6 +543,24 @@
     let currentConferenceRecipients = [];
     let currentConferenceUsers = [];
     let allUsers = {{ users|tojson }};
+
+    const broadcastLocales = {
+        hide: "{{ get_text('hide') }}",
+        show: "{{ get_text('show') }}",
+        noData: "{{ get_text('no_data_simple') }}",
+        andMoreUsers: "{{ get_text('and_more_users') }}",
+        andMoreParticipants: "{{ get_text('and_more_participants') }}",
+        promptUrl: "{{ get_text('prompt_insert_link_url') }}",
+        promptText: "{{ get_text('prompt_insert_link_text') }}",
+        linkDefault: "{{ get_text('link_text_default') }}",
+        confirmAll: "{{ get_text('confirm_send_all') }}",
+        confirmCompanies: "{{ get_text('confirm_send_companies') }}",
+        confirmUsers: "{{ get_text('confirm_send_users') }}",
+        confirmConferences: "{{ get_text('confirm_send_conferences') }}",
+        selectCompanyWarning: "{{ get_text('select_company_warning') }}",
+        selectUserWarning: "{{ get_text('select_user_warning') }}",
+        selectConferenceWarning: "{{ get_text('select_conference_warning') }}"
+    };
 
     // ============================================
     // TOGGLE SELECTORS
@@ -602,7 +619,7 @@
         const container = document.getElementById('companyRecipientList');
         if (!container) return;
         if (currentCompanyRecipients.length === 0) {
-            container.innerHTML = '<div class="text-muted text-center p-3">Нет данных</div>';
+            container.innerHTML = `<div class="text-muted text-center p-3">${broadcastLocales.noData}</div>`;
             return;
         }
         let html = '';
@@ -618,7 +635,7 @@
             `;
         });
         if (currentCompanyRecipients.length > 30) {
-            html += `<div class="text-center text-muted p-2">... и еще ${currentCompanyRecipients.length - 30} пользователей</div>`;
+            html += `<div class="text-center text-muted p-2">${broadcastLocales.andMoreUsers.replace('{}', currentCompanyRecipients.length - 30)}</div>`;
         }
         container.innerHTML = html;
     }
@@ -628,10 +645,10 @@
         const btn = event.target.closest('button');
         if (list.style.display === 'none') {
             list.style.display = 'block';
-            btn.innerHTML = '<i class="bi bi-eye-slash"></i> Скрыть';
+            btn.innerHTML = `<i class="bi bi-eye-slash"></i> ${broadcastLocales.hide}`;
         } else {
             list.style.display = 'none';
-            btn.innerHTML = '<i class="bi bi-eye"></i> Показать';
+            btn.innerHTML = `<i class="bi bi-eye"></i> ${broadcastLocales.show}`;
         }
     }
 
@@ -673,7 +690,7 @@
         const container = document.getElementById('conferenceRecipientList');
         if (!container) return;
         if (!currentConferenceUsers || currentConferenceUsers.length === 0) {
-            container.innerHTML = '<div class="text-muted text-center p-3">Нет данных</div>';
+            container.innerHTML = `<div class="text-muted text-center p-3">${broadcastLocales.noData}</div>`;
             return;
         }
         let html = '';
@@ -689,7 +706,7 @@
             `;
         });
         if (currentConferenceUsers.length > 30) {
-            html += `<div class="text-center text-muted p-2">... и еще ${currentConferenceUsers.length - 30} участников</div>`;
+            html += `<div class="text-center text-muted p-2">${broadcastLocales.andMoreParticipants.replace('{}', currentConferenceUsers.length - 30)}</div>`;
         }
         container.innerHTML = html;
     }
@@ -699,10 +716,10 @@
         const btn = event.target.closest('button');
         if (list.style.display === 'none') {
             list.style.display = 'block';
-            btn.innerHTML = '<i class="bi bi-eye-slash"></i> Скрыть';
+            btn.innerHTML = `<i class="bi bi-eye-slash"></i> ${broadcastLocales.hide}`;
         } else {
             list.style.display = 'none';
-            btn.innerHTML = '<i class="bi bi-eye"></i> Показать';
+            btn.innerHTML = `<i class="bi bi-eye"></i> ${broadcastLocales.show}`;
         }
     }
 
@@ -797,13 +814,12 @@
     }
 
     function insertLink() {
-        const url = prompt('Введите URL ссылки:', 'https://');
+        const url = prompt(broadcastLocales.promptUrl, 'https://');
         if (!url) return;
-        const text = prompt('Введите текст ссылки:', 'ссылка');
+        const text = prompt(broadcastLocales.promptText, broadcastLocales.linkDefault);
         if (!text) return;
 
         const start = messageInput.selectionStart;
-        // Используем HTML-тег для ссылки
         const linkText = `<a href="${url}">${text}</a>`;
         const newText = messageInput.value.substring(0, start) + linkText + messageInput.value.substring(start);
         messageInput.value = newText;
@@ -871,24 +887,23 @@
 
     // Submit confirmation
     document.getElementById('broadcastForm').addEventListener('submit', async function(e) {
-        const message = messageInput?.value.trim() || '';
         const targetType = document.querySelector('input[name="target_type"]:checked')?.value;
-        let confirmText = 'Отправить сообщение ';
+        let confirmText = '';
 
         if (targetType === 'all') {
-            confirmText += 'ВСЕМ пользователям?';
+            confirmText = broadcastLocales.confirmAll;
         } else if (targetType === 'company') {
             const companies = Array.from(document.querySelectorAll('#companyCheckboxes input:checked')).map(cb => cb.value);
-            if (!companies.length) { alert('Выберите хотя бы одну компанию!'); e.preventDefault(); return; }
-            confirmText += `пользователям компаний: ${companies.join(', ')}?`;
+            if (!companies.length) { alert(broadcastLocales.selectCompanyWarning); e.preventDefault(); return; }
+            confirmText = broadcastLocales.confirmCompanies.replace('{}', companies.join(', '));
         } else if (targetType === 'specific') {
             const selected = document.querySelectorAll('.user-checkbox:checked').length;
-            if (!selected) { alert('Выберите хотя бы одного пользователя!'); e.preventDefault(); return; }
-            confirmText += `выбранным пользователям (${selected})?`;
+            if (!selected) { alert(broadcastLocales.selectUserWarning); e.preventDefault(); return; }
+            confirmText = broadcastLocales.confirmUsers.replace('{}', selected);
         } else if (targetType === 'conference') {
             const conferences = Array.from(document.querySelectorAll('#conferenceCheckboxes input:checked')).map(cb => cb.value);
-            if (!conferences.length) { alert('Выберите хотя бы одну конференцию!'); e.preventDefault(); return; }
-            confirmText += `участникам конференций: ${conferences.join(', ')}?`;
+            if (!conferences.length) { alert(broadcastLocales.selectConferenceWarning); e.preventDefault(); return; }
+            confirmText = broadcastLocales.confirmConferences.replace('{}', conferences.join(', '));
         }
 
         if (!confirm(confirmText)) e.preventDefault();

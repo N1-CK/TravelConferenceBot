@@ -509,11 +509,11 @@
         <div class="chat-sidebar" id="chatSidebar">
             <div class="telegram-folders-bar" id="foldersBar">
                 <div class="folder-pill active" data-folder="all" onclick="selectFolder('all')">
-                    <span>Все</span>
+                    <span>{{ get_text('all_folders') }}</span>
                     <span class="badge bg-secondary" id="count-all">0</span>
                 </div>
                 <div class="folder-pill" data-folder="unread" onclick="selectFolder('unread')">
-                    <span>Непрочитанные</span>
+                    <span>{{ get_text('unread_folders') }}</span>
                     <span class="badge bg-danger" id="count-unread">0</span>
                 </div>
 
@@ -526,16 +526,16 @@
                     {% endfor %}
                 </div>
 
-                <button type="button" class="btn-add-folder" onclick="openCreateFolderModal()" title="Создать новую папку">
+                <button type="button" class="btn-add-folder" onclick="openCreateFolderModal()" title="{{ get_text('create_new_folder') }}">
                     <i class="bi bi-plus-lg"></i>
                 </button>
             </div>
 
             <div id="archiveViewHeader" class="archive-view-header" style="display: none;">
-                <span class="archive-back-btn" onclick="exitArchiveMode()" title="Вернуться ко всем чатам">
+                <span class="archive-back-btn" onclick="exitArchiveMode()" title="{{ get_text('back_to_all_chats') }}">
                     <i class="bi bi-arrow-left"></i>
                 </span>
-                <span>Архив чатов</span>
+                <span>{{ get_text('archive_header') }}</span>
             </div>
 
             <div class="p-3 border-bottom">
@@ -548,10 +548,10 @@
                 </div>
                 <div class="flex-grow-1" style="min-width: 0;">
                     <div class="d-flex justify-content-between align-items-center">
-                        <strong>Архив чатов</strong>
+                        <strong>{{ get_text('archive_header') }}</strong>
                         <span class="badge bg-secondary rounded-pill" id="archiveTotalCount">0</span>
                     </div>
-                    <small class="text-muted text-truncate d-block">Архивированные переписки</small>
+                    <small class="text-muted text-truncate d-block">{{ get_text('archive_desc') }}</small>
                 </div>
             </div>
 
@@ -588,7 +588,7 @@
         <div class="chat-main" id="chatMain">
             <div class="chat-header" id="chatHeader">
                 <div class="d-flex align-items-center" style="min-width: 0;">
-                    <button type="button" class="mobile-chat-back-btn" onclick="event.stopPropagation(); backToChatsList();" title="Назад к чатам">
+                    <button type="button" class="mobile-chat-back-btn" onclick="event.stopPropagation(); backToChatsList();" title="{{ get_text('back_to_chats') }}">
                         <i class="bi bi-arrow-left"></i>
                     </button>
                     <div class="conversation-avatar me-3" style="width: 38px; height: 38px; font-size: 1rem;">?</div>
@@ -598,8 +598,8 @@
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-primary" id="btnManageChatFolders" style="display: none;" onclick="openChatFoldersModal()" title="Настроить папки чата">
-                        <i class="bi bi-folder-plus me-1"></i> <span class="d-none d-md-inline">Папки</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="btnManageChatFolders" style="display: none;" onclick="openChatFoldersModal()" title="{{ get_text('manage_chat_folders') }}">
+                        <i class="bi bi-folder-plus me-1"></i> <span class="d-none d-md-inline">{{ get_text('folders') }}</span>
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" onclick="currentUserId && showUserCard(currentUserId)" title="{{ get_text('user_details') }}">
                         <i class="bi bi-info-lg"></i>
@@ -708,7 +708,6 @@
                     </div>
                     <div class="d-flex justify-content-between px-2 mt-1">
                         <small class="text-muted"><span id="chatCharCounter">0 / 4000</span></small>
-                        <small class="text-muted"><i class="bi bi-code-slash"></i> {{ get_text('html_supported') }}</small>
                     </div>
                 </form>
             </div>
@@ -792,16 +791,16 @@
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content">
             <div class="modal-header py-2">
-                <h6 class="modal-title">Создать папку</h6>
+                <h6 class="modal-title">{{ get_text('create_folder_title') }}</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <label class="form-label small text-muted">Название папки</label>
-                <input type="text" id="newFolderNameInput" class="form-control" placeholder="Например: VIP, Срочно, PR...">
+                <label class="form-label small text-muted">{{ get_text('folder_name_label') }}</label>
+                <input type="text" id="newFolderNameInput" class="form-control" placeholder="{{ get_text('folder_name_placeholder') }}">
             </div>
             <div class="modal-footer py-2">
-                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-sm btn-primary" onclick="submitCreateFolder()">Создать</button>
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">{{ get_text('cancel') }}</button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="submitCreateFolder()">{{ get_text('create_folder_btn') }}</button>
             </div>
         </div>
     </div>
@@ -811,15 +810,15 @@
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content">
             <div class="modal-header py-2">
-                <h6 class="modal-title">Папки чата</h6>
+                <h6 class="modal-title">{{ get_text('chat_folders_title') }}</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="text-muted small mb-2">Выберите, в каких ваших папках будет находиться этот пользователь:</div>
+                <div class="text-muted small mb-2">{{ get_text('chat_folders_select_hint') }}</div>
                 <div id="chatFoldersCheckboxesList"></div>
             </div>
             <div class="modal-footer py-2">
-                <button type="button" class="btn btn-sm btn-primary w-100" data-bs-dismiss="modal">Готово</button>
+                <button type="button" class="btn btn-sm btn-primary w-100" data-bs-dismiss="modal">{{ get_text('done_btn') }}</button>
             </div>
         </div>
     </div>
@@ -827,13 +826,13 @@
 
 <div id="chatContextMenu" class="chat-context-menu">
     <div class="chat-context-menu-item" id="ctxToggleUnread" onclick="executeContextAction('unread')">
-        <i class="bi bi-envelope"></i> <span>Пометить как непрочитанное</span>
+        <i class="bi bi-envelope"></i> <span>{{ get_text('mark_as_unread') }}</span>
     </div>
     <div class="chat-context-menu-item" id="ctxToggleArchive" onclick="executeContextAction('archive')">
-        <i class="bi bi-archive"></i> <span>В архив</span>
+        <i class="bi bi-archive"></i> <span>{{ get_text('to_archive') }}</span>
     </div>
     <div class="chat-context-menu-item" id="ctxToggleMute" onclick="executeContextAction('mute')">
-        <i class="bi bi-bell-slash"></i> <span>Отключить уведомления</span>
+        <i class="bi bi-bell-slash"></i> <span>{{ get_text('mute_notifications') }}</span>
     </div>
 </div>
 {% endblock %}
@@ -873,7 +872,16 @@
         statusPaid: "{{ get_text('status_paid') }}",
         flightsPurchased: "{{ get_text('flights_purchased') }}",
         perDiemCard: "{{ get_text('per_diem_card') }}",
-        perDiemCrypto: "{{ get_text('per_diem_crypto') }}"
+        perDiemCrypto: "{{ get_text('per_diem_crypto') }}",
+        markAsRead: "{{ get_text('mark_as_read') }}",
+        markAsUnread: "{{ get_text('mark_as_unread') }}",
+        toArchive: "{{ get_text('to_archive') }}",
+        unarchive: "{{ get_text('unarchive') }}",
+        muteNotifications: "{{ get_text('mute_notifications') }}",
+        unmuteNotifications: "{{ get_text('unmute_notifications') }}",
+        confirmDeleteFolder: "{{ get_text('confirm_delete_folder') }}",
+        errorCreateFolder: "{{ get_text('error_create_folder') }}",
+        noFoldersHint: "{{ get_text('no_folders_hint') }}"
     };
 
     let currentUserId = null;
@@ -926,26 +934,23 @@
         const item = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
         if (!item) return;
 
-        const isUnread = parseInt(item.getAttribute('data-unread') || '0') > 0;
-        const isArchived = item.getAttribute('data-archived') === '1';
-
         const unreadLabel = document.querySelector('#ctxToggleUnread span');
         const unreadIcon = document.querySelector('#ctxToggleUnread i');
         if (isUnread) {
-            unreadLabel.textContent = 'Пометить как прочитанное';
+            unreadLabel.textContent = locales.markAsRead;
             unreadIcon.className = 'bi bi-envelope-open';
         } else {
-            unreadLabel.textContent = 'Пометить как непрочитанное';
+            unreadLabel.textContent = locales.markAsUnread;
             unreadIcon.className = 'bi bi-envelope';
         }
 
         const archiveLabel = document.querySelector('#ctxToggleArchive span');
         const archiveIcon = document.querySelector('#ctxToggleArchive i');
         if (isArchived) {
-            archiveLabel.textContent = 'Разархивировать';
+            archiveLabel.textContent = locales.unarchive;
             archiveIcon.className = 'bi bi-arrow-up-right-circle';
         } else {
-            archiveLabel.textContent = 'В архив';
+            archiveLabel.textContent = locales.toArchive;
             archiveIcon.className = 'bi bi-archive';
         }
 
@@ -953,7 +958,7 @@
         const muteLabel = document.querySelector('#ctxToggleMute span');
         const muteIcon = document.querySelector('#ctxToggleMute i');
         if (muteLabel && muteIcon) {
-            muteLabel.textContent = isMuted ? 'Включить уведомления' : 'Отключить уведомления';
+            muteLabel.textContent = isMuted ? locales.unmuteNotifications : locales.muteNotifications;
             muteIcon.className = isMuted ? 'bi bi-bell' : 'bi bi-bell-slash';
         }
 
@@ -1156,7 +1161,8 @@
 
     function handleFolderContextMenu(event, folderId, folderName) {
         event.preventDefault();
-        if (confirm(`Удалить папку "${folderName}"? Сами диалоги удалены не будут.`)) {
+        const confirmMsg = locales.confirmDeleteFolder.replace('{}', folderName);
+        if (confirm(confirmMsg)) {
             fetch(`/api/folders/${folderId}`, { method: 'DELETE' })
                 .then(r => r.json())
                 .then(() => {
@@ -1171,7 +1177,7 @@
         if (!currentUserId) return;
         const listDiv = document.getElementById('chatFoldersCheckboxesList');
         if (!managerFoldersCache.length) {
-            listDiv.innerHTML = '<div class="text-muted small">У вас пока нет папок. Создайте их кнопкой "+" в панели над чатами.</div>';
+            listDiv.innerHTML = `<div class="text-muted small">${locales.noFoldersHint}</div>`;
             new bootstrap.Modal(document.getElementById('chatFoldersModal')).show();
             return;
         }

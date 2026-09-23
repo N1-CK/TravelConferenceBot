@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Управление менеджерами{% endblock %}
+{% block title %}{{ get_text('managers_management') }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -22,9 +22,9 @@
 {% block content %}
 <div class="fade-in">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="bi bi-shield-lock"></i> Управление менеджерами</h2>
+        <h2><i class="bi bi-shield-lock"></i> {{ get_text('managers_management') }}</h2>
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addManagerModal">
-            <i class="bi bi-plus-circle"></i> Добавить менеджера
+            <i class="bi bi-plus-circle"></i> {{ get_text('add_manager') }}
         </button>
     </div>
 
@@ -33,19 +33,19 @@
         <div class="col-md-4 mb-3">
             <div class="stat-card">
                 <div class="stat-number">{{ managers|length }}</div>
-                <div class="stat-label">Всего менеджеров</div>
+                <div class="stat-label">{{ get_text('total_managers') }}</div>
             </div>
         </div>
         <div class="col-md-4 mb-3">
             <div class="stat-card">
                 <div class="stat-number text-success">{{ managers|selectattr('is_active')|list|length }}</div>
-                <div class="stat-label">Активных</div>
+                <div class="stat-label">{{ get_text('active_managers') }}</div>
             </div>
         </div>
         <div class="col-md-4 mb-3">
             <div class="stat-card">
                 <div class="stat-number text-info">{{ groups|length }}</div>
-                <div class="stat-label">Групп доступа</div>
+                <div class="stat-label">{{ get_text('access_groups') }}</div>
             </div>
         </div>
     </div>
@@ -53,20 +53,20 @@
     <!-- Managers Table -->
     <div class="card">
         <div class="card-header">
-            <i class="bi bi-people"></i> Список менеджеров
+            <i class="bi bi-people"></i> {{ get_text('managers_list') }}
         </div>
         <div class="card-body">
             <div class="table-responsive">
                 <table id="managersTable" class="table table-hover">
                     <thead>
                         <tr>
-                            <th>ID</th>
-                            <th>Логин</th>
-                            <th>Полное имя</th>
-                            <th>Группы доступа</th>
-                            <th>Статус</th>
-                            <th>Последний вход</th>
-                            <th>Действия</th>
+                            <th>{{ get_text('id') }}</th>
+                            <th>{{ get_text('login') }}</th>
+                            <th>{{ get_text('full_name') }}</th>
+                            <th>{{ get_text('access_groups_col') }}</th>
+                            <th>{{ get_text('status') }}</th>
+                            <th>{{ get_text('last_login') }}</th>
+                            <th>{{ get_text('actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -82,9 +82,9 @@
                             </td>
                             <td>
                                 {% if manager.is_active %}
-                                <span class="badge bg-success">Активен</span>
+                                <span class="badge bg-success">{{ get_text('active') }}</span>
                                 {% else %}
-                                <span class="badge bg-secondary">Заблокирован</span>
+                                <span class="badge bg-secondary">{{ get_text('blocked') }}</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -95,14 +95,14 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <button class="btn btn-sm btn-outline-primary" onclick="editManager({{ manager.id }})">
+                                <button class="btn btn-sm btn-outline-primary" onclick="editManager({{ manager.id }})" title="{{ get_text('edit') }}">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                <button class="btn btn-sm btn-outline-warning" onclick="resetPassword({{ manager.id }})">
+                                <button class="btn btn-sm btn-outline-warning" onclick="resetPassword({{ manager.id }})" title="{{ get_text('reset_password') }}">
                                     <i class="bi bi-key"></i>
                                 </button>
                                 {% if manager.username != session.username %}
-                                <button class="btn btn-sm btn-outline-danger" onclick="deleteManager({{ manager.id }})">
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteManager({{ manager.id }})" title="{{ get_text('delete') }}">
                                     <i class="bi bi-trash"></i>
                                 </button>
                                 {% endif %}
@@ -121,25 +121,25 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Добавить менеджера</h5>
+                <h5 class="modal-title">{{ get_text('add_manager') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="/admin_managers/add" method="POST">
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Логин *</label>
+                        <label class="form-label">{{ get_text('login') }} *</label>
                         <input type="text" class="form-control" name="username" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Пароль *</label>
+                        <label class="form-label">{{ get_text('password') }} *</label>
                         <input type="password" class="form-control" name="password" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Полное имя</label>
+                        <label class="form-label">{{ get_text('full_name') }}</label>
                         <input type="text" class="form-control" name="full_name">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Группы доступа</label>
+                        <label class="form-label">{{ get_text('access_groups_col') }}</label>
                         {% for group in groups %}
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" name="groups" value="{{ group.name }}">
@@ -149,8 +149,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="submit" class="btn btn-primary">Добавить</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('cancel') }}</button>
+                    <button type="submit" class="btn btn-primary">{{ get_text('btn_add') }}</button>
                 </div>
             </form>
         </div>
@@ -162,29 +162,29 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Редактировать менеджера</h5>
+                <h5 class="modal-title">{{ get_text('edit_manager') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="editManagerForm" method="POST">
                 <div class="modal-body">
                     <input type="hidden" id="editManagerId" name="manager_id">
                     <div class="mb-3">
-                        <label class="form-label">Логин</label>
+                        <label class="form-label">{{ get_text('login') }}</label>
                         <input type="text" class="form-control" id="editUsername" readonly>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Полное имя</label>
+                        <label class="form-label">{{ get_text('full_name') }}</label>
                         <input type="text" class="form-control" id="editFullName" name="full_name">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Статус</label>
+                        <label class="form-label">{{ get_text('status') }}</label>
                         <select class="form-select" id="editIsActive" name="is_active">
-                            <option value="true">Активен</option>
-                            <option value="false">Заблокирован</option>
+                            <option value="true">{{ get_text('active') }}</option>
+                            <option value="false">{{ get_text('blocked') }}</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Группы доступа</label>
+                        <label class="form-label">{{ get_text('access_groups_col') }}</label>
                         <div id="editGroupsContainer">
                             {% for group in groups %}
                             <div class="form-check">
@@ -196,8 +196,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('cancel') }}</button>
+                    <button type="submit" class="btn btn-primary">{{ get_text('save') }}</button>
                 </div>
             </form>
         </div>
@@ -209,24 +209,24 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Сброс пароля</h5>
+                <h5 class="modal-title">{{ get_text('reset_password') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="resetPasswordForm" method="POST">
                 <div class="modal-body">
                     <input type="hidden" id="resetManagerId" name="manager_id">
                     <div class="mb-3">
-                        <label class="form-label">Новый пароль</label>
+                        <label class="form-label">{{ get_text('new_password') }}</label>
                         <input type="password" class="form-control" name="new_password" required minlength="6">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Подтверждение пароля</label>
+                        <label class="form-label">{{ get_text('confirm_password') }}</label>
                         <input type="password" class="form-control" name="confirm_password" required>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="submit" class="btn btn-warning">Сбросить пароль</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('cancel') }}</button>
+                    <button type="submit" class="btn btn-warning">{{ get_text('reset_password') }}</button>
                 </div>
             </form>
         </div>
@@ -236,9 +236,16 @@
 
 {% block extra_js %}
 <script>
+    const managerLocales = {
+        deleteConfirm: "{{ get_text('confirm_delete_manager') }}",
+        passwordsMismatch: "{{ get_text('passwords_not_match') }}",
+        passwordLength: "{{ get_text('password_min_length') }}"
+    };
+
     $(document).ready(function() {
+        const lang = '{{ session.get("lang", "ru") }}';
         $('#managersTable').DataTable({
-            language: { url: '//cdn.datatables.net/plug-ins/1.11.5/i18n/ru.json' },
+            language: { url: `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json` },
             pageLength: 25,
             order: [[0, 'asc']]
         });
@@ -270,7 +277,7 @@
     }
 
     function deleteManager(id) {
-        if (confirm('Удалить менеджера? Это действие нельзя отменить.')) {
+        if (confirm(managerLocales.deleteConfirm)) {
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = `/admin_managers/delete/${id}`;
@@ -285,10 +292,10 @@
 
         if (newPass !== confirmPass) {
             e.preventDefault();
-            alert('Пароли не совпадают');
+            alert(managerLocales.passwordsMismatch);
         } else if (newPass.length < 6) {
             e.preventDefault();
-            alert('Пароль должен содержать минимум 6 символов');
+            alert(managerLocales.passwordLength);
         }
     });
 </script>

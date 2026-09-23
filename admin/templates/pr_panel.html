@@ -476,17 +476,17 @@
                                                     <button class="btn btn-outline-warning"
                                                             onclick="updateBannerStatus({{ req.id }}, 'pending')"
                                                             {% if req.status == 'pending' %}disabled{% endif %}>
-                                                        <i class="bi bi-hourglass-split"></i> Ожидание
+                                                        <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_badge') }}
                                                     </button>
                                                     <button class="btn btn-outline-info"
                                                             onclick="updateBannerStatus({{ req.id }}, 'in_progress')"
                                                             {% if req.status == 'in_progress' %}disabled{% endif %}>
-                                                        <i class="bi bi-arrow-repeat"></i> В процессе
+                                                        <i class="bi bi-arrow-repeat"></i> {{ get_text('status_in_progress_badge') }}
                                                     </button>
                                                     <button class="btn btn-outline-success"
                                                             onclick="updateBannerStatus({{ req.id }}, 'ready')"
                                                             {% if req.status == 'ready' %}disabled{% endif %}>
-                                                        <i class="bi bi-check-lg"></i> Готово
+                                                        <i class="bi bi-check-lg"></i> {{ get_text('status_ready_badge') }}
                                                     </button>
                                                 </div>
                                             </div>
@@ -656,19 +656,19 @@
                                             <div class="mobile-card-actions">
                                                 <div class="btn-group btn-group-sm" role="group">
                                                     <button class="btn btn-outline-warning"
-                                                            onclick="updateCardStatus({{ card.id }}, 'pending')"
-                                                            {% if card.status == 'pending' %}disabled{% endif %}>
-                                                        <i class="bi bi-hourglass-split"></i> Ожидание
+                                                            onclick="updateBannerStatus({{ req.id }}, 'pending')"
+                                                            {% if req.status == 'pending' %}disabled{% endif %}>
+                                                        <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_badge') }}
                                                     </button>
                                                     <button class="btn btn-outline-info"
-                                                            onclick="updateCardStatus({{ card.id }}, 'in_progress')"
-                                                            {% if card.status == 'in_progress' %}disabled{% endif %}>
-                                                        <i class="bi bi-arrow-repeat"></i> В процессе
+                                                            onclick="updateBannerStatus({{ req.id }}, 'in_progress')"
+                                                            {% if req.status == 'in_progress' %}disabled{% endif %}>
+                                                        <i class="bi bi-arrow-repeat"></i> {{ get_text('status_in_progress_badge') }}
                                                     </button>
                                                     <button class="btn btn-outline-success"
-                                                            onclick="updateCardStatus({{ card.id }}, 'ready')"
-                                                            {% if card.status == 'ready' %}disabled{% endif %}>
-                                                        <i class="bi bi-check-lg"></i> Готово
+                                                            onclick="updateBannerStatus({{ req.id }}, 'ready')"
+                                                            {% if req.status == 'ready' %}disabled{% endif %}>
+                                                        <i class="bi bi-check-lg"></i> {{ get_text('status_ready_badge') }}
                                                     </button>
                                                 </div>
                                             </div>
