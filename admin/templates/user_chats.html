@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block body_class %}chat-page{% endblock %}
 
 {% block title %}{{ get_text('user_chats') }}{% endblock %}
 
@@ -6,7 +7,7 @@
 <style>
     /* Десктопная разметка */
     .chat-container { display: flex; height: calc(100vh - 150px); background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.08); position: relative; }
-    .chat-sidebar { width: 340px; border-right: 1px solid #dee2e6; overflow-y: auto; background: #f8f9fa; display: flex; flex-direction: column; }
+    .chat-sidebar { width: min(340px, 40%); flex-shrink: 0; border-right: 1px solid #dee2e6; overflow-y: auto; background: #f8f9fa; display: flex; flex-direction: column; }
     .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; background: white; }
     .chat-header { padding: 12px 20px; border-bottom: 1px solid #dee2e6; background: white; display: flex; align-items: center; justify-content: space-between; }
     .chat-messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px; background: #f8f9fa; }
@@ -330,13 +331,27 @@
     }
 
     /* Адаптив для смартфонов */
-    @media (max-width: 768px) {
+    @media (max-width: 991.98px) {
         /* Общая высота страницы — dynamic viewport */
-        html, body {
-            height: 100dvh !important;
-            max-height: 100dvh !important;
+        html, body.chat-page {
             overflow: hidden !important;
             margin: 0 !important;
+            padding: 0 !important;
+        }
+        body.chat-page {
+            display: flex;
+            flex-direction: column;
+            height: var(--chat-viewport-height, 100dvh) !important;
+            max-height: var(--chat-viewport-height, 100dvh) !important;
+        }
+        body.chat-page .mobile-header { flex-shrink: 0; }
+        body.chat-page > .container-fluid { flex: 1 1 auto; min-height: 0; }
+        body.chat-page > .container-fluid > .row { height: 100%; }
+        body.chat-page .main-content {
+            display: flex;
+            flex-direction: column;
+            min-height: 0 !important;
+            height: 100%;
             padding: 0 !important;
         }
 
@@ -356,8 +371,9 @@
         #chatsTab {
             display: flex !important;
             flex-direction: column !important;
-            height: calc(100dvh - 56px - 44px) !important;
-            max-height: calc(100dvh - 56px - 44px) !important;
+            flex: 1 1 auto;
+            height: auto !important;
+            max-height: none !important;
             min-height: 0 !important;
             overflow: hidden !important;
         }
@@ -483,11 +499,23 @@
         }
 
         #questionsTab {
-            height: calc(100dvh - 56px - 44px) !important;
+            flex: 1 1 auto;
+            min-height: 0;
+            height: auto !important;
             overflow-y: auto !important;
             padding: 8px;
             -webkit-overflow-scrolling: touch !important;
         }
+        body.chat-page #chatsTab.is-hidden,
+        body.chat-page #questionsTab.is-hidden { display: none !important; }
+        .chat-header > div:first-child { flex: 1 1 auto; min-width: 0; }
+        .chat-header > div:last-child { flex-shrink: 0; }
+        .chat-header .conversation-avatar { flex-shrink: 0; margin-right: .5rem !important; }
+        .chat-header .text-truncate { min-width: 0; }
+        .tg-voice-player { max-width: 100%; }
+        .tg-images-grid { max-width: 100%; }
+        .user-info-card .info-label { width: 36%; min-width: 0; }
+        .user-info-card .info-value { min-width: 0; overflow-wrap: anywhere; }
     }
 </style>
 {% endblock %}
@@ -1966,8 +1994,12 @@
     }
 
     function switchTab(tab) {
-        document.getElementById('chatsTab').style.display = (tab === 'chats') ? 'block' : 'none';
-        document.getElementById('questionsTab').style.display = (tab === 'questions') ? 'block' : 'none';
+        const chats = document.getElementById('chatsTab');
+        const questions = document.getElementById('questionsTab');
+        chats.classList.toggle('is-hidden', tab !== 'chats');
+        questions.classList.toggle('is-hidden', tab !== 'questions');
+        chats.style.display = (tab === 'chats') ? '' : 'none';
+        questions.style.display = (tab === 'questions') ? 'block' : 'none';
 
         document.querySelectorAll('#chatTabs .nav-link').forEach(btn => {
             btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
@@ -2145,23 +2177,20 @@
     if (window.visualViewport) {
         const vv = window.visualViewport;
         const applyKeyboardFix = () => {
-            const isMobile = window.matchMedia('(max-width: 768px)').matches;
-            if (!isMobile) return;
-            const keyboardHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-            document.documentElement.style.setProperty('--kb-height', keyboardHeight + 'px');
-            if (keyboardHeight > 50) {
-                document.querySelectorAll('.chat-input').forEach(el => {
-                    el.style.paddingBottom = `calc(10px + ${keyboardHeight}px + env(safe-area-inset-bottom, 0px))`;
-                });
+            const isMobile = window.matchMedia('(max-width: 991.98px)').matches;
+            if (!isMobile) {
+                document.body.style.removeProperty('--chat-viewport-height');
+                return;
+            }
+            document.body.style.setProperty('--chat-viewport-height', vv.height + 'px');
+            if (window.innerHeight - vv.height - vv.offsetTop > 50) {
                 scrollToBottomForce(false);
-            } else {
-                document.querySelectorAll('.chat-input').forEach(el => {
-                    el.style.paddingBottom = '';
-                });
             }
         };
         vv.addEventListener('resize', applyKeyboardFix);
         vv.addEventListener('scroll', applyKeyboardFix);
+        window.addEventListener('resize', applyKeyboardFix);
+        applyKeyboardFix();
     }
 </script>
 

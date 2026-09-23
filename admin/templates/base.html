@@ -15,7 +15,7 @@
         body {
             background: #f0f2f5;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            overflow-x: hidden;
+            overflow-x: clip;
         }
 
         /* Верхняя мобильная плашка */
@@ -58,27 +58,37 @@
         }
 
         /* Выдвижной сайдбар на мобилках */
-        @media (max-width: 768px) {
+        @media (max-width: 991.98px) {
             .mobile-header {
                 display: flex;
+                gap: 10px;
+                padding-top: max(12px, env(safe-area-inset-top));
+                padding-left: max(18px, env(safe-area-inset-left));
+                padding-right: max(18px, env(safe-area-inset-right));
             }
+            .mobile-header .fw-bold { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .mobile-header > button, .mobile-header > .user-avatar { flex-shrink: 0; }
             .sidebar {
                 position: fixed;
                 top: 0;
-                left: -280px;
-                width: 280px;
-                height: 100vh;
+                left: 0;
+                width: min(280px, 85vw);
+                height: 100dvh;
+                transform: translateX(-105%);
                 box-shadow: 5px 0 25px rgba(0,0,0,0.3);
             }
             .sidebar.active {
-                left: 0;
+                transform: translateX(0);
             }
+            .sidebar .user-info button { display: inline-block !important; }
             .sidebar-backdrop.active {
                 display: block;
             }
             .main-content {
+                width: 100%;
+                flex: 0 0 100%;
                 padding: 14px 10px !important;
-                min-height: calc(100vh - 56px);
+                min-height: 0;
             }
             .toast-container {
                 top: 70px !important;
@@ -336,13 +346,51 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
         }
+
+        /* Keep wide data inside its own scroll region instead of clipping the page. */
+        .main-content, .card, .card-body, .tab-content, .tab-pane { min-width: 0; }
+        .main-content img, .modal img { max-width: 100%; height: auto; }
+        .table-responsive { max-width: 100%; -webkit-overflow-scrolling: touch; }
+        .modal-body { overflow-wrap: anywhere; overflow-x: auto; }
+        .modal-body .table { min-width: max-content; }
+        .modal-body .table-responsive .table { margin-bottom: 0; }
+        .modal-body pre { max-width: 100%; overflow-x: auto; }
+
+        @media (max-width: 767.98px) {
+            .main-content { padding-bottom: max(14px, env(safe-area-inset-bottom)) !important; }
+            .main-content .card-body, .main-content .card-header { min-width: 0; }
+            .main-content .card-body :is(input, select, textarea) { max-width: 100%; }
+            .main-content .btn-group .btn { white-space: normal; overflow-wrap: anywhere; }
+            .main-content .info-row > *, .main-content .detail-row > * { min-width: 0; overflow-wrap: anywhere; }
+            .main-content .badge { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+            .main-content h1, .main-content h2 { overflow-wrap: anywhere; }
+            .main-content > .fade-in > .d-flex.justify-content-between,
+            .main-content > .fade-in > .card-header.d-flex.justify-content-between {
+                flex-wrap: wrap;
+                gap: .75rem;
+            }
+            .card-header.d-flex { flex-wrap: wrap; gap: .5rem; }
+            .card-header .btn-group { max-width: 100%; overflow-x: auto; }
+            .nav-tabs { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+            .nav-tabs .nav-item { flex-shrink: 0; }
+            .dataTables_wrapper > .row { min-width: 0; }
+            .dataTables_wrapper .dataTables_filter,
+            .dataTables_wrapper .dataTables_length { text-align: left; }
+            .dataTables_wrapper .dataTables_filter label,
+            .dataTables_wrapper .dataTables_filter input { max-width: 100%; }
+            .dataTables_wrapper .dataTables_paginate .pagination { flex-wrap: wrap; justify-content: center; gap: .25rem; }
+            .modal-dialog { margin: .5rem; max-width: calc(100% - 1rem); }
+            .modal-body :is(input, select, textarea) { max-width: 100%; font-size: 16px; }
+            .modal-footer { flex-wrap: wrap; }
+            .toast-container { max-width: calc(100vw - 30px); }
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
     {% if session.logged_in %}
     <div class="mobile-header">
-        <button class="btn text-white p-0" onclick="toggleSidebar()" type="button">
+        <button class="btn text-white p-0" onclick="toggleSidebar()" type="button" aria-label="Открыть меню" aria-controls="appSidebar" aria-expanded="false" id="sidebarToggle">
             <i class="bi bi-list fs-2"></i>
         </button>
         <div class="fw-bold fs-6">Travel Conference Bot</div>
@@ -377,7 +425,7 @@
                 <div class="user-info">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0 text-truncate"><i class="bi bi-person-circle me-2"></i> {{ session.full_name or session.username }}</h5>
-                        <button class="btn text-white-50 d-md-none p-0" onclick="toggleSidebar()"><i class="bi bi-x-lg fs-5"></i></button>
+                        <button class="btn text-white-50 d-md-none p-0" type="button" aria-label="Закрыть меню" onclick="toggleSidebar()"><i class="bi bi-x-lg fs-5"></i></button>
                     </div>
                     <p class="mt-1">{{ get_text('role_' + session.role) if session.role else get_text('role_user') }}</p>
                     {% if session.groups %}
@@ -454,6 +502,7 @@
         function toggleSidebar() {
             document.getElementById('appSidebar').classList.toggle('active');
             document.getElementById('sidebarBackdrop').classList.toggle('active');
+            document.getElementById('sidebarToggle').setAttribute('aria-expanded', document.getElementById('appSidebar').classList.contains('active'));
         }
 
         document.querySelectorAll('.toast').forEach(toast => {
