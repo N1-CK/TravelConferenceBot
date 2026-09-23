@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% block body_class %}chat-page{% endblock %}
 
 {% block title %}{{ get_text('user_chats') }}{% endblock %}
 
@@ -7,7 +6,7 @@
 <style>
     /* Десктопная разметка */
     .chat-container { display: flex; height: calc(100vh - 150px); background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.08); position: relative; }
-    .chat-sidebar { width: min(340px, 40%); flex-shrink: 0; border-right: 1px solid #dee2e6; overflow-y: auto; background: #f8f9fa; display: flex; flex-direction: column; }
+    .chat-sidebar { width: 340px; border-right: 1px solid #dee2e6; overflow-y: auto; background: #f8f9fa; display: flex; flex-direction: column; }
     .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; background: white; }
     .chat-header { padding: 12px 20px; border-bottom: 1px solid #dee2e6; background: white; display: flex; align-items: center; justify-content: space-between; }
     .chat-messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px; background: #f8f9fa; }
@@ -331,27 +330,13 @@
     }
 
     /* Адаптив для смартфонов */
-    @media (max-width: 991.98px) {
+    @media (max-width: 768px) {
         /* Общая высота страницы — dynamic viewport */
-        html, body.chat-page {
+        html, body {
+            height: 100dvh !important;
+            max-height: 100dvh !important;
             overflow: hidden !important;
             margin: 0 !important;
-            padding: 0 !important;
-        }
-        body.chat-page {
-            display: flex;
-            flex-direction: column;
-            height: var(--chat-viewport-height, 100dvh) !important;
-            max-height: var(--chat-viewport-height, 100dvh) !important;
-        }
-        body.chat-page .mobile-header { flex-shrink: 0; }
-        body.chat-page > .container-fluid { flex: 1 1 auto; min-height: 0; }
-        body.chat-page > .container-fluid > .row { height: 100%; }
-        body.chat-page .main-content {
-            display: flex;
-            flex-direction: column;
-            min-height: 0 !important;
-            height: 100%;
             padding: 0 !important;
         }
 
@@ -371,9 +356,8 @@
         #chatsTab {
             display: flex !important;
             flex-direction: column !important;
-            flex: 1 1 auto;
-            height: auto !important;
-            max-height: none !important;
+            height: calc(100dvh - 56px - 44px) !important;
+            max-height: calc(100dvh - 56px - 44px) !important;
             min-height: 0 !important;
             overflow: hidden !important;
         }
@@ -499,23 +483,11 @@
         }
 
         #questionsTab {
-            flex: 1 1 auto;
-            min-height: 0;
-            height: auto !important;
+            height: calc(100dvh - 56px - 44px) !important;
             overflow-y: auto !important;
             padding: 8px;
             -webkit-overflow-scrolling: touch !important;
         }
-        body.chat-page #chatsTab.is-hidden,
-        body.chat-page #questionsTab.is-hidden { display: none !important; }
-        .chat-header > div:first-child { flex: 1 1 auto; min-width: 0; }
-        .chat-header > div:last-child { flex-shrink: 0; }
-        .chat-header .conversation-avatar { flex-shrink: 0; margin-right: .5rem !important; }
-        .chat-header .text-truncate { min-width: 0; }
-        .tg-voice-player { max-width: 100%; }
-        .tg-images-grid { max-width: 100%; }
-        .user-info-card .info-label { width: 36%; min-width: 0; }
-        .user-info-card .info-value { min-width: 0; overflow-wrap: anywhere; }
     }
 </style>
 {% endblock %}
@@ -537,11 +509,11 @@
         <div class="chat-sidebar" id="chatSidebar">
             <div class="telegram-folders-bar" id="foldersBar">
                 <div class="folder-pill active" data-folder="all" onclick="selectFolder('all')">
-                    <span>{{ get_text('all_folders') }}</span>
+                    <span>Все</span>
                     <span class="badge bg-secondary" id="count-all">0</span>
                 </div>
                 <div class="folder-pill" data-folder="unread" onclick="selectFolder('unread')">
-                    <span>{{ get_text('unread_folders') }}</span>
+                    <span>Непрочитанные</span>
                     <span class="badge bg-danger" id="count-unread">0</span>
                 </div>
 
@@ -554,16 +526,16 @@
                     {% endfor %}
                 </div>
 
-                <button type="button" class="btn-add-folder" onclick="openCreateFolderModal()" title="{{ get_text('create_new_folder') }}">
+                <button type="button" class="btn-add-folder" onclick="openCreateFolderModal()" title="Создать новую папку">
                     <i class="bi bi-plus-lg"></i>
                 </button>
             </div>
 
             <div id="archiveViewHeader" class="archive-view-header" style="display: none;">
-                <span class="archive-back-btn" onclick="exitArchiveMode()" title="{{ get_text('back_to_all_chats') }}">
+                <span class="archive-back-btn" onclick="exitArchiveMode()" title="Вернуться ко всем чатам">
                     <i class="bi bi-arrow-left"></i>
                 </span>
-                <span>{{ get_text('archive_header') }}</span>
+                <span>Архив чатов</span>
             </div>
 
             <div class="p-3 border-bottom">
@@ -576,10 +548,10 @@
                 </div>
                 <div class="flex-grow-1" style="min-width: 0;">
                     <div class="d-flex justify-content-between align-items-center">
-                        <strong>{{ get_text('archive_header') }}</strong>
+                        <strong>Архив чатов</strong>
                         <span class="badge bg-secondary rounded-pill" id="archiveTotalCount">0</span>
                     </div>
-                    <small class="text-muted text-truncate d-block">{{ get_text('archive_desc') }}</small>
+                    <small class="text-muted text-truncate d-block">Архивированные переписки</small>
                 </div>
             </div>
 
@@ -616,7 +588,7 @@
         <div class="chat-main" id="chatMain">
             <div class="chat-header" id="chatHeader">
                 <div class="d-flex align-items-center" style="min-width: 0;">
-                    <button type="button" class="mobile-chat-back-btn" onclick="event.stopPropagation(); backToChatsList();" title="{{ get_text('back_to_chats') }}">
+                    <button type="button" class="mobile-chat-back-btn" onclick="event.stopPropagation(); backToChatsList();" title="Назад к чатам">
                         <i class="bi bi-arrow-left"></i>
                     </button>
                     <div class="conversation-avatar me-3" style="width: 38px; height: 38px; font-size: 1rem;">?</div>
@@ -626,8 +598,8 @@
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-primary" id="btnManageChatFolders" style="display: none;" onclick="openChatFoldersModal()" title="{{ get_text('manage_chat_folders') }}">
-                        <i class="bi bi-folder-plus me-1"></i> <span class="d-none d-md-inline">{{ get_text('folders') }}</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="btnManageChatFolders" style="display: none;" onclick="openChatFoldersModal()" title="Настроить папки чата">
+                        <i class="bi bi-folder-plus me-1"></i> <span class="d-none d-md-inline">Папки</span>
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle" onclick="currentUserId && showUserCard(currentUserId)" title="{{ get_text('user_details') }}">
                         <i class="bi bi-info-lg"></i>
@@ -736,6 +708,7 @@
                     </div>
                     <div class="d-flex justify-content-between px-2 mt-1">
                         <small class="text-muted"><span id="chatCharCounter">0 / 4000</span></small>
+                        <small class="text-muted"><i class="bi bi-code-slash"></i> {{ get_text('html_supported') }}</small>
                     </div>
                 </form>
             </div>
@@ -819,16 +792,16 @@
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content">
             <div class="modal-header py-2">
-                <h6 class="modal-title">{{ get_text('create_folder_title') }}</h6>
+                <h6 class="modal-title">Создать папку</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <label class="form-label small text-muted">{{ get_text('folder_name_label') }}</label>
-                <input type="text" id="newFolderNameInput" class="form-control" placeholder="{{ get_text('folder_name_placeholder') }}">
+                <label class="form-label small text-muted">Название папки</label>
+                <input type="text" id="newFolderNameInput" class="form-control" placeholder="Например: VIP, Срочно, PR...">
             </div>
             <div class="modal-footer py-2">
-                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">{{ get_text('cancel') }}</button>
-                <button type="button" class="btn btn-sm btn-primary" onclick="submitCreateFolder()">{{ get_text('create_folder_btn') }}</button>
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="submitCreateFolder()">Создать</button>
             </div>
         </div>
     </div>
@@ -838,15 +811,15 @@
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content">
             <div class="modal-header py-2">
-                <h6 class="modal-title">{{ get_text('chat_folders_title') }}</h6>
+                <h6 class="modal-title">Папки чата</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="text-muted small mb-2">{{ get_text('chat_folders_select_hint') }}</div>
+                <div class="text-muted small mb-2">Выберите, в каких ваших папках будет находиться этот пользователь:</div>
                 <div id="chatFoldersCheckboxesList"></div>
             </div>
             <div class="modal-footer py-2">
-                <button type="button" class="btn btn-sm btn-primary w-100" data-bs-dismiss="modal">{{ get_text('done_btn') }}</button>
+                <button type="button" class="btn btn-sm btn-primary w-100" data-bs-dismiss="modal">Готово</button>
             </div>
         </div>
     </div>
@@ -854,13 +827,13 @@
 
 <div id="chatContextMenu" class="chat-context-menu">
     <div class="chat-context-menu-item" id="ctxToggleUnread" onclick="executeContextAction('unread')">
-        <i class="bi bi-envelope"></i> <span>{{ get_text('mark_as_unread') }}</span>
+        <i class="bi bi-envelope"></i> <span>Пометить как непрочитанное</span>
     </div>
     <div class="chat-context-menu-item" id="ctxToggleArchive" onclick="executeContextAction('archive')">
-        <i class="bi bi-archive"></i> <span>{{ get_text('to_archive') }}</span>
+        <i class="bi bi-archive"></i> <span>В архив</span>
     </div>
     <div class="chat-context-menu-item" id="ctxToggleMute" onclick="executeContextAction('mute')">
-        <i class="bi bi-bell-slash"></i> <span>{{ get_text('mute_notifications') }}</span>
+        <i class="bi bi-bell-slash"></i> <span>Отключить уведомления</span>
     </div>
 </div>
 {% endblock %}
@@ -900,16 +873,7 @@
         statusPaid: "{{ get_text('status_paid') }}",
         flightsPurchased: "{{ get_text('flights_purchased') }}",
         perDiemCard: "{{ get_text('per_diem_card') }}",
-        perDiemCrypto: "{{ get_text('per_diem_crypto') }}",
-        markAsRead: "{{ get_text('mark_as_read') }}",
-        markAsUnread: "{{ get_text('mark_as_unread') }}",
-        toArchive: "{{ get_text('to_archive') }}",
-        unarchive: "{{ get_text('unarchive') }}",
-        muteNotifications: "{{ get_text('mute_notifications') }}",
-        unmuteNotifications: "{{ get_text('unmute_notifications') }}",
-        confirmDeleteFolder: "{{ get_text('confirm_delete_folder') }}",
-        errorCreateFolder: "{{ get_text('error_create_folder') }}",
-        noFoldersHint: "{{ get_text('no_folders_hint') }}"
+        perDiemCrypto: "{{ get_text('per_diem_crypto') }}"
     };
 
     let currentUserId = null;
@@ -962,23 +926,26 @@
         const item = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
         if (!item) return;
 
+        const isUnread = parseInt(item.getAttribute('data-unread') || '0', 10) > 0;
+        const isArchived = item.getAttribute('data-archived') === '1';
+
         const unreadLabel = document.querySelector('#ctxToggleUnread span');
         const unreadIcon = document.querySelector('#ctxToggleUnread i');
         if (isUnread) {
-            unreadLabel.textContent = locales.markAsRead;
+            unreadLabel.textContent = 'Пометить как прочитанное';
             unreadIcon.className = 'bi bi-envelope-open';
         } else {
-            unreadLabel.textContent = locales.markAsUnread;
+            unreadLabel.textContent = 'Пометить как непрочитанное';
             unreadIcon.className = 'bi bi-envelope';
         }
 
         const archiveLabel = document.querySelector('#ctxToggleArchive span');
         const archiveIcon = document.querySelector('#ctxToggleArchive i');
         if (isArchived) {
-            archiveLabel.textContent = locales.unarchive;
+            archiveLabel.textContent = 'Разархивировать';
             archiveIcon.className = 'bi bi-arrow-up-right-circle';
         } else {
-            archiveLabel.textContent = locales.toArchive;
+            archiveLabel.textContent = 'В архив';
             archiveIcon.className = 'bi bi-archive';
         }
 
@@ -986,7 +953,7 @@
         const muteLabel = document.querySelector('#ctxToggleMute span');
         const muteIcon = document.querySelector('#ctxToggleMute i');
         if (muteLabel && muteIcon) {
-            muteLabel.textContent = isMuted ? locales.unmuteNotifications : locales.muteNotifications;
+            muteLabel.textContent = isMuted ? 'Включить уведомления' : 'Отключить уведомления';
             muteIcon.className = isMuted ? 'bi bi-bell' : 'bi bi-bell-slash';
         }
 
@@ -1189,8 +1156,7 @@
 
     function handleFolderContextMenu(event, folderId, folderName) {
         event.preventDefault();
-        const confirmMsg = locales.confirmDeleteFolder.replace('{}', folderName);
-        if (confirm(confirmMsg)) {
+        if (confirm(`Удалить папку "${folderName}"? Сами диалоги удалены не будут.`)) {
             fetch(`/api/folders/${folderId}`, { method: 'DELETE' })
                 .then(r => r.json())
                 .then(() => {
@@ -1205,7 +1171,7 @@
         if (!currentUserId) return;
         const listDiv = document.getElementById('chatFoldersCheckboxesList');
         if (!managerFoldersCache.length) {
-            listDiv.innerHTML = `<div class="text-muted small">${locales.noFoldersHint}</div>`;
+            listDiv.innerHTML = '<div class="text-muted small">У вас пока нет папок. Создайте их кнопкой "+" в панели над чатами.</div>';
             new bootstrap.Modal(document.getElementById('chatFoldersModal')).show();
             return;
         }
@@ -1994,12 +1960,8 @@
     }
 
     function switchTab(tab) {
-        const chats = document.getElementById('chatsTab');
-        const questions = document.getElementById('questionsTab');
-        chats.classList.toggle('is-hidden', tab !== 'chats');
-        questions.classList.toggle('is-hidden', tab !== 'questions');
-        chats.style.display = (tab === 'chats') ? '' : 'none';
-        questions.style.display = (tab === 'questions') ? 'block' : 'none';
+        document.getElementById('chatsTab').style.display = (tab === 'chats') ? 'block' : 'none';
+        document.getElementById('questionsTab').style.display = (tab === 'questions') ? 'block' : 'none';
 
         document.querySelectorAll('#chatTabs .nav-link').forEach(btn => {
             btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
@@ -2177,20 +2139,23 @@
     if (window.visualViewport) {
         const vv = window.visualViewport;
         const applyKeyboardFix = () => {
-            const isMobile = window.matchMedia('(max-width: 991.98px)').matches;
-            if (!isMobile) {
-                document.body.style.removeProperty('--chat-viewport-height');
-                return;
-            }
-            document.body.style.setProperty('--chat-viewport-height', vv.height + 'px');
-            if (window.innerHeight - vv.height - vv.offsetTop > 50) {
+            const isMobile = window.matchMedia('(max-width: 768px)').matches;
+            if (!isMobile) return;
+            const keyboardHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+            document.documentElement.style.setProperty('--kb-height', keyboardHeight + 'px');
+            if (keyboardHeight > 50) {
+                document.querySelectorAll('.chat-input').forEach(el => {
+                    el.style.paddingBottom = `calc(10px + ${keyboardHeight}px + env(safe-area-inset-bottom, 0px))`;
+                });
                 scrollToBottomForce(false);
+            } else {
+                document.querySelectorAll('.chat-input').forEach(el => {
+                    el.style.paddingBottom = '';
+                });
             }
         };
         vv.addEventListener('resize', applyKeyboardFix);
         vv.addEventListener('scroll', applyKeyboardFix);
-        window.addEventListener('resize', applyKeyboardFix);
-        applyKeyboardFix();
     }
 </script>
 

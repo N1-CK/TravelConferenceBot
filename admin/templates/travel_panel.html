@@ -432,7 +432,7 @@
                             </td>
 
                             <!-- Created At (Desktop) -->
-                            <td class="col-secondary">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</td>
+                            <td class="col-secondary" data-order="{{ req.created_at.strftime('%Y-%m-%d %H:%M:%S') if req.created_at else '' }}">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</td>
 
                             <!-- Actions -->
                             <td class="col-actions">
@@ -750,7 +750,7 @@
                 url: `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`
             },
             pageLength: 25,
-            order: [[0, 'desc']]
+            order: [[9, 'desc']]
         });
     }
 
