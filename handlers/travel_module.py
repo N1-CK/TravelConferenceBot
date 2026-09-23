@@ -1,10 +1,9 @@
 import logging
 import re
 from datetime import datetime
-from typing import List, Dict, Any, Union
+from typing import Dict, List, Union
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.enums import ParseMode
@@ -13,11 +12,10 @@ from handlers.managers_chat import send_question_to_manager, get_manager_chat_id
 
 from database import db
 import os
-from handlers.managers_chat import send_question_to_manager
 from keyboards import get_travel_menu_keyboard
-from utility.lang_utils import *
+from utility.lang_utils import t
 
-TRAVEL_MANAGER_CHAT_ID = int(os.getenv("TG_TRAVEL_MANAGER_CHAT_ID", 0))
+TRAVEL_MANAGER_CHAT_ID = int(os.getenv("TG_TRAVEL_MANAGER_CHAT_ID", "0"))
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -712,7 +710,6 @@ async def process_baggage(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith("hotel_needed_"), TravelStates.waiting_for_hotel_needed)
 async def process_hotel_needed(callback: CallbackQuery, state: FSMContext):
     """Обработка необходимости отеля"""
-    user_id = callback.from_user.id
     hotel_needed = callback.data == "hotel_needed_yes"
     await state.update_data(hotel_needed=hotel_needed)
 
@@ -733,7 +730,6 @@ async def show_flight_choice(update: Union[Message, CallbackQuery], state: FSMCo
     """Показать выбор рейсов"""
     user_id = update.from_user.id if hasattr(update, 'from_user') else update.message.from_user.id
     data = await state.get_data()
-    conference = data.get('selected_conference')
 
     flights = await db.get_available_flights(username, data.get('departure_from'), data.get('return_to'))
 
@@ -862,7 +858,6 @@ async def process_flight_choice(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith("hotel_after_flight_"), TravelStates.waiting_for_hotel_needed)
 async def process_hotel_after_flight(callback: CallbackQuery, state: FSMContext):
     """Обработка ответа об отеле после выбора рейса"""
-    user_id = callback.from_user.id
     hotel_needed = callback.data == "hotel_after_flight_yes"
     await state.update_data(hotel_needed=hotel_needed)
     await send_request_to_manager(callback, state)

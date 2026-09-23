@@ -1,36 +1,40 @@
-from aiogram.client.session import aiohttp
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
-from functools import wraps
 import asyncio
-import os
-from datetime import datetime, timedelta
-import secrets
-import hashlib
-from dotenv import load_dotenv
-import io
 import csv
-from werkzeug.utils import secure_filename
-from urllib.parse import unquote
-import requests
-import mimetypes
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
-import uuid
-
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from utility.notifications import *
-from database import db
-from locales import get_text
-
+import io
 import logging
-logger = logging.getLogger(__name__)
-
-from aiogram import Bot
+import mimetypes
+import os
+import secrets
+import sys
 import threading
 import concurrent.futures
+import uuid
+from datetime import datetime, timedelta
+from functools import wraps
+from urllib.parse import unquote
+
+import openpyxl
+import requests
+from aiogram.client.session import aiohttp
+from dotenv import load_dotenv
+from flask import Flask, flash, jsonify, redirect, render_template, request, send_file, session, url_for
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from werkzeug.utils import secure_filename
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from database import db
+from locales import get_text
+from utility.notifications import (
+    notify_banner_status_change,
+    notify_business_card_status_change,
+    notify_ticket_status_change,
+    notify_travel_flight_status_change,
+    notify_travel_visa_status_change,
+)
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -99,18 +103,6 @@ def init_db():
 
 init_db()
 
-DB_CONFIG = {
-    'user': os.getenv('DB_USER'),
-    'password': os.getenv('DB_PASSWORD'),
-    'host': os.getenv('DB_HOST'),
-    'port': os.getenv('DB_PORT'),
-    'database': os.getenv('DB_NAME')
-}
-
-ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
-ADMIN_PASSWORD_HASH = hashlib.sha256(os.getenv('ADMIN_PASSWORD', 'admin123').encode()).hexdigest()
-DB_SCHEMA = os.getenv('DB_SCHEMA')
-
 # ============================================
 # ДЕКОРАТОРЫ АВТОРИЗАЦИИ
 # ============================================
@@ -118,7 +110,7 @@ DB_SCHEMA = os.getenv('DB_SCHEMA')
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'logged_in' not in session:
+        if not session.get('logged_in'):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -127,7 +119,7 @@ def group_required(allowed_groups=None):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            if 'logged_in' not in session:
+            if not session.get('logged_in'):
                 return redirect(url_for('login'))
 
             if session.get('role') == 'admin':
@@ -149,7 +141,7 @@ def role_required(allowed_roles=None, permissions=None):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            if 'logged_in' not in session:
+            if not session.get('logged_in'):
                 return redirect(url_for('login'))
 
             role = session.get('role', 'user')
@@ -531,7 +523,7 @@ def broadcast():
         for filepath in saved_files:
             try:
                 os.remove(filepath)
-            except:
+            except Exception:
                 pass
 
         company_info = ', '.join(request.form.getlist('companies')) if target_type == 'company' else target_type
@@ -778,9 +770,82 @@ def pr_panel():
 
 @app.route('/admin_users')
 @login_required
+@role_required(['admin'])
 def admin_users_page():
     admins = run_async(db.get_all_admin_users())
     return render_template('admin_users.html', admins=admins, username=session.get('username'))
+
+
+@app.route('/admin_users/add', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def add_admin_user():
+    username = (request.form.get('username') or '').strip()
+    password = request.form.get('password') or ''
+    full_name = (request.form.get('full_name') or '').strip() or None
+    role = request.form.get('role', 'user')
+
+    if not username or len(password) < 6 or role not in {'admin', 'user'}:
+        flash('Проверьте имя пользователя, роль и пароль (минимум 6 символов)', 'danger')
+        return redirect(url_for('admin_users_page'))
+
+    permissions = {
+        'manage_users': 'manage_users' in request.form,
+        'broadcast': 'broadcast' in request.form,
+        'view_stats': 'view_stats' in request.form,
+        'manage_conferences': 'manage_conferences' in request.form,
+    }
+    success = run_async(db.add_admin_user(username, password, full_name, role, permissions))
+    flash('Пользователь добавлен' if success else 'Не удалось добавить пользователя',
+          'success' if success else 'danger')
+    return redirect(url_for('admin_users_page'))
+
+
+@app.route('/admin_users/edit/<int:admin_id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def edit_admin_user(admin_id):
+    role = request.form.get('role', 'user')
+    if role not in {'admin', 'user'}:
+        flash('Недопустимая роль', 'danger')
+        return redirect(url_for('admin_users_page'))
+
+    data = {
+        'full_name': (request.form.get('full_name') or '').strip() or None,
+        'role': role,
+        'can_manage_users': 'manage_users' in request.form,
+        'can_broadcast': 'broadcast' in request.form,
+        'can_view_stats': 'view_stats' in request.form,
+        'can_manage_conferences': 'manage_conferences' in request.form,
+    }
+    password = request.form.get('password') or ''
+    if password:
+        if len(password) < 6:
+            flash('Пароль должен содержать минимум 6 символов', 'danger')
+            return redirect(url_for('admin_users_page'))
+        data['password'] = password
+
+    success = run_async(db.update_admin_user(admin_id, data))
+    flash('Данные обновлены' if success else 'Не удалось обновить данные',
+          'success' if success else 'danger')
+    return redirect(url_for('admin_users_page'))
+
+
+@app.route('/admin_users/delete/<int:admin_id>', methods=['POST'])
+@login_required
+@role_required(['admin'])
+def delete_admin_user(admin_id):
+    admins = run_async(db.get_all_admin_users()) or []
+    target = next((admin for admin in admins if admin['id'] == admin_id), None)
+    if not target:
+        flash('Пользователь не найден', 'danger')
+    elif target['username'] == session.get('username'):
+        flash('Нельзя удалить текущую учётную запись', 'danger')
+    else:
+        success = run_async(db.delete_admin_user(admin_id))
+        flash('Пользователь удалён' if success else 'Не удалось удалить пользователя',
+              'success' if success else 'danger')
+    return redirect(url_for('admin_users_page'))
 
 @app.route('/change_password', methods=['GET', 'POST'])
 @login_required
@@ -875,7 +940,6 @@ def api_update_travel_visa_status(request_id):
     if success and current_request and old_status != status:
         user_data = run_async(db.get_user_data(current_request.get('user_id')))
         lang = user_data.get('language', 'ru') if user_data else 'ru'
-        from utility.notifications import notify_travel_visa_status_change
         run_async(notify_travel_visa_status_change(
             user_id=current_request.get('user_id'),
             request_id=request_id,
@@ -903,7 +967,6 @@ def api_update_travel_flight_status(request_id):
     if success and current_request and old_status != status:
         user_data = run_async(db.get_user_data(current_request.get('user_id')))
         lang = user_data.get('language', 'ru') if user_data else 'ru'
-        from utility.notifications import notify_travel_flight_status_change
         run_async(notify_travel_flight_status_change(
             user_id=current_request.get('user_id'),
             request_id=request_id,
@@ -1518,7 +1581,12 @@ def api_get_file(file_id):
         return "Этот файл был удален с сервера и не имеет ID в Telegram", 404
 
     try:
-        file_info = requests.get(f"https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}").json()
+        file_info_response = requests.get(
+            f"https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}",
+            timeout=20,
+        )
+        file_info_response.raise_for_status()
+        file_info = file_info_response.json()
         if not file_info.get('ok'):
             return "Файл не найден в Telegram", 404
 
@@ -1534,7 +1602,8 @@ def api_get_file(file_id):
             else:
                 mime_type = 'application/octet-stream'
 
-        file_data = requests.get(download_url)
+        file_data = requests.get(download_url, timeout=60)
+        file_data.raise_for_status()
         force_download = request.args.get('download') == '1'
 
         response = send_file(
@@ -1809,4 +1878,5 @@ if __name__ == '__main__':
         print("Check your .env file and make sure PostgreSQL is running")
         print("⚠️ Continuing without database connection...")
 
-    app.run(host='0.0.0.0', port=5005, debug=True)
+    debug_enabled = os.getenv('FLASK_DEBUG', '').lower() in {'1', 'true', 'yes'}
+    app.run(host='0.0.0.0', port=5005, debug=debug_enabled)

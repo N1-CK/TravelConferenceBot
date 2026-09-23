@@ -3,9 +3,8 @@ import logging
 import os
 import re
 from datetime import datetime, timedelta
-from typing import Union, Optional
+from typing import Union
 
-import asyncio
 from aiogram import Router, F
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
@@ -15,7 +14,6 @@ from aiogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton,
     FSInputFile
 )
-from keyboards import get_main_menu_keyboard
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.enums import ParseMode
 
@@ -71,7 +69,6 @@ async def process_affiliate_password(msg: Message, state: FSMContext):
 async def process_affiliate_company(msg: Message, state: FSMContext):
     """Обработка названия компании"""
     user_id = msg.from_user.id
-    username = msg.from_user.username
     company_input = msg.text.strip()
 
     if not company_input:
@@ -188,7 +185,7 @@ async def back_to_affiliate_main(call: CallbackQuery, state: FSMContext):
     await state.clear()
     try:
         await call.message.delete()
-    except:
+    except Exception:
         pass
     await show_affiliate_main_menu(call)
 
@@ -823,7 +820,6 @@ async def process_report_budget(msg: Message, state: FSMContext):
     await state.update_data(budget=msg.text)
 
     data = await state.get_data()
-    username = msg.from_user.username
     company = await db.get_user_company(user_id)
 
     report_text = (
@@ -897,7 +893,6 @@ async def show_affiliate_rules(call: CallbackQuery):
     """Показать правила"""
     user_id = call.from_user.id
     try:
-        username = call.from_user.username
         company = await db.get_user_company(user_id)
 
         base_path = './instructions/conferences/'
@@ -925,7 +920,7 @@ async def show_affiliate_rules(call: CallbackQuery):
 
         try:
             await call.message.delete()
-        except:
+        except Exception:
             pass
 
         await call.message.answer_document(
@@ -944,7 +939,6 @@ async def show_affiliate_limits(call: CallbackQuery):
     """Показать лимиты"""
     user_id = call.from_user.id
     try:
-        username = call.from_user.username
         company = await db.get_user_company(user_id)
 
         base_path = './instructions/limits/'
@@ -972,7 +966,7 @@ async def show_affiliate_limits(call: CallbackQuery):
 
         try:
             await call.message.delete()
-        except:
+        except Exception:
             pass
 
         await call.message.answer_document(

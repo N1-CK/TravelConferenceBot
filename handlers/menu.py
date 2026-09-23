@@ -7,11 +7,10 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from keyboards import get_main_menu_keyboard, get_profile_edit_keyboard, get_language_keyboard, get_event_menu_keyboard, \
-    get_pr_menu_keyboard, get_travel_menu_keyboard
+from keyboards import get_event_menu_keyboard, get_pr_menu_keyboard, get_travel_menu_keyboard
 from database import db
 import logging
-from utility.lang_utils import *
+from utility.lang_utils import get_text_sync, get_user_lang, t
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -134,9 +133,10 @@ async def show_travel_menu(callback: CallbackQuery, state: FSMContext):
     """Переход в раздел TRAVEL с локализацией и отображением конференции"""
     user_id = callback.from_user.id
     selected_conf = await db.get_selected_conference(user_id)
-
-    conf_text = f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}" if selected_conf else ""
-
+    conf_text = (
+        f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}"
+        if selected_conf else ""
+    )
     await callback.message.edit_text(
         f"{await t(user_id, 'travel_title')}{conf_text}",
         reply_markup=await get_travel_menu_keyboard(user_id)

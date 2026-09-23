@@ -9,10 +9,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from handlers.managers_chat import send_question_to_manager, get_manager_chat_id, send_request_notification_to_manager
 from keyboards import get_back_next_keyboard, get_event_menu_keyboard
 from database import db
-from handlers.managers_chat import send_question_to_manager
-from utility.lang_utils import t, get_user_lang
+from utility.lang_utils import t
 
-EVENT_MANAGER_CHAT_ID = int(os.getenv("TG_EVENT_MANAGER_CHAT_ID", 0))
+EVENT_MANAGER_CHAT_ID = int(os.getenv("TG_EVENT_MANAGER_CHAT_ID", "0"))
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -48,8 +47,6 @@ class EventTicketForm(StatesGroup):
 async def show_event_rules_pdf(callback: CallbackQuery):
     """Отправка PDF с правилами поведения в зависимости от компании"""
     user_id = callback.from_user.id
-    username = callback.from_user.username
-
     # Получаем компанию пользователя
     user_data = await db.get_user_data(user_id)
     company = user_data.get('company', '') if user_data else ''
@@ -96,7 +93,7 @@ async def show_event_rules_pdf(callback: CallbackQuery):
     # Отправляем PDF
     try:
         await callback.message.delete()
-    except:
+    except Exception:
         pass
 
     await callback.message.answer_document(
@@ -126,7 +123,7 @@ async def accept_rules(callback: CallbackQuery):
                 f"{await t(user_id, 'rules_accepted')}\n\n{await t(user_id, 'event_title')}:",
                 reply_markup=await get_event_menu_keyboard(user_id)
             )
-        except:
+        except Exception:
             await callback.message.answer(
                 f"{await t(user_id, 'rules_accepted')}\n\n{await t(user_id, 'event_title')}:",
                 reply_markup=await get_event_menu_keyboard(user_id)
@@ -198,7 +195,7 @@ async def start_ticket_form(callback: CallbackQuery, state: FSMContext):
 
     await callback.message.edit_text(
         f"{await t(user_id, 'event_ticket')}\n\n{start_event_text}\n{step_text}\n\n{question_text}",
-        reply_markup=await get_back_next_keyboard(back_to="menu_event", next_disabled=True, user_id=user_id)
+        reply_markup=await get_back_next_keyboard(back_to="menu_event", user_id=user_id)
     )
 
 
@@ -390,7 +387,7 @@ async def ticket_back_to_name(callback: CallbackQuery, state: FSMContext):
     await state.set_state(EventTicketForm.waiting_for_full_name)
     await callback.message.edit_text(
         await t(user_id, 'ticket_step', step=1, total=6) + "\n\n" + await t(user_id, 'ticket_full_name'),
-        reply_markup=await get_back_next_keyboard(back_to="menu_event", next_disabled=True, user_id=user_id)
+        reply_markup=await get_back_next_keyboard(back_to="menu_event", user_id=user_id)
     )
 
 

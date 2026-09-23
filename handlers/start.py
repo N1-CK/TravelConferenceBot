@@ -1,5 +1,4 @@
 from aiogram import Router, F
-from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
@@ -7,12 +6,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from typing import Union, Dict, Any
+from typing import Union
 
 from utility.auth import check_whitelist
 from database import db
 from keyboards import get_main_menu_keyboard
-from utility.lang_utils import *
+from utility.lang_utils import get_text_sync, get_user_lang, t
 
 router = Router()
 
@@ -350,7 +349,7 @@ async def show_conference_list(callback: CallbackQuery, state: FSMContext):
     # Удаляем старое сообщение
     try:
         await callback.message.delete()
-    except:
+    except Exception:
         pass
 
     await show_conferences_selection(callback.message, username, user_id)
@@ -359,8 +358,6 @@ async def show_conference_list(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "menu_main")
 async def return_to_main_menu(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    user_data = await db.get_user_data(callback.from_user.id)
-    lang = user_data.get('language', 'ru') if user_data else 'ru'
 
     text = await t(callback.from_user.id, 'welcome')
     markup = await get_main_menu_keyboard(callback.from_user.id)

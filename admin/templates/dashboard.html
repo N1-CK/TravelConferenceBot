@@ -439,6 +439,12 @@
     let openedFromAllModal = false;
     let allBroadcastsCache = [];
 
+    function escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = value == null ? '' : String(value);
+        return div.innerHTML;
+    }
+
     const i18n = {
         broadcast_all: '{{ get_text("broadcast_all") }}',
         broadcast_by_company: '{{ get_text("broadcast_by_company") }}',
@@ -480,7 +486,7 @@
             allBroadcastsCache = await resp.json();
             renderAllBroadcastsTable(allBroadcastsCache);
         } catch (e) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4"><i class="bi bi-exclamation-triangle fs-3 d-block"></i> ${e.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4"><i class="bi bi-exclamation-triangle fs-3 d-block"></i> ${escapeHtml(e.message)}</td></tr>`;
         }
     }
 
@@ -500,10 +506,12 @@
         };
 
         tbody.innerHTML = items.map(b => {
-            const timeStr = b.formatted_time || b.timestamp || '-';
-            const senderStr = b.username || 'admin';
+            const timeStr = escapeHtml(b.formatted_time || b.timestamp || '-');
+            const senderStr = escapeHtml(b.username || 'admin');
             const successCount = b.success_count || 0;
             const failedCount = b.failed_count || 0;
+            const company = escapeHtml(b.company || '');
+            const broadcastType = escapeHtml(b.broadcast_type || '-');
 
             return `
                 <tr class="broadcast-row" onclick="openBroadcastModal(${b.id}, true)">
@@ -519,7 +527,7 @@
                         <div class="mobile-card-bottom">
                             <span class="badge bg-success"><i class="bi bi-check2 me-1"></i>${successCount} ✓</span>
                             ${(failedCount > 0) ? `<span class="badge bg-danger"><i class="bi bi-x me-1"></i>${failedCount} ✗</span>` : '<span class="badge bg-light text-muted border">0 ✗</span>'}
-                            ${b.company ? `<span class="badge bg-light text-secondary border ms-auto">${b.company}</span>` : ''}
+                            ${company ? `<span class="badge bg-light text-secondary border ms-auto">${company}</span>` : ''}
                         </div>
                     </div>
 
@@ -527,8 +535,8 @@
                     <td class="web-col"><strong>#${b.id}</strong></td>
                     <td class="web-col"><small>${timeStr}</small></td>
                     <td class="web-col">@${senderStr}</td>
-                    <td class="web-col">${typeLabels[b.broadcast_type] || `<span class="badge bg-secondary">${b.broadcast_type || '-'}</span>`}</td>
-                    <td class="web-col">${b.company ? `<span class="badge bg-light text-dark border">${b.company}</span>` : '-'}</td>
+                    <td class="web-col">${typeLabels[b.broadcast_type] || `<span class="badge bg-secondary">${broadcastType}</span>`}</td>
+                    <td class="web-col">${company ? `<span class="badge bg-light text-dark border">${company}</span>` : '-'}</td>
                     <td class="web-col"><span class="badge bg-success">${successCount} ✓</span></td>
                     <td class="web-col">${(failedCount > 0) ? `<span class="badge bg-danger">${failedCount} ✗</span>` : '<span class="text-muted">0</span>'}</td>
                 </tr>
@@ -587,7 +595,7 @@
                 failedHtml = `<div class="text-muted text-center py-3">${i18n.no_delivery_errors}</div>`;
             } else {
                 failedList.forEach(u => {
-                    const name = u.full_name ? `${u.full_name} (@${u.username})` : `@${u.username}`;
+                    const name = escapeHtml(u.full_name ? `${u.full_name} (@${u.username})` : `@${u.username}`);
                     failedHtml += `
                         <div class="user-pill failed">
                             <div>
@@ -595,7 +603,7 @@
                                 ${u.user_id ? `<small class="text-muted ms-1">(ID: ${u.user_id})</small>` : ''}
                             </div>
                             <span class="badge bg-danger text-wrap" style="max-width: 50%; font-weight: normal;">
-                                <i class="bi bi-exclamation-triangle"></i> ${u.reason || '{{ get_text("error_occurred") }}'}
+                                <i class="bi bi-exclamation-triangle"></i> ${escapeHtml(u.reason || '{{ get_text("error_occurred") }}')}
                             </span>
                         </div>
                     `;
@@ -607,7 +615,7 @@
                 successHtml = `<div class="text-muted text-center py-3">${i18n.no_delivery_data}</div>`;
             } else {
                 successList.forEach(u => {
-                    const name = u.full_name ? `${u.full_name} (@${u.username})` : `@${u.username}`;
+                    const name = escapeHtml(u.full_name ? `${u.full_name} (@${u.username})` : `@${u.username}`);
                     successHtml += `
                         <div class="user-pill success">
                             <div>
@@ -625,13 +633,13 @@
                     <div class="col-sm-6">
                         <div class="p-3 bg-light rounded-3">
                             <div class="text-muted small">${i18n.broadcast_time}</div>
-                            <div class="fw-bold">${data.timestamp || '-'}</div>
+                            <div class="fw-bold">${escapeHtml(data.timestamp || '-')}</div>
                         </div>
                     </div>
                     <div class="col-sm-6">
                         <div class="p-3 bg-light rounded-3">
                             <div class="text-muted small">${i18n.sender}</div>
-                            <div class="fw-bold">@${data.sender || 'admin'}</div>
+                            <div class="fw-bold">@${escapeHtml(data.sender || 'admin')}</div>
                         </div>
                     </div>
                 </div>
@@ -665,7 +673,7 @@
                 </div>
             `;
         } catch (e) {
-            contentDiv.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ${e.message}</div>`;
+            contentDiv.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ${escapeHtml(e.message)}</div>`;
         }
     }
 

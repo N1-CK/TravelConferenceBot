@@ -23,10 +23,10 @@ class ManagerReplyForm(StatesGroup):
 user_manager_mapping = {}
 
 # Получаем ID чатов из переменных окружения
-PR_MANAGER_CHAT_ID = int(os.getenv("TG_PR_MANAGER_CHAT_ID", 0))
-EVENT_MANAGER_CHAT_ID = int(os.getenv("TG_EVENT_MANAGER_CHAT_ID", 0))
-TRAVEL_MANAGER_CHAT_ID = int(os.getenv("TG_TRAVEL_MANAGER_CHAT_ID", 0))
-ADMIN_CHAT_ID = int(os.getenv("TG_ADMIN_CHAT_ID", 0))
+PR_MANAGER_CHAT_ID = int(os.getenv("TG_PR_MANAGER_CHAT_ID", "0"))
+EVENT_MANAGER_CHAT_ID = int(os.getenv("TG_EVENT_MANAGER_CHAT_ID", "0"))
+TRAVEL_MANAGER_CHAT_ID = int(os.getenv("TG_TRAVEL_MANAGER_CHAT_ID", "0"))
+ADMIN_CHAT_ID = int(os.getenv("TG_ADMIN_CHAT_ID", "0"))
 
 
 def get_manager_chat_id(department: str) -> int:

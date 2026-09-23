@@ -1,15 +1,38 @@
+import hashlib
+import hmac
 import logging
 import os
+import re
+from datetime import datetime
 from typing import List, Dict
 
 import asyncpg
 from dotenv import load_dotenv
-from datetime import datetime
-
-import re
+from werkzeug.security import check_password_hash, generate_password_hash
 
 load_dotenv()
 logger = logging.getLogger(__name__)
+
+
+def _hash_password(password: str) -> str:
+    """Создать стойкий хеш пароля для новых и обновлённых учётных записей."""
+    return generate_password_hash(password)
+
+
+def _is_legacy_password_hash(password_hash: str) -> bool:
+    return bool(re.fullmatch(r"[0-9a-f]{64}", password_hash or ""))
+
+
+def _verify_password(password_hash: str, password: str) -> bool:
+    """Поддержать старые SHA-256 хеши до их автоматического обновления."""
+    if _is_legacy_password_hash(password_hash):
+        legacy_hash = hashlib.sha256(password.encode()).hexdigest()
+        return hmac.compare_digest(password_hash, legacy_hash)
+
+    try:
+        return check_password_hash(password_hash, password)
+    except (TypeError, ValueError):
+        return False
 
 
 class Database:
@@ -533,10 +556,9 @@ class Database:
                 """)
 
                 # Создаем первого админа если нет
-                from hashlib import sha256
                 default_admin = os.getenv('ADMIN_USERNAME', 'admin')
                 default_pass = os.getenv('ADMIN_PASSWORD', 'admin123')
-                password_hash = sha256(default_pass.encode()).hexdigest()
+                password_hash = _hash_password(default_pass)
 
                 await conn.execute(f"""
                     INSERT INTO {self.db_schema_admin}.admin_users 
@@ -1006,7 +1028,7 @@ class Database:
                         ALTER TABLE {self.db_schema_travel}.travel_flight_request 
                         ADD COLUMN IF NOT EXISTS flight_request_status TEXT DEFAULT 'pending'
                     """)
-                except:
+                except Exception:
                     pass
 
                 await conn.execute(f"""
@@ -1721,7 +1743,7 @@ class Database:
                         ALTER TABLE {self.db_schema_pr}.affil_bookings 
                         ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'confirmed'
                     """)
-                except:
+                except Exception:
                     pass
 
                 await conn.execute(f"""
@@ -1743,7 +1765,7 @@ class Database:
                         ALTER TABLE {self.db_schema_pr}.affil_reports 
                         ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'
                     """)
-                except:
+                except Exception:
                     pass
 
                 await conn.execute(f"""
@@ -2093,8 +2115,7 @@ class Database:
                              role: str = 'user', permissions: dict = None) -> bool:
         """Добавление администратора"""
         try:
-            from hashlib import sha256
-            password_hash = sha256(password.encode()).hexdigest()
+            password_hash = _hash_password(password)
 
             async with self.pool.acquire() as conn:
                 exists = await conn.fetchval(f"""
@@ -2124,26 +2145,32 @@ class Database:
     async def verify_admin(self, username: str, password: str) -> dict:
         """Проверка учетных данных администратора"""
         try:
-            from hashlib import sha256
-            password_hash = sha256(password.encode()).hexdigest()
-
             async with self.pool.acquire() as conn:
                 admin = await conn.fetchrow(f"""
                     SELECT id, username, full_name, role, 
                            can_manage_users, can_broadcast, can_view_stats, can_manage_conferences,
-                           is_active
+                           is_active, password_hash
                     FROM {self.db_schema_admin}.admin_users 
-                    WHERE username = $1 AND password_hash = $2 AND is_active = TRUE
-                """, username, password_hash)
+                    WHERE username = $1 AND is_active = TRUE
+                """, username)
 
-                if admin:
+                if admin and _verify_password(admin['password_hash'], password):
+                    if _is_legacy_password_hash(admin['password_hash']):
+                        await conn.execute(f"""
+                            UPDATE {self.db_schema_admin}.admin_users
+                            SET password_hash = $1
+                            WHERE id = $2
+                        """, _hash_password(password), admin['id'])
+
                     await conn.execute(f"""
                         UPDATE {self.db_schema_admin}.admin_users 
                         SET last_login = NOW() 
                         WHERE id = $1
                     """, admin['id'])
 
-                    return dict(admin)
+                    result = dict(admin)
+                    result.pop('password_hash', None)
+                    return result
                 return {}
         except Exception as e:
             logger.error(f"Error verifying admin: {e}")
@@ -2172,17 +2199,21 @@ class Database:
                 set_clauses = []
                 values = []
                 i = 1
+                allowed_columns = {
+                    'username', 'full_name', 'role', 'can_manage_users',
+                    'can_broadcast', 'can_view_stats',
+                    'can_manage_conferences', 'is_active',
+                }
 
                 for key, value in data.items():
-                    if key != 'id' and key != 'password_hash':
+                    if key in allowed_columns:
                         set_clauses.append(f"{key} = ${i}")
                         values.append(value)
                         i += 1
 
                 if 'password' in data and data['password']:
-                    from hashlib import sha256
                     set_clauses.append(f"password_hash = ${i}")
-                    values.append(sha256(data['password'].encode()).hexdigest())
+                    values.append(_hash_password(data['password']))
                     i += 1
 
                 if set_clauses:
@@ -2352,7 +2383,7 @@ class Database:
             logger.error(f"Error getting flight requests: {e}")
             return []
 
-    async def update_visa_status(self, request_id: int, status: str, comment: str = None) -> bool:
+    async def update_visa_status(self, request_id: int, status: str) -> bool:
         """Обновить статус визовой заявки"""
         try:
             async with self.pool.acquire() as conn:
@@ -2992,7 +3023,7 @@ class Database:
                                 'created_at': row['created_at'].strftime('%d.%m.%Y %H:%M'),
                                 'status': 'pending'
                             })
-                    except:
+                    except Exception:
                         pass
 
                 travel_row = await conn.fetchrow(f"""
@@ -3095,9 +3126,8 @@ class Database:
                         ON CONFLICT (name) DO NOTHING
                     """, name, desc)
 
-                from hashlib import sha256
                 admin_pass = os.getenv('ADMIN_PASSWORD', 'admin123')
-                admin_hash = sha256(admin_pass.encode()).hexdigest()
+                admin_hash = _hash_password(admin_pass)
 
                 admin_id = await conn.fetchval(f"""
                     INSERT INTO {self.db_schema_admin}.managers (username, password_hash, full_name, role)
@@ -3129,19 +3159,22 @@ class Database:
     async def verify_manager(self, username: str, password: str) -> dict:
         """Проверка учетных данных менеджера"""
         try:
-            from hashlib import sha256
-            password_hash = sha256(password.encode()).hexdigest()
-
             async with self.pool.acquire() as conn:
                 manager = await conn.fetchrow(f"""
-                    SELECT id, username, full_name, role, is_active
+                    SELECT id, username, full_name, role, is_active, password_hash
                     FROM {self.db_schema_admin}.managers
                     WHERE username = $1
-                      AND password_hash = $2
                       AND is_active = TRUE
-                """, username, password_hash)
+                """, username)
 
-                if manager:
+                if manager and _verify_password(manager['password_hash'], password):
+                    if _is_legacy_password_hash(manager['password_hash']):
+                        await conn.execute(f"""
+                            UPDATE {self.db_schema_admin}.managers
+                            SET password_hash = $1
+                            WHERE id = $2
+                        """, _hash_password(password), manager['id'])
+
                     groups = await conn.fetch(f"""
                         SELECT g.name, g.description
                         FROM {self.db_schema_admin}.manager_groups g
@@ -3171,8 +3204,7 @@ class Database:
     async def add_manager(self, username: str, password: str, full_name: str = None, groups: list = None) -> bool:
         """Добавить нового менеджера"""
         try:
-            from hashlib import sha256
-            password_hash = sha256(password.encode()).hexdigest()
+            password_hash = _hash_password(password)
 
             async with self.pool.acquire() as conn:
                 manager_id = await conn.fetchval(f"""
@@ -3312,8 +3344,7 @@ class Database:
     async def update_manager_password(self, manager_id: int, new_password: str) -> bool:
         """Обновление пароля менеджера"""
         try:
-            from hashlib import sha256
-            password_hash = sha256(new_password.encode()).hexdigest()
+            password_hash = _hash_password(new_password)
 
             async with self.pool.acquire() as conn:
                 await conn.execute(f"""
@@ -3631,7 +3662,9 @@ class Database:
     async def close(self):
         """Закрыть пул соединений"""
         if self.pool:
-            await self.pool.close()
+            pool = self.pool
+            self.pool = None
+            await pool.close()
             logger.info("Database pool closed")
 
 

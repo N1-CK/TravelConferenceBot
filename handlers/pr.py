@@ -8,10 +8,9 @@ from keyboards import get_pr_menu_keyboard, get_back_next_keyboard
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import db
 import os
-from handlers.managers_chat import send_question_to_manager
-from utility.lang_utils import *
+from utility.lang_utils import t
 
-PR_MANAGER_CHAT_ID = int(os.getenv("TG_PR_MANAGER_CHAT_ID", 0))
+PR_MANAGER_CHAT_ID = int(os.getenv("TG_PR_MANAGER_CHAT_ID", "0"))
 
 router = Router()
 
@@ -162,7 +161,7 @@ async def start_business_cards_form(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     await callback.message.edit_text(
         await t(user_id, 'business_cards_title') + "\n\n" + await t(user_id, 'business_cards_step1'),
-        reply_markup=await get_back_next_keyboard(back_to="pr_menu", next_disabled=True, user_id=user_id)
+        reply_markup=await get_back_next_keyboard(back_to="pr_menu", user_id=user_id)
     )
 
 
@@ -175,7 +174,7 @@ async def start_banner_form(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
         f"{await t(user_id, 'pr_banner_form_title')}\n\n"
         f"{await t(user_id, 'pr_banner_step1')}",
-        reply_markup=await get_back_next_keyboard(back_to="pr_menu", next_disabled=True, user_id=user_id)
+        reply_markup=await get_back_next_keyboard(back_to="pr_menu", user_id=user_id)
     )
 
 
@@ -263,7 +262,7 @@ async def back_to_name_from_position(callback: CallbackQuery, state: FSMContext)
 
     await callback.message.edit_text(
         await t(user_id, 'pr_banner_step1'),
-        reply_markup=await get_back_next_keyboard(back_to="pr_menu", next_disabled=True, user_id=user_id)
+        reply_markup=await get_back_next_keyboard(back_to="pr_menu", user_id=user_id)
     )
 
 
@@ -506,7 +505,7 @@ async def back_to_name_bc(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     await callback.message.edit_text(
         await t(user_id, 'business_cards_title') + "\n\n" + await t(user_id, 'business_cards_step1'),
-        reply_markup=await get_back_next_keyboard(back_to="pr_menu", next_disabled=True, user_id=user_id)
+        reply_markup=await get_back_next_keyboard(back_to="pr_menu", user_id=user_id)
     )
     await callback.answer()
 
@@ -604,10 +603,6 @@ async def start_pr_question(callback: CallbackQuery, state: FSMContext):
 async def pr_conference_rules_handler(callback: CallbackQuery):
     user_id = callback.from_user.id
 
-    from keyboards import get_pr_menu_keyboard
-    from aiogram.utils.keyboard import InlineKeyboardBuilder
-    from aiogram.types import InlineKeyboardButton
-
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="menu_pr"))
 
@@ -683,6 +678,6 @@ async def cancel_form(callback: CallbackQuery, state: FSMContext):
     cancel_text = await t(user_id, 'form_cancelled_message')
     try:
         await callback.message.edit_text(cancel_text, reply_markup=await get_pr_menu_keyboard(user_id))
-    except:
+    except Exception:
         await callback.message.answer(cancel_text, reply_markup=await get_pr_menu_keyboard(user_id))
     await callback.answer()

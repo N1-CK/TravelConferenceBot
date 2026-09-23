@@ -83,8 +83,6 @@
 
     <div class="container-fluid">
         <div class="row">
-            {% include '_sidebar.html' %}
-
             <!-- Main Content -->
             <div class="col-12 main-content">
                 <div class="d-flex justify-content-between align-items-center mb-4 admin-users-heading">
@@ -152,7 +150,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% if admin.id != session.admin_id %}
+                                        {% if admin.username != session.username %}
                                         <button class="btn btn-sm btn-outline-primary"
                                                 onclick="editAdmin({{ admin.id }}, '{{ admin.username }}', '{{ admin.full_name or '' }}', '{{ admin.role }}', {{ admin.can_manage_users|lower }}, {{ admin.can_broadcast|lower }}, {{ admin.can_view_stats|lower }}, {{ admin.can_manage_conferences|lower }})">
                                             <i class="bi bi-pencil"></i>
@@ -189,8 +187,8 @@
                             <input type="text" class="form-control" name="username" required>
                         </div>
                        <div class="mb-3">
-                            <label class="form-label">{{ get_text('password') }} ({{ get_text('leave_empty') }})</label>
-                            <input type="password" class="form-control" name="password">
+                            <label class="form-label">{{ get_text('password') }} *</label>
+                            <input type="password" class="form-control" name="password" minlength="6" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">{{ get_text('full_name') }}</label>

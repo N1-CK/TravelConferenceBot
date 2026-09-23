@@ -1,26 +1,11 @@
-import asyncio
-from aiogram import Router, F
+from aiogram import Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery
-from aiogram.filters import Command
+from aiogram.types import Message
 from database import db
 import logging
-from handlers.managers_chat import forward_user_message_to_admin
 
 router = Router()
 logger = logging.getLogger(__name__)
-
-
-@router.message(Command("start"))
-async def cmd_start(message: Message):
-    await db.save_user_message(
-        user_id=message.from_user.id,
-        username=message.from_user.username or message.from_user.first_name,
-        message_text="/start",
-        direction='incoming'
-    )
-    from handlers.start import cmd_start as start_handler
-    await start_handler(message)
 
 
 @router.message()

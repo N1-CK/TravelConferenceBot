@@ -404,12 +404,16 @@
             .then(response => response.json())
             .then(data => {
                 currentUserFullName = data.full_name || data.username;
+                const username = escapeHtml(data.username || '');
+                const fullName = escapeHtml(data.full_name || '');
+                const company = escapeHtml(data.company || '-');
+                const encodedCompany = encodeURIComponent(data.company || '').replace(/'/g, '%27');
 
                 let html = `
                     <div class="row">
                         <div class="col-md-4 text-center">
-                            <h5>@${data.username}</h5>
-                            <p>${data.full_name || ''}</p>
+                            <h5>@${username}</h5>
+                            <p>${fullName}</p>
                         </div>
                         <div class="col-md-8">
                             <table class="table table-sm">
@@ -417,23 +421,23 @@
                                 <tr>
                                     <th>{{ get_text('company') }}:</th>
                                     <td>
-                                        ${data.company || '-'}
+                                        ${company}
                                         {% if session.role == 'admin' %}
-                                        <button class="btn btn-sm btn-link py-0 ms-2 text-decoration-none" onclick="editCompanyPrompt(${data.user_id}, '${data.company || ''}')" title="Изменить организацию">
+                                        <button class="btn btn-sm btn-link py-0 ms-2 text-decoration-none" onclick="editCompanyPrompt(${Number(data.user_id)}, decodeURIComponent('${encodedCompany}'))" title="Изменить организацию">
                                             <i class="bi bi-pencil-square text-primary"></i>
                                         </button>
                                         {% endif %}
                                     </td>
                                 </tr>
-                                <tr><th>{{ get_text('position') }}:</th><td>${data.position || '-'}</td></tr>
+                                <tr><th>{{ get_text('position') }}:</th><td>${escapeHtml(data.position || '-')}</td></tr>
                                 <tr><th>{{ get_text('language') }}:</th><td>${data.language == 'ru' ? '🇷🇺 Русский' : '🇬🇧 English'}</td></tr>
-                                <tr><th>{{ get_text('registered_at') }}:</th><td>${data.registered_at || '-'}</td></tr>
-                                <tr><th>{{ get_text('last_active') }}:</th><td>${data.last_active || '-'}</td></tr>
+                                <tr><th>{{ get_text('registered_at') }}:</th><td>${escapeHtml(data.registered_at || '-')}</td></tr>
+                                <tr><th>{{ get_text('last_active') }}:</th><td>${escapeHtml(data.last_active || '-')}</td></tr>
                             </table>
 
                             <h6 class="mt-3">{{ get_text('conferences') }}</h6>
                             <div>
-                                ${data.conferences?.map(c => `<span class="conference-tag">${c}</span>`).join(' ') || '-'}
+                                ${data.conferences?.map(c => `<span class="conference-tag">${escapeHtml(c)}</span>`).join(' ') || '-'}
                             </div>
 
                             <h6 class="mt-3">{{ get_text('requests') }}</h6>
@@ -445,9 +449,9 @@
                                     <tbody>
                                         ${data.requests?.map(r => `
                                             <tr>
-                                                <td>${r.type}</td>
-                                                <td>${r.created_at}</td>
-                                                <td><span class="badge bg-warning">${r.status}</span></td>
+                                                <td>${escapeHtml(r.type)}</td>
+                                                <td>${escapeHtml(r.created_at)}</td>
+                                                <td><span class="badge bg-warning">${escapeHtml(r.status)}</span></td>
                                             </tr>
                                         `).join('') || '<tr><td colspan="3" class="text-center">-</td></tr>'}
                                     </tbody>
@@ -459,6 +463,12 @@
                 document.getElementById('userModalBody').innerHTML = html;
                 new bootstrap.Modal(document.getElementById('userModal')).show();
             });
+    }
+
+    function escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = value == null ? '' : String(value);
+        return div.innerHTML;
     }
 
     function exportUsers() {

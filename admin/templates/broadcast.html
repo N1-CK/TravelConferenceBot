@@ -544,6 +544,12 @@
     let currentConferenceUsers = [];
     let allUsers = {{ users|tojson }};
 
+    function escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = value == null ? '' : String(value);
+        return div.innerHTML;
+    }
+
     const broadcastLocales = {
         hide: "{{ get_text('hide') }}",
         show: "{{ get_text('show') }}",
@@ -626,10 +632,10 @@
         currentCompanyRecipients.slice(0, 30).forEach(user => {
             html += `
                 <div class="recipient-item">
-                    <div class="recipient-avatar">${(user.username || 'U')[0].toUpperCase()}</div>
+                    <div class="recipient-avatar">${escapeHtml((user.username || 'U')[0].toUpperCase())}</div>
                     <div class="recipient-info">
-                        <div class="recipient-username">@${user.username || user.user_id}</div>
-                        <div class="recipient-company">${user.company || ''}</div>
+                        <div class="recipient-username">@${escapeHtml(user.username || user.user_id)}</div>
+                        <div class="recipient-company">${escapeHtml(user.company || '')}</div>
                     </div>
                 </div>
             `;
@@ -697,10 +703,10 @@
         currentConferenceUsers.slice(0, 30).forEach(user => {
             html += `
                 <div class="recipient-item">
-                    <div class="recipient-avatar">${(user.username || 'U')[0].toUpperCase()}</div>
+                    <div class="recipient-avatar">${escapeHtml((user.username || 'U')[0].toUpperCase())}</div>
                     <div class="recipient-info">
-                        <div class="recipient-username">@${user.username || user.user_id}</div>
-                        <div class="recipient-company">${user.company || ''}</div>
+                        <div class="recipient-username">@${escapeHtml(user.username || user.user_id)}</div>
+                        <div class="recipient-company">${escapeHtml(user.company || '')}</div>
                     </div>
                 </div>
             `;

@@ -1,6 +1,4 @@
-import json
-import os
-from typing import Dict, Any
+from typing import Dict
 
 # Полные тексты для всех языков
 TEXTS = {
@@ -484,7 +482,7 @@ TEXTS = {
         'error_loading_broadcasts': 'Не удалось загрузить историю рассылок',
         'error_loading_data': 'Ошибка загрузки данных',
 
-        'booths_tab_title': 'Стенды компаний (Booths)',
+        'booths_tab_title': 'Стенды компаний',
         'export_excel': 'Экспорт в Excel',
         'export_excel_title': 'Выгрузить в Excel',
         'add_edit_stand': 'Добавить / Обновить стенд',

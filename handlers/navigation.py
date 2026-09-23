@@ -6,15 +6,14 @@ from aiogram.fsm.context import FSMContext
 router = Router()
 
 
-@router.callback_query(F.data == "menu_main")
 async def go_to_main_menu(callback: CallbackQuery, state: FSMContext):
-    """Переход в главное меню из любого места"""
-    await state.clear()
-
+    """Общий fallback возврата в главное меню."""
     from keyboards import get_main_menu_keyboard
+
+    await state.clear()
     await callback.message.edit_text(
         "Главное меню. Выберите раздел:",
-        reply_markup=await get_main_menu_keyboard()
+        reply_markup=await get_main_menu_keyboard(callback.from_user.id)
     )
 
 
