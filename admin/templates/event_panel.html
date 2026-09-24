@@ -272,6 +272,7 @@
             display: flex !important;
             gap: 6px !important;
         }
+        #ticketsTable .ticket-archive-trigger { flex: 0 0 auto !important; }
         #ticketsTable td.t-col-actions .btn {
             flex: 1 !important;
             border-radius: 8px !important;
@@ -466,6 +467,11 @@
                                                     {% if req.status == 'ready' %}disabled{% endif %}
                                                     title="{{ get_text('set_ready') }}">
                                                 <i class="bi bi-check-lg"></i> <span class="d-md-none ms-1">{{ get_text('status_ready_short') }}</span>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary ticket-archive-trigger"
+                                                    title="{{ get_text('unarchive') if req.is_archived else get_text('to_archive') }}"
+                                                    aria-label="{{ get_text('unarchive') if req.is_archived else get_text('to_archive') }}">
+                                                <i class="bi bi-three-dots"></i>
                                             </button>
                                         </div>
                                     </td>
@@ -714,6 +720,16 @@
             event.preventDefault();
             showTicketContext(row, event.clientX, event.clientY);
         });
+        table.addEventListener('click', event => {
+            const trigger = event.target.closest('.ticket-archive-trigger');
+            if (!trigger) return;
+            event.stopPropagation();
+            const row = trigger.closest('tr[data-ticket-id]');
+            if (row) {
+                const rect = trigger.getBoundingClientRect();
+                showTicketContext(row, rect.left, rect.bottom);
+            }
+        });
         let timer, startX, startY, longPressed = false;
         table.addEventListener('touchstart', event => {
             const row = event.target.closest('tr[data-ticket-id]');
@@ -754,11 +770,13 @@
                 showToast({{ get_text('error_occurred')|tojson }}, 'danger');
             }
         });
-        refreshTicketArchive();
     }
 
     $(document).ready(function() {
         const lang = '{{ session.get("lang", "ru") }}';
+
+        // Bind row actions independently of the other DataTables instances.
+        initTicketArchive();
 
         // Таблица билетов
         ticketsTable = $('#ticketsTable').DataTable({
@@ -768,6 +786,7 @@
             pageLength: 25,
             order: [[0, 'desc']]
         });
+        refreshTicketArchive();
 
         // Таблица стендов
         standsTable = $('#standsTable').DataTable({
@@ -777,8 +796,6 @@
             pageLength: 25,
             order: [[0, 'asc'], [1, 'asc']]
         });
-
-        initTicketArchive();
 
         // Пересчет ширины колонок DataTables при смене вкладки
         $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {

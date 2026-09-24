@@ -576,6 +576,10 @@ class Database:
                         logger.warning(f"Table might already exist: {e}")
 
                 await conn.execute(f"""
+                    ALTER TABLE {self.db_schema_travel}.travel_flight_request
+                    ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE
+                """)
+                await conn.execute(f"""
                     ALTER TABLE {self.db_schema_event}.event_ticket_requests
                     ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE
                 """)
