@@ -179,7 +179,7 @@ class TelegramBot:
                 elif ext in {'mp3', 'm4a', 'wav', 'flac'}:
                     url = f"{self.api_url}/sendAudio"
                     field_name = 'audio'
-                elif ext in {'jpg', 'jpeg', 'png', 'webp'}:
+                elif ext in {'jpg', 'jpeg', 'png', 'webp'} and os.path.getsize(file) <= 10 * 1024 * 1024:
                     url = f"{self.api_url}/sendPhoto"
                     field_name = 'photo'
                 else:
@@ -236,7 +236,7 @@ class TelegramBot:
                 form_data.add_field(attach_name, f, filename=os.path.basename(file_path))
 
                 ext = file_path.rsplit('.', 1)[-1].lower() if '.' in file_path else ''
-                if ext in {'jpg', 'jpeg', 'png'}:
+                if ext in {'jpg', 'jpeg', 'png'} and os.path.getsize(file_path) <= 10 * 1024 * 1024:
                     media_type = 'photo'
                 elif ext in {'mp3', 'm4a', 'wav', 'flac'}:
                     media_type = 'audio'
@@ -1541,6 +1541,9 @@ def api_send_message():
 
         if saved_files:
             tg_file_ids = run_async(bot.send_documents(user_id, message, saved_files), timeout=300)
+            if not tg_file_ids or len(tg_file_ids) != len(saved_files):
+                logger.error("Telegram sent %s/%s files to user %s", len(tg_file_ids or []), len(saved_files), user_id)
+                return jsonify({'success': False, 'error': 'Telegram не подтвердил отправку всех файлов. Проверьте чат перед повторной отправкой.'}), 502
             messages_to_insert = []
             if tg_file_ids:
                 for idx, tg_file_id in enumerate(tg_file_ids):
