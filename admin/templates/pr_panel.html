@@ -41,23 +41,12 @@
     .nav-tabs .nav-link i {
         margin-right: 8px;
     }
-    .pr-data-table {
-        width: 100% !important;
-        font-size: 0.875rem;
+    .table-affiliate {
+        font-size: 0.85rem;
     }
-    .pr-data-table thead th {
-        background: #f8f9fc;
-        color: #495057;
-        font-weight: 600;
-        white-space: nowrap;
-        border-bottom: 2px solid #e9ecef;
-    }
-    .pr-data-table tbody td, .pr-data-table thead th {
+    .table-affiliate td, .table-affiliate th {
         vertical-align: middle;
-        padding: 10px 12px;
-    }
-    .pr-data-table tbody tr:hover {
-        background-color: #f8f9fc;
+        padding: 10px 8px;
     }
     .booking-details, .report-details {
         max-width: 250px;
@@ -70,7 +59,6 @@
     .mobile-pr-card {
         display: none;
     }
-    .mobile-td-card { vertical-align: middle; }
 
     @media (max-width: 767.98px) {
         .nav-tabs {
@@ -91,11 +79,11 @@
         }
 
         /* 1. Дашборд: сетка 2х2 */
-        .tab-pane .row {
+        .tab-pane > .mb-4 > .row {
             margin-left: -5px !important;
             margin-right: -5px !important;
         }
-        .tab-pane .row > [class*="col-"] {
+        .tab-pane > .mb-4 > .row > [class*="col-"] {
             flex: 0 0 50% !important;
             max-width: 50% !important;
             padding-left: 5px !important;
@@ -181,62 +169,44 @@
             overflow: hidden !important;
         }
         .table-responsive {
-            border: none !important;
-            overflow-x: auto !important;
-            overflow-y: hidden !important;
+            overflow-x: visible !important;
+            width: 100%;
+        }
+        #bannersTable, #cardsTable, #bookingsTable, #reportsTable,
+        #bannersTable tbody, #cardsTable tbody, #bookingsTable tbody, #reportsTable tbody {
+            display: block !important;
             width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
+            min-width: 0 !important;
         }
-
-        table.dataTable,
-        table.dataTable.no-footer,
-        #bannersTable,
-        #cardsTable,
-        #bookingsTable,
-        #reportsTable {
+        #bannersTable thead, #cardsTable thead,
+        #bookingsTable thead, #reportsTable thead { display: none !important; }
+        #bannersTable tbody tr, #cardsTable tbody tr {
+            display: block !important;
             width: 100% !important;
-            min-width: 100% !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            display: table !important;
-            border-collapse: collapse !important;
-            box-sizing: border-box !important;
+            margin-bottom: 14px;
         }
-
-        #bannersTable thead, #cardsTable thead {
-            display: none !important;
-        }
-
-        .desktop-td {
-            display: none !important;
-        }
-
-        .mobile-td-card {
+        #bannersTable tbody td, #cardsTable tbody td { display: none !important; }
+        #bannersTable tbody td.pr-primary-cell,
+        #cardsTable tbody td.pr-primary-cell {
             display: block !important;
             width: 100% !important;
             padding: 0 !important;
-            border: none !important;
-            box-sizing: border-box !important;
+            border: 0 !important;
         }
-        .mobile-td-card .desktop-id { display: none !important; }
-
         .mobile-pr-card {
             display: flex !important;
-            flex-direction: column !important;
-            gap: 10px !important;
-            width: 100% !important;
-            background: white !important;
-            border-radius: 16px !important;
-            border: 1px solid #e9ecef !important;
-            margin-bottom: 14px !important;
-            padding: 14px !important;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
-            box-sizing: border-box !important;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            min-width: 0;
+            overflow-wrap: anywhere;
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e9ecef;
+            padding: 14px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+            box-sizing: border-box;
         }
-
         .mobile-card-top {
             display: flex !important;
             justify-content: space-between !important;
@@ -270,7 +240,7 @@
             transition: transform 0.25s ease !important;
             margin-left: 6px !important;
         }
-        .mobile-expand-toggle[open] summary i {
+        .mobile-expand-toggle details[open] summary i {
             transform: rotate(180deg) !important;
         }
 
@@ -330,35 +300,32 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
             box-sizing: border-box !important;
         }
-        #bookingsTable thead, #reportsTable thead { display: none !important; }
         #bookingsTable tbody td, #reportsTable tbody td {
             display: flex !important;
             justify-content: space-between;
-            align-items: baseline;
+            align-items: flex-start;
             gap: 12px;
-            width: 100%;
-            padding: 5px 0 !important;
-            border: 0;
-            white-space: normal;
+            width: 100% !important;
+            max-width: none !important;
+            padding: 8px 0 !important;
+            border: 0 !important;
+            white-space: normal !important;
+            overflow: visible !important;
             overflow-wrap: anywhere;
-            max-width: none;
         }
         #bookingsTable tbody td::before, #reportsTable tbody td::before {
             content: attr(data-label);
+            flex: 0 0 38%;
             color: #6c757d;
             font-weight: 600;
-            flex: 0 0 38%;
         }
         #bookingsTable tbody td:first-child, #reportsTable tbody td:first-child {
-            border-bottom: 1px solid #f1f3f5;
-            padding-bottom: 9px !important;
-            margin-bottom: 4px;
+            border-bottom: 1px solid #e9ecef !important;
         }
-        #bookingsTable tbody td:last-child, #reportsTable tbody td:last-child {
-            border-top: 1px solid #f1f3f5;
-            padding-top: 9px !important;
-            margin-top: 4px;
-        }
+        .mobile-card-top, .info-row { gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+        .mobile-card-top > *, .info-row > * { min-width: 0; }
+        .mobile-card-actions .btn-group { flex-wrap: wrap; }
+        .dataTables_wrapper > .row:last-child > div { width: 100%; text-align: center; }
     }
 </style>
 {% endblock %}
@@ -429,7 +396,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="bannersTable" class="table table-hover align-middle pr-data-table">
+                        <table id="bannersTable" class="table table-hover align-middle">
                             <thead>
                                 <tr>
                                     <th>{{ get_text('id') }}</th>
@@ -446,9 +413,8 @@
                             <tbody>
                                 {% for req in banner_requests %}
                                 <tr data-status="{{ req.status }}">
-                                    <!-- МОБИЛЬНАЯ КАРТОЧКА НА 100% ШИРИНЫ (вложена в 1 td с colspan) -->
-                                    <td class="mobile-td-card">
-                                        <span class="desktop-id">{{ req.id }}</span>
+                                    <!-- Общая ячейка ID и мобильной карточки: 9 ячеек на 9 заголовков -->
+                                    <td class="pr-primary-cell" data-order="{{ req.id }}"><span class="d-none d-md-inline">{{ req.id }}</span>
                                         <div class="mobile-pr-card">
                                             <div class="mobile-card-top">
                                                 <div>
@@ -473,7 +439,7 @@
                                             <div class="mobile-expand-toggle w-100">
                                                 <details>
                                                     <summary>
-                                                        <span>{{ get_text('more_info') }}</span> <i class="bi bi-chevron-down"></i>
+                                                        <span>{{ get_text('more_info', default='Подробнее') }}</span> <i class="bi bi-chevron-down"></i>
                                                     </summary>
                                                     <div class="mobile-extra-info">
                                                         <div class="info-row">
@@ -517,8 +483,6 @@
                                             </div>
                                         </div>
                                     </td>
-
-                                    <!-- ДЕСКТОПНЫЕ КОЛОНКИ (абсолютно без изменений) -->
                                     <td class="desktop-td d-none d-md-table-cell"><strong>@{{ req.username }}</strong></td>
                                     <td class="desktop-td d-none d-md-table-cell">{{ req.full_name or '-' }}</td>
                                     <td class="desktop-td d-none d-md-table-cell">{{ req.position or '-' }}</td>
@@ -604,13 +568,13 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="cardsTable" class="table table-hover align-middle pr-data-table">
+                        <table id="cardsTable" class="table table-hover align-middle">
                             <thead>
                                 <tr>
                                     <th>{{ get_text('id') }}</th>
                                     <th>{{ get_text('username') }}</th>
                                     <th>{{ get_text('full_name') }}</th>
-                                    <th>{{ get_text('pr_position_en') }}</th>
+                                    <th>{{ get_text('position') }}</th>
                                     <th>{{ get_text('company') }}</th>
                                     <th>{{ get_text('brand_style') }}</th>
                                     <th>{{ get_text('created_at') }}</th>
@@ -622,8 +586,7 @@
                                 {% for card in business_cards %}
                                 <tr data-status="{{ card.status }}">
                                     <!-- МОБИЛЬНАЯ КАРТОЧКА ВИЗИТКИ НА 100% ШИРИНЫ -->
-                                    <td class="mobile-td-card">
-                                        <span class="desktop-id">{{ card.id }}</span>
+                                    <td class="pr-primary-cell" data-order="{{ card.id }}"><span class="d-none d-md-inline">{{ card.id }}</span>
                                         <div class="mobile-pr-card">
                                             <div class="mobile-card-top">
                                                 <div>
@@ -648,11 +611,11 @@
                                             <div class="mobile-expand-toggle w-100">
                                                 <details>
                                                     <summary>
-                                                        <span>{{ get_text('more_info') }}</span> <i class="bi bi-chevron-down"></i>
+                                                        <span>{{ get_text('more_info', default='Подробнее') }}</span> <i class="bi bi-chevron-down"></i>
                                                     </summary>
                                                     <div class="mobile-extra-info">
                                                         <div class="info-row">
-                                                            <span class="info-label">{{ get_text('pr_position_en') }}:</span>
+                                                            <span class="info-label">{{ get_text('position') }}:</span>
                                                             <span>{{ card.position_en or '-' }}</span>
                                                         </div>
                                                         <div class="info-row">
@@ -676,24 +639,22 @@
                                                     <button class="btn btn-outline-warning"
                                                             onclick="updateCardStatus({{ card.id }}, 'pending')"
                                                             {% if card.status == 'pending' %}disabled{% endif %}>
-                                                        <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_badge') }}
+                                                        <i class="bi bi-hourglass-split"></i> Ожидание
                                                     </button>
                                                     <button class="btn btn-outline-info"
                                                             onclick="updateCardStatus({{ card.id }}, 'in_progress')"
                                                             {% if card.status == 'in_progress' %}disabled{% endif %}>
-                                                        <i class="bi bi-arrow-repeat"></i> {{ get_text('status_in_progress_badge') }}
+                                                        <i class="bi bi-arrow-repeat"></i> В процессе
                                                     </button>
                                                     <button class="btn btn-outline-success"
                                                             onclick="updateCardStatus({{ card.id }}, 'ready')"
                                                             {% if card.status == 'ready' %}disabled{% endif %}>
-                                                        <i class="bi bi-check-lg"></i> {{ get_text('status_ready_badge') }}
+                                                        <i class="bi bi-check-lg"></i> Готово
                                                     </button>
                                                 </div>
                                             </div>
                                         </div>
                                     </td>
-
-                                    <!-- ДЕСКТОПНЫЕ КОЛОНКИ -->
                                     <td class="desktop-td d-none d-md-table-cell"><strong>@{{ card.username }}</strong></td>
                                     <td class="desktop-td d-none d-md-table-cell">{{ card.full_name or '-' }}</td>
                                     <td class="desktop-td d-none d-md-table-cell">{{ card.position_en or '-' }}</td>
@@ -756,7 +717,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="bookingsTable" class="table table-hover align-middle pr-data-table">
+                        <table id="bookingsTable" class="table table-hover table-affiliate align-middle">
                             <thead>
                                 <tr>
                                     <th>{{ get_text('id') }}</th>
@@ -791,7 +752,7 @@
                                         </button>
                                     </td>
                                 </tr>
-                                {% endfor %}
+                            {% endfor %}
                             </tbody>
                         </table>
                     </div>
@@ -807,7 +768,7 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table id="reportsTable" class="table table-hover align-middle pr-data-table">
+                    <table id="reportsTable" class="table table-hover table-affiliate align-middle">
                         <thead>
                             <tr>
                                 <th>{{ get_text('id') }}</th>
@@ -893,31 +854,12 @@
     const bookingsData = {{ affiliate_bookings|tojson|safe }};
     const reportsData = {{ affiliate_reports|tojson|safe }};
 
-    const tableLanguage = {
-        search: {{ get_text('dt_search')|tojson }},
-        lengthMenu: {{ get_text('dt_length')|tojson }},
-        info: {{ get_text('dt_info')|tojson }},
-        infoEmpty: {{ get_text('dt_info_empty')|tojson }},
-        infoFiltered: {{ get_text('dt_info_filtered')|tojson }},
-        emptyTable: {{ get_text('dt_empty')|tojson }},
-        zeroRecords: {{ get_text('dt_zero')|tojson }},
-        loadingRecords: {{ get_text('dt_loading')|tojson }},
-        processing: {{ get_text('dt_processing')|tojson }},
-        paginate: {
-            first: {{ get_text('dt_first')|tojson }},
-            last: {{ get_text('dt_last')|tojson }},
-            next: {{ get_text('dt_next')|tojson }},
-            previous: {{ get_text('dt_previous')|tojson }}
-        },
-        aria: {
-            sortAscending: {{ get_text('dt_sort_asc')|tojson }},
-            sortDescending: {{ get_text('dt_sort_desc')|tojson }}
-        }
-    };
+    const lang = '{{ session.get("lang", "ru") }}';
+    const datatableLangUrl = `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`;
 
     $(document).ready(function() {
         const dtConfig = {
-            language: tableLanguage,
+            language: { url: datatableLangUrl },
             pageLength: 25,
             autoWidth: false,
             order: [[0, 'desc']]

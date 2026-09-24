@@ -179,7 +179,7 @@ class TelegramBot:
                 elif ext in {'mp3', 'm4a', 'wav', 'flac'}:
                     url = f"{self.api_url}/sendAudio"
                     field_name = 'audio'
-                elif ext in {'jpg', 'jpeg', 'png', 'webp'} and os.path.getsize(file) <= 10 * 1024 * 1024:
+                elif ext in {'jpg', 'jpeg', 'png', 'webp'}:
                     url = f"{self.api_url}/sendPhoto"
                     field_name = 'photo'
                 else:
@@ -236,7 +236,7 @@ class TelegramBot:
                 form_data.add_field(attach_name, f, filename=os.path.basename(file_path))
 
                 ext = file_path.rsplit('.', 1)[-1].lower() if '.' in file_path else ''
-                if ext in {'jpg', 'jpeg', 'png'} and os.path.getsize(file_path) <= 10 * 1024 * 1024:
+                if ext in {'jpg', 'jpeg', 'png'}:
                     media_type = 'photo'
                 elif ext in {'mp3', 'm4a', 'wav', 'flac'}:
                     media_type = 'audio'
@@ -732,28 +732,6 @@ def pr_panel():
     affiliate_bookings = run_async(db.get_all_affiliate_bookings()) or []
     affiliate_reports = run_async(db.get_all_affiliate_reports()) or []
 
-    # Older bookings may contain Russian or English labels saved by the bot.
-    # Normalize only known option values for this page; leave free text untouched.
-    option_keys = {
-        'карта': 'affiliate_value_card', 'card': 'affiliate_value_card',
-        'наличные': 'affiliate_value_cash', 'cash': 'affiliate_value_cash',
-        'обычный': 'affiliate_value_regular', 'regular': 'affiliate_value_regular',
-        'не указано': 'affiliate_value_unspecified', 'not specified': 'affiliate_value_unspecified',
-    }
-    lang = session.get('lang', 'ru')
-    affiliate_bookings = [
-        {
-            **booking,
-            **{
-                field: get_text(option_keys[str(booking[field]).strip().casefold()], lang)
-                if booking.get(field) is not None and str(booking[field]).strip().casefold() in option_keys
-                else booking.get(field)
-                for field in ('payment_method', 'partnertype')
-            },
-        }
-        for booking in affiliate_bookings
-    ]
-
     for req in banner_requests:
         if 'status' not in req or not req.get('status'):
             req['status'] = 'pending'
@@ -945,6 +923,20 @@ def api_get_travel_request(request_id):
     except Exception as e:
         logger.error(f"Error getting travel request {request_id}: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/travel/request/<int:request_id>/toggle_archive', methods=['POST'])
+@login_required
+def api_toggle_travel_archive(request_id):
+    if session.get('role') != 'admin' and 'travel' not in session.get('groups', []):
+        return jsonify({'error': 'Access denied'}), 403
+    try:
+        is_archived = run_async(db.toggle_travel_request_archive(request_id))
+        if is_archived is None:
+            return jsonify({'error': 'Request not found'}), 404
+        return jsonify({'success': True, 'is_archived': is_archived})
+    except Exception:
+        logger.exception('Error toggling travel request archive %s', request_id)
+        return jsonify({'error': 'Could not update archive'}), 500
 
 @app.route('/api/travel/request/<int:request_id>/visa_status', methods=['POST'])
 @login_required
@@ -1563,9 +1555,6 @@ def api_send_message():
 
         if saved_files:
             tg_file_ids = run_async(bot.send_documents(user_id, message, saved_files), timeout=300)
-            if not tg_file_ids or len(tg_file_ids) != len(saved_files):
-                logger.error("Telegram sent %s/%s files to user %s", len(tg_file_ids or []), len(saved_files), user_id)
-                return jsonify({'success': False, 'error': 'Telegram не подтвердил отправку всех файлов. Проверьте чат перед повторной отправкой.'}), 502
             messages_to_insert = []
             if tg_file_ids:
                 for idx, tg_file_id in enumerate(tg_file_ids):

@@ -573,6 +573,12 @@ class Database:
                     except Exception as e:
                         logger.warning(f"Table might already exist: {e}")
 
+                # Existing installations need the column as well as new databases.
+                await conn.execute(f"""
+                    ALTER TABLE {self.db_schema_travel}.travel_flight_request
+                    ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE
+                """)
+
                 logger.info("All tables created successfully")
                 return True
 
@@ -1179,6 +1185,16 @@ class Database:
             logger.error(f"Error getting travel flight requests: {e}")
             return []
 
+    async def toggle_travel_request_archive(self, request_id: int):
+        """Return the new archive state, or None when the request does not exist."""
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval(f"""
+                UPDATE {self.db_schema_travel}.travel_flight_request
+                SET is_archived = NOT is_archived, updated_at = NOW()
+                WHERE id = $1
+                RETURNING is_archived
+            """, request_id)
+
     async def get_travel_flight_request_by_id(self, request_id: int) -> dict:
         """Получить заявку на билет по ID вместе с данными суточных"""
         try:
@@ -1243,21 +1259,22 @@ class Database:
             async with self.pool.acquire() as conn:
                 total_requests = await conn.fetchval(f"""
                     SELECT COUNT(*) FROM {self.db_schema_travel}.travel_flight_request
+                    WHERE is_archived = FALSE
                 """) or 0
 
                 visa_pending = await conn.fetchval(f"""
                     SELECT COUNT(*) FROM {self.db_schema_travel}.travel_flight_request 
-                    WHERE visa_request_status = 'pending'
+                    WHERE visa_request_status = 'pending' AND is_archived = FALSE
                 """) or 0
 
                 flight_pending = await conn.fetchval(f"""
                     SELECT COUNT(*) FROM {self.db_schema_travel}.travel_flight_request 
-                    WHERE flight_request_status = 'pending'
+                    WHERE flight_request_status = 'pending' AND is_archived = FALSE
                 """) or 0
 
                 flight_purchased = await conn.fetchval(f"""
                     SELECT COUNT(*) FROM {self.db_schema_travel}.travel_flight_request 
-                    WHERE flight_request_status = 'purchased'
+                    WHERE flight_request_status = 'purchased' AND is_archived = FALSE
                 """) or 0
 
                 return {

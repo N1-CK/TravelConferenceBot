@@ -34,6 +34,25 @@
     .status-ready, .status-completed { background: #d4edda; color: #155724; }
     .status-purchased { background: #d1e7dd; color: #0f5132; }
 
+    .travel-archive-row {
+        display: flex; align-items: center; gap: 12px; width: 100%;
+        padding: 12px 16px; margin-bottom: 16px; text-align: left;
+        background: #f8f9fc; border: 1px solid #e2e8f0;
+        border-radius: 12px; color: #344054;
+    }
+    .travel-archive-row:hover { background: #eef1fa; }
+    .travel-archive-row .badge { margin-left: auto; }
+    .travel-context-menu {
+        display: none; position: fixed; z-index: 1100; min-width: 180px;
+        background: white; border: 1px solid #dee2e6; border-radius: 10px;
+        box-shadow: 0 10px 24px rgba(0,0,0,.15); padding: 5px;
+    }
+    .travel-context-menu button {
+        width: 100%; text-align: left; border: 0; background: transparent;
+        border-radius: 6px; padding: 9px 12px;
+    }
+    .travel-context-menu button:hover, .travel-context-menu button:focus { background: #f1f5f9; }
+
     /* По умолчанию аккордеон скрыт на десктопе */
     .mobile-expand-toggle,
     .mobile-extra-info {
@@ -290,6 +309,11 @@
             </div>
         </div>
         <div class="card-body">
+            <button type="button" class="travel-archive-row" id="travelArchiveRow" aria-label="{{ get_text('travel_archive') }}">
+                <i class="bi bi-archive"></i>
+                <span id="travelArchiveTitle">{{ get_text('travel_archive') }}</span>
+                <span class="badge bg-secondary rounded-pill" id="travelArchiveCount">0</span>
+            </button>
             <div class="table-responsive">
                 <table id="requestsTable" class="table table-hover align-middle">
                     <thead>
@@ -309,7 +333,7 @@
                     </thead>
                     <tbody>
                         {% for req in requests %}
-                        <tr data-visa-status="{{ req.visa_request_status }}" data-flight-status="{{ req.flight_request_status }}">
+                        <tr data-request-id="{{ req.id }}" data-archived="{{ '1' if req.is_archived else '0' }}" data-visa-status="{{ req.visa_request_status }}" data-flight-status="{{ req.flight_request_status }}">
                             <td class="col-user-summary">
                                 <span class="d-none d-md-inline">{{ req.id }}</span>
                                 <div class="d-md-none">
@@ -466,6 +490,9 @@
 </div>
 
 <!-- Request Details Modal -->
+<div id="travelContextMenu" class="travel-context-menu">
+    <button type="button" id="travelArchiveAction"><i class="bi bi-archive"></i> <span>{{ get_text('to_archive') }}</span></button>
+</div>
 <div class="modal fade" id="requestModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -518,6 +545,96 @@
 
 <script>
     let requestsTable;
+    let travelArchiveMode = false;
+    let travelContextId = null;
+
+    function refreshTravelArchive() {
+        const rows = requestsTable.rows().nodes().toArray();
+        document.getElementById('travelArchiveCount').textContent = rows.filter(row => row.dataset.archived === '1').length;
+        const active = rows.filter(row => row.dataset.archived !== '1');
+        document.querySelector('#statAll .stat-number').textContent = active.length;
+        document.querySelector('#statVisaPending .stat-number').textContent = active.filter(row => row.dataset.visaStatus === 'pending').length;
+        document.querySelector('#statFlightPending .stat-number').textContent = active.filter(row => row.dataset.flightStatus === 'pending').length;
+        document.querySelector('#statFlightPurchased .stat-number').textContent = active.filter(row => row.dataset.flightStatus === 'purchased').length;
+        document.getElementById('travelArchiveTitle').textContent = travelArchiveMode
+            ? {{ get_text('travel_archive_back')|tojson }}
+            : {{ get_text('travel_archive')|tojson }};
+        document.getElementById('travelArchiveRow').querySelector('i').className = travelArchiveMode ? 'bi bi-arrow-left' : 'bi bi-archive';
+        requestsTable.draw();
+    }
+
+    function showTravelContext(row, x, y) {
+        travelContextId = Number(row.dataset.requestId);
+        const archived = row.dataset.archived === '1';
+        const menu = document.getElementById('travelContextMenu');
+        menu.querySelector('span').textContent = archived ? {{ get_text('unarchive')|tojson }} : {{ get_text('to_archive')|tojson }};
+        menu.querySelector('i').className = archived ? 'bi bi-arrow-up-right-circle' : 'bi bi-archive';
+        menu.style.display = 'block';
+        menu.style.left = Math.max(8, Math.min(x, window.innerWidth - menu.offsetWidth - 8)) + 'px';
+        menu.style.top = Math.max(8, Math.min(y, window.innerHeight - menu.offsetHeight - 8)) + 'px';
+        menu.querySelector('button').focus();
+    }
+
+    function initTravelArchive() {
+        $.fn.dataTable.ext.search.push((settings, data, index) => {
+            if (settings.nTable.id !== 'requestsTable') return true;
+            const row = settings.aoData[index].nTr;
+            return !!row && (row.dataset.archived === '1') === travelArchiveMode;
+        });
+        document.getElementById('travelArchiveRow').addEventListener('click', () => {
+            travelArchiveMode = !travelArchiveMode;
+            document.getElementById('travelContextMenu').style.display = 'none';
+            refreshTravelArchive();
+        });
+        const table = document.getElementById('requestsTable');
+        table.addEventListener('contextmenu', event => {
+            const row = event.target.closest('tr[data-request-id]');
+            if (!row) return;
+            event.preventDefault();
+            showTravelContext(row, event.clientX, event.clientY);
+        });
+        let timer, startX, startY, longPressed = false;
+        table.addEventListener('touchstart', event => {
+            const row = event.target.closest('tr[data-request-id]');
+            if (!row || event.touches.length !== 1 || event.target.closest('button, a, input, select, summary')) return;
+            const touch = event.touches[0];
+            startX = touch.clientX; startY = touch.clientY;
+            clearTimeout(timer);
+            timer = setTimeout(() => { longPressed = true; showTravelContext(row, startX, startY); }, 550);
+        }, { passive: true });
+        table.addEventListener('touchmove', event => {
+            const touch = event.touches[0];
+            if (!touch || Math.hypot(touch.clientX - startX, touch.clientY - startY) > 10) clearTimeout(timer);
+        }, { passive: true });
+        table.addEventListener('touchend', () => clearTimeout(timer));
+        table.addEventListener('touchcancel', () => clearTimeout(timer));
+        table.addEventListener('click', event => {
+            if (longPressed) { event.preventDefault(); event.stopPropagation(); longPressed = false; }
+        }, true);
+        document.addEventListener('click', event => {
+            if (!event.target.closest('#travelContextMenu')) document.getElementById('travelContextMenu').style.display = 'none';
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') document.getElementById('travelContextMenu').style.display = 'none';
+        });
+        document.getElementById('travelArchiveAction').addEventListener('click', async () => {
+            const id = travelContextId;
+            document.getElementById('travelContextMenu').style.display = 'none';
+            if (!id) return;
+            try {
+                const response = await fetch(`/api/travel/request/${id}/toggle_archive`, { method: 'POST' });
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.error || 'Archive request failed');
+                const row = requestsTable.rows().nodes().toArray().find(node => Number(node.dataset.requestId) === id);
+                if (row) row.dataset.archived = result.is_archived ? '1' : '0';
+                refreshTravelArchive();
+            } catch (error) {
+                console.error(error);
+                showToast({{ get_text('error_occurred')|tojson }}, 'danger');
+            }
+        });
+        refreshTravelArchive();
+    }
 
     function escapeHtml(text) {
         if (!text) return '';
@@ -805,6 +922,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         initDataTable();
         initFilters();
+        initTravelArchive();
     });
 </script>
 {% endblock %}
