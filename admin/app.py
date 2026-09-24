@@ -732,6 +732,28 @@ def pr_panel():
     affiliate_bookings = run_async(db.get_all_affiliate_bookings()) or []
     affiliate_reports = run_async(db.get_all_affiliate_reports()) or []
 
+    # Older bookings may contain Russian or English labels saved by the bot.
+    # Normalize only known option values for this page; leave free text untouched.
+    option_keys = {
+        'карта': 'affiliate_value_card', 'card': 'affiliate_value_card',
+        'наличные': 'affiliate_value_cash', 'cash': 'affiliate_value_cash',
+        'обычный': 'affiliate_value_regular', 'regular': 'affiliate_value_regular',
+        'не указано': 'affiliate_value_unspecified', 'not specified': 'affiliate_value_unspecified',
+    }
+    lang = session.get('lang', 'ru')
+    affiliate_bookings = [
+        {
+            **booking,
+            **{
+                field: get_text(option_keys[str(booking[field]).strip().casefold()], lang)
+                if booking.get(field) is not None and str(booking[field]).strip().casefold() in option_keys
+                else booking.get(field)
+                for field in ('payment_method', 'partnertype')
+            },
+        }
+        for booking in affiliate_bookings
+    ]
+
     for req in banner_requests:
         if 'status' not in req or not req.get('status'):
             req['status'] = 'pending'

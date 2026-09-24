@@ -41,12 +41,23 @@
     .nav-tabs .nav-link i {
         margin-right: 8px;
     }
-    .table-affiliate {
-        font-size: 0.85rem;
+    .pr-data-table {
+        width: 100% !important;
+        font-size: 0.875rem;
     }
-    .table-affiliate td, .table-affiliate th {
+    .pr-data-table thead th {
+        background: #f8f9fc;
+        color: #495057;
+        font-weight: 600;
+        white-space: nowrap;
+        border-bottom: 2px solid #e9ecef;
+    }
+    .pr-data-table tbody td, .pr-data-table thead th {
         vertical-align: middle;
-        padding: 10px 8px;
+        padding: 10px 12px;
+    }
+    .pr-data-table tbody tr:hover {
+        background-color: #f8f9fc;
     }
     .booking-details, .report-details {
         max-width: 250px;
@@ -59,6 +70,7 @@
     .mobile-pr-card {
         display: none;
     }
+    .mobile-td-card { vertical-align: middle; }
 
     @media (max-width: 767.98px) {
         .nav-tabs {
@@ -209,6 +221,7 @@
             border: none !important;
             box-sizing: border-box !important;
         }
+        .mobile-td-card .desktop-id { display: none !important; }
 
         .mobile-pr-card {
             display: flex !important;
@@ -306,7 +319,7 @@
         }
 
         /* 4. Карточки Affiliate */
-        #bookingsTable tr, #reportsTable tr {
+        #bookingsTable tbody tr, #reportsTable tbody tr {
             display: block !important;
             width: 100% !important;
             background: white !important;
@@ -317,24 +330,34 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
             box-sizing: border-box !important;
         }
-        .affiliate-card-mobile {
+        #bookingsTable thead, #reportsTable thead { display: none !important; }
+        #bookingsTable tbody td, #reportsTable tbody td {
             display: flex !important;
-            flex-direction: column !important;
-            gap: 8px !important;
-            width: 100% !important;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 12px;
+            width: 100%;
+            padding: 5px 0 !important;
+            border: 0;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            max-width: none;
         }
-        .affiliate-top {
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            border-bottom: 1px solid #f1f3f5 !important;
-            padding-bottom: 8px !important;
+        #bookingsTable tbody td::before, #reportsTable tbody td::before {
+            content: attr(data-label);
+            color: #6c757d;
+            font-weight: 600;
+            flex: 0 0 38%;
         }
-        .affiliate-row {
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            font-size: 0.85rem !important;
+        #bookingsTable tbody td:first-child, #reportsTable tbody td:first-child {
+            border-bottom: 1px solid #f1f3f5;
+            padding-bottom: 9px !important;
+            margin-bottom: 4px;
+        }
+        #bookingsTable tbody td:last-child, #reportsTable tbody td:last-child {
+            border-top: 1px solid #f1f3f5;
+            padding-top: 9px !important;
+            margin-top: 4px;
         }
     }
 </style>
@@ -406,7 +429,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="bannersTable" class="table table-hover align-middle">
+                        <table id="bannersTable" class="table table-hover align-middle pr-data-table">
                             <thead>
                                 <tr>
                                     <th>{{ get_text('id') }}</th>
@@ -424,7 +447,8 @@
                                 {% for req in banner_requests %}
                                 <tr data-status="{{ req.status }}">
                                     <!-- МОБИЛЬНАЯ КАРТОЧКА НА 100% ШИРИНЫ (вложена в 1 td с colspan) -->
-                                    <td class="mobile-td-card d-md-none" colspan="9">
+                                    <td class="mobile-td-card">
+                                        <span class="desktop-id">{{ req.id }}</span>
                                         <div class="mobile-pr-card">
                                             <div class="mobile-card-top">
                                                 <div>
@@ -449,7 +473,7 @@
                                             <div class="mobile-expand-toggle w-100">
                                                 <details>
                                                     <summary>
-                                                        <span>{{ get_text('more_info', default='Подробнее') }}</span> <i class="bi bi-chevron-down"></i>
+                                                        <span>{{ get_text('more_info') }}</span> <i class="bi bi-chevron-down"></i>
                                                     </summary>
                                                     <div class="mobile-extra-info">
                                                         <div class="info-row">
@@ -495,7 +519,6 @@
                                     </td>
 
                                     <!-- ДЕСКТОПНЫЕ КОЛОНКИ (абсолютно без изменений) -->
-                                    <td class="desktop-td d-none d-md-table-cell">{{ req.id }}</td>
                                     <td class="desktop-td d-none d-md-table-cell"><strong>@{{ req.username }}</strong></td>
                                     <td class="desktop-td d-none d-md-table-cell">{{ req.full_name or '-' }}</td>
                                     <td class="desktop-td d-none d-md-table-cell">{{ req.position or '-' }}</td>
@@ -534,13 +557,6 @@
                                                 <i class="bi bi-check-lg"></i>
                                             </button>
                                         </div>
-                                    </td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="9" class="text-center text-muted py-4">
-                                        <i class="bi bi-image fs-1"></i>
-                                        <p class="mt-2">{{ get_text('no_banner_requests') }}</p>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -588,13 +604,13 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="cardsTable" class="table table-hover align-middle">
+                        <table id="cardsTable" class="table table-hover align-middle pr-data-table">
                             <thead>
                                 <tr>
                                     <th>{{ get_text('id') }}</th>
                                     <th>{{ get_text('username') }}</th>
                                     <th>{{ get_text('full_name') }}</th>
-                                    <th>{{ get_text('position') }}</th>
+                                    <th>{{ get_text('pr_position_en') }}</th>
                                     <th>{{ get_text('company') }}</th>
                                     <th>{{ get_text('brand_style') }}</th>
                                     <th>{{ get_text('created_at') }}</th>
@@ -606,7 +622,8 @@
                                 {% for card in business_cards %}
                                 <tr data-status="{{ card.status }}">
                                     <!-- МОБИЛЬНАЯ КАРТОЧКА ВИЗИТКИ НА 100% ШИРИНЫ -->
-                                    <td class="mobile-td-card d-md-none" colspan="9">
+                                    <td class="mobile-td-card">
+                                        <span class="desktop-id">{{ card.id }}</span>
                                         <div class="mobile-pr-card">
                                             <div class="mobile-card-top">
                                                 <div>
@@ -631,11 +648,11 @@
                                             <div class="mobile-expand-toggle w-100">
                                                 <details>
                                                     <summary>
-                                                        <span>{{ get_text('more_info', default='Подробнее') }}</span> <i class="bi bi-chevron-down"></i>
+                                                        <span>{{ get_text('more_info') }}</span> <i class="bi bi-chevron-down"></i>
                                                     </summary>
                                                     <div class="mobile-extra-info">
                                                         <div class="info-row">
-                                                            <span class="info-label">{{ get_text('position') }}:</span>
+                                                            <span class="info-label">{{ get_text('pr_position_en') }}:</span>
                                                             <span>{{ card.position_en or '-' }}</span>
                                                         </div>
                                                         <div class="info-row">
@@ -659,17 +676,17 @@
                                                     <button class="btn btn-outline-warning"
                                                             onclick="updateCardStatus({{ card.id }}, 'pending')"
                                                             {% if card.status == 'pending' %}disabled{% endif %}>
-                                                        <i class="bi bi-hourglass-split"></i> Ожидание
+                                                        <i class="bi bi-hourglass-split"></i> {{ get_text('status_pending_badge') }}
                                                     </button>
                                                     <button class="btn btn-outline-info"
                                                             onclick="updateCardStatus({{ card.id }}, 'in_progress')"
                                                             {% if card.status == 'in_progress' %}disabled{% endif %}>
-                                                        <i class="bi bi-arrow-repeat"></i> В процессе
+                                                        <i class="bi bi-arrow-repeat"></i> {{ get_text('status_in_progress_badge') }}
                                                     </button>
                                                     <button class="btn btn-outline-success"
                                                             onclick="updateCardStatus({{ card.id }}, 'ready')"
                                                             {% if card.status == 'ready' %}disabled{% endif %}>
-                                                        <i class="bi bi-check-lg"></i> Готово
+                                                        <i class="bi bi-check-lg"></i> {{ get_text('status_ready_badge') }}
                                                     </button>
                                                 </div>
                                             </div>
@@ -677,7 +694,6 @@
                                     </td>
 
                                     <!-- ДЕСКТОПНЫЕ КОЛОНКИ -->
-                                    <td class="desktop-td d-none d-md-table-cell">{{ card.id }}</td>
                                     <td class="desktop-td d-none d-md-table-cell"><strong>@{{ card.username }}</strong></td>
                                     <td class="desktop-td d-none d-md-table-cell">{{ card.full_name or '-' }}</td>
                                     <td class="desktop-td d-none d-md-table-cell">{{ card.position_en or '-' }}</td>
@@ -724,13 +740,6 @@
                                         </div>
                                     </td>
                                 </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="9" class="text-center text-muted py-4">
-                                        <i class="bi bi-card-text fs-1"></i>
-                                        <p class="mt-2">{{ get_text('no_cards_requests') }}</p>
-                                    </td>
-                                </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -747,7 +756,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="bookingsTable" class="table table-hover table-affiliate align-middle">
+                        <table id="bookingsTable" class="table table-hover align-middle pr-data-table">
                             <thead>
                                 <tr>
                                     <th>{{ get_text('id') }}</th>
@@ -766,25 +775,21 @@
                             <tbody>
                                 {% for b in affiliate_bookings %}
                                 <tr>
-                                    <td>{{ b.id }}</td>
-                                    <td><strong>@{{ b.username }}</strong></td>
-                                    <td>{{ b.manager or '-' }}</td>
-                                    <td><small>{{ b.datetime or '-' }}</small></td>
-                                    <td class="booking-details" title="{{ b.company or '' }}">{{ b.company or '-' }}</td>
-                                    <td>{{ b.partner or '-' }}</td>
-                                    <td class="booking-details" title="{{ b.restaurant or '' }}">{{ b.restaurant or '-' }}</td>
-                                    <td>{{ b.people or '-' }}</td>
-                                    <td>{{ b.payment_method or '-' }}</td>
-                                    <td>{{ b.partnertype or '-' }}</td>
-                                    <td>
+                                    <td data-label="{{ get_text('id') }}">{{ b.id }}</td>
+                                    <td data-label="{{ get_text('username') }}"><strong>@{{ b.username }}</strong></td>
+                                    <td data-label="{{ get_text('affiliate_manager') }}">{{ b.manager or '-' }}</td>
+                                    <td data-label="{{ get_text('affiliate_datetime') }}"><small>{{ b.datetime or '-' }}</small></td>
+                                    <td data-label="{{ get_text('company') }}" class="booking-details" title="{{ b.company or '' }}">{{ b.company or '-' }}</td>
+                                    <td data-label="{{ get_text('affiliate_partner') }}">{{ b.partner or '-' }}</td>
+                                    <td data-label="{{ get_text('affiliate_restaurant') }}" class="booking-details" title="{{ b.restaurant or '' }}">{{ b.restaurant or '-' }}</td>
+                                    <td data-label="{{ get_text('affiliate_people') }}">{{ b.people or '-' }}</td>
+                                    <td data-label="{{ get_text('affiliate_payment') }}">{{ b.payment_method or '-' }}</td>
+                                    <td data-label="{{ get_text('affiliate_partner_type') }}">{{ b.partnertype or '-' }}</td>
+                                    <td data-label="{{ get_text('actions') }}">
                                         <button class="btn btn-sm btn-outline-primary" onclick="viewBookingDetails({{ b.id }})" title="{{ get_text('view') }}">
                                             <i class="bi bi-eye"></i>
                                         </button>
                                     </td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="11" class="text-center text-muted py-4">{{ get_text('affiliate_no_bookings') }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -802,7 +807,7 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table id="reportsTable" class="table table-hover table-affiliate align-middle">
+                    <table id="reportsTable" class="table table-hover align-middle pr-data-table">
                         <thead>
                             <tr>
                                 <th>{{ get_text('id') }}</th>
@@ -819,25 +824,21 @@
                         <tbody>
                             {% for r in affiliate_reports %}
                             <tr>
-                                <td>{{ r.id }}</td>
-                                <td><strong>@{{ r.username }}</strong></td>
-                                <td class="booking-details" title="{{ r.company or '' }}">{{ r.company or '-' }}</td>
-                                <td><small>{{ r.meeting_date or '-' }}</small></td>
-                                <td>{{ r.manager or '-' }}</td>
-                                <td>{{ r.partner or '-' }}</td>
-                                <td class="report-details" title="{{ r.result or '' }}">
+                                <td data-label="{{ get_text('id') }}">{{ r.id }}</td>
+                                <td data-label="{{ get_text('username') }}"><strong>@{{ r.username }}</strong></td>
+                                <td data-label="{{ get_text('company') }}" class="booking-details" title="{{ r.company or '' }}">{{ r.company or '-' }}</td>
+                                <td data-label="{{ get_text('affiliate_meeting_date') }}"><small>{{ r.meeting_date or '-' }}</small></td>
+                                <td data-label="{{ get_text('affiliate_manager') }}">{{ r.manager or '-' }}</td>
+                                <td data-label="{{ get_text('affiliate_partner') }}">{{ r.partner or '-' }}</td>
+                                <td data-label="{{ get_text('affiliate_results') }}" class="report-details" title="{{ r.result or '' }}">
                                     {{ (r.result[:50] ~ '...') if r.result and r.result|length > 50 else (r.result or '-') }}
                                 </td>
-                                <td><span class="badge bg-success">{{ r.budget or '0' }}</span></td>
-                                <td>
+                                <td data-label="{{ get_text('affiliate_budget') }}"><span class="badge bg-success">{{ r.budget or '0' }}</span></td>
+                                <td data-label="{{ get_text('actions') }}">
                                     <button class="btn btn-sm btn-outline-primary" onclick="viewReportDetails({{ r.id }})" title="{{ get_text('view') }}">
                                         <i class="bi bi-eye"></i>
                                     </button>
                                 </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="9" class="text-center text-muted py-4">{{ get_text('affiliate_no_reports') }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -892,12 +893,31 @@
     const bookingsData = {{ affiliate_bookings|tojson|safe }};
     const reportsData = {{ affiliate_reports|tojson|safe }};
 
-    const lang = '{{ session.get("lang", "ru") }}';
-    const datatableLangUrl = `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`;
+    const tableLanguage = {
+        search: {{ get_text('dt_search')|tojson }},
+        lengthMenu: {{ get_text('dt_length')|tojson }},
+        info: {{ get_text('dt_info')|tojson }},
+        infoEmpty: {{ get_text('dt_info_empty')|tojson }},
+        infoFiltered: {{ get_text('dt_info_filtered')|tojson }},
+        emptyTable: {{ get_text('dt_empty')|tojson }},
+        zeroRecords: {{ get_text('dt_zero')|tojson }},
+        loadingRecords: {{ get_text('dt_loading')|tojson }},
+        processing: {{ get_text('dt_processing')|tojson }},
+        paginate: {
+            first: {{ get_text('dt_first')|tojson }},
+            last: {{ get_text('dt_last')|tojson }},
+            next: {{ get_text('dt_next')|tojson }},
+            previous: {{ get_text('dt_previous')|tojson }}
+        },
+        aria: {
+            sortAscending: {{ get_text('dt_sort_asc')|tojson }},
+            sortDescending: {{ get_text('dt_sort_desc')|tojson }}
+        }
+    };
 
     $(document).ready(function() {
         const dtConfig = {
-            language: { url: datatableLangUrl },
+            language: tableLanguage,
             pageLength: 25,
             autoWidth: false,
             order: [[0, 'desc']]

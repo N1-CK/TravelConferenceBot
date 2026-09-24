@@ -1761,6 +1761,7 @@
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = () => {
+                    try {
                     const canvas = document.createElement('canvas');
                     let width = img.width;
                     let height = img.height;
@@ -1792,9 +1793,13 @@
                             resolve(compressedFile);
                         }
                     }, 'image/jpeg', 0.82);
+                    } catch (err) { resolve(file); }
                 };
+                img.onerror = () => resolve(file);
                 img.src = e.target.result;
             };
+            reader.onerror = () => resolve(file);
+            reader.onabort = () => resolve(file);
             reader.readAsDataURL(file);
         });
     }
@@ -1832,13 +1837,14 @@
 
             for (let i = 0; i < selectedFilesQueue.length; i++) {
                 const originalFile = selectedFilesQueue[i];
-                const fileToSend = await compressImageIfNeeded(originalFile);
+                const fileToSend = await compressImageIfNeeded(originalFile).catch(() => originalFile);
                 formData.append('files', fileToSend);
             }
         }
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/api/send_message', true);
+        xhr.timeout = 330000;
 
         xhr.upload.onprogress = function(e) {
             if (e.lengthComputable) {
@@ -1876,7 +1882,9 @@
                     showToast(locales.errorSending, 'danger');
                 }
             } else {
-                showToast(locales.errorSending, 'danger');
+                let error = '';
+                try { error = JSON.parse(xhr.responseText).error || ''; } catch (e) {}
+                showToast(error || (xhr.status === 413 ? 'Файл превышает лимит веб-сервера. Увеличьте client_max_body_size.' : locales.errorSending), 'danger');
             }
         };
 
@@ -1888,6 +1896,15 @@
                 submitBtn.innerHTML = '<i class="bi bi-send-fill" style="margin-left: 2px;"></i>';
             }
             showToast(locales.networkError, 'danger');
+        };
+        xhr.ontimeout = function() {
+            isUploadingFile = false;
+            progContainer.style.display = 'none';
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-send-fill" style="margin-left: 2px;"></i>';
+            }
+            showToast('Превышено время отправки файла. Проверьте чат перед повторной отправкой.', 'danger');
         };
 
         xhr.send(formData);
