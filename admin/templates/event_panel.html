@@ -29,6 +29,25 @@
     .status-in_progress { background: #cfe2ff; color: #084298; }
     .status-ready { background: #d4edda; color: #155724; }
 
+    .ticket-archive-row {
+        display: flex; align-items: center; gap: 12px; width: 100%;
+        padding: 12px 16px; margin-bottom: 16px; text-align: left;
+        background: #f8f9fc; border: 1px solid #e2e8f0;
+        border-radius: 12px; color: #344054;
+    }
+    .ticket-archive-row:hover { background: #eef1fa; }
+    .ticket-archive-row .badge { margin-left: auto; }
+    .ticket-context-menu {
+        display: none; position: fixed; z-index: 1100; min-width: 180px;
+        background: white; border: 1px solid #dee2e6; border-radius: 10px;
+        box-shadow: 0 10px 24px rgba(0,0,0,.15); padding: 5px;
+    }
+    .ticket-context-menu button {
+        width: 100%; text-align: left; border: 0; background: transparent;
+        border-radius: 6px; padding: 9px 12px;
+    }
+    .ticket-context-menu button:hover, .ticket-context-menu button:focus { background: #f1f5f9; }
+
     /* Стили вкладок */
     .nav-tabs .nav-link {
         color: #6c757d;
@@ -290,21 +309,21 @@
             <div class="row mb-4">
                 <div class="col-md-4 mb-3">
                     <div class="stat-card" onclick="filterByCard('pending')">
-                        <div class="stat-number text-warning">{{ stats.ticket_stats.pending }}</div>
+                        <div class="stat-number text-warning" id="ticketPendingCount">{{ stats.ticket_stats.pending }}</div>
                         <div class="stat-label">{{ get_text('tickets_pending') }}</div>
                         <small class="text-muted d-none d-md-block">{{ get_text('awaiting_processing') }}</small>
                     </div>
                 </div>
                 <div class="col-md-4 mb-3">
                     <div class="stat-card" onclick="filterByCard('in_progress')">
-                        <div class="stat-number text-info">{{ stats.ticket_stats.in_progress }}</div>
+                        <div class="stat-number text-info" id="ticketInProgressCount">{{ stats.ticket_stats.in_progress }}</div>
                         <div class="stat-label">{{ get_text('tickets_in_progress') }}</div>
                         <small class="text-muted d-none d-md-block">{{ get_text('in_processing') }}</small>
                     </div>
                 </div>
                 <div class="col-md-4 mb-3">
                     <div class="stat-card" onclick="filterByCard('ready')">
-                        <div class="stat-number text-success">{{ stats.ticket_stats.ready }}</div>
+                        <div class="stat-number text-success" id="ticketReadyCount">{{ stats.ticket_stats.ready }}</div>
                         <div class="stat-label">{{ get_text('tickets_ready') }}</div>
                         <small class="text-muted d-none d-md-block">{{ get_text('ready_to_send') }}</small>
                     </div>
@@ -329,6 +348,11 @@
                     </div>
                 </div>
                 <div class="card-body">
+                    <button type="button" class="ticket-archive-row" id="ticketArchiveRow" aria-label="{{ get_text('event_archive') }}">
+                        <i class="bi bi-archive"></i>
+                        <span id="ticketArchiveTitle">{{ get_text('event_archive') }}</span>
+                        <span class="badge bg-secondary rounded-pill" id="ticketArchiveCount">0</span>
+                    </button>
                     <div class="table-responsive">
                         <table id="ticketsTable" class="table table-hover align-middle">
                             <thead class="table-header">
@@ -348,7 +372,7 @@
                             </thead>
                             <tbody>
                                 {% for req in ticket_requests %}
-                                <tr data-status="{{ req.status }}">
+                                <tr data-ticket-id="{{ req.id }}" data-archived="{{ '1' if req.is_archived else '0' }}" data-status="{{ req.status }}">
                                     <!-- ID (На вебе только чистый ID, на мобилке шапка карточки) -->
                                     <td class="t-col-header">
                                         <span class="d-none d-md-inline">{{ req.id }}</span>
@@ -444,13 +468,6 @@
                                                 <i class="bi bi-check-lg"></i> <span class="d-md-none ms-1">{{ get_text('status_ready_short') }}</span>
                                             </button>
                                         </div>
-                                    </td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="11" class="text-center text-muted py-4">
-                                        <i class="bi bi-ticket fs-1"></i>
-                                        <p class="mt-2">{{ get_text('no_ticket_requests') }}</p>
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -594,6 +611,10 @@
     </div>
 </div>
 
+<div id="ticketContextMenu" class="ticket-context-menu">
+    <button type="button" id="ticketArchiveAction"><i class="bi bi-archive"></i> <span>{{ get_text('to_archive') }}</span></button>
+</div>
+
 <!-- Модальное окно редактирования стенда -->
 <div class="modal fade" id="editStandModal" tabindex="-1" aria-labelledby="editStandModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -651,6 +672,90 @@
 <script>
     let ticketsTable;
     let standsTable;
+    let ticketArchiveMode = false;
+    let ticketContextId = null;
+
+    function refreshTicketArchive() {
+        const rows = ticketsTable.rows().nodes().toArray();
+        const active = rows.filter(row => row.dataset.archived !== '1');
+        document.getElementById('ticketArchiveCount').textContent = rows.length - active.length;
+        document.getElementById('ticketPendingCount').textContent = active.filter(row => row.dataset.status === 'pending').length;
+        document.getElementById('ticketInProgressCount').textContent = active.filter(row => row.dataset.status === 'in_progress').length;
+        document.getElementById('ticketReadyCount').textContent = active.filter(row => row.dataset.status === 'ready').length;
+        document.getElementById('ticketArchiveTitle').textContent = ticketArchiveMode
+            ? {{ get_text('event_archive_back')|tojson }}
+            : {{ get_text('event_archive')|tojson }};
+        document.querySelector('#ticketArchiveRow i').className = ticketArchiveMode ? 'bi bi-arrow-left' : 'bi bi-archive';
+        ticketsTable.draw();
+    }
+
+    function showTicketContext(row, x, y) {
+        ticketContextId = Number(row.dataset.ticketId);
+        const archived = row.dataset.archived === '1';
+        const menu = document.getElementById('ticketContextMenu');
+        menu.querySelector('span').textContent = archived ? {{ get_text('unarchive')|tojson }} : {{ get_text('to_archive')|tojson }};
+        menu.querySelector('i').className = archived ? 'bi bi-arrow-up-right-circle' : 'bi bi-archive';
+        menu.style.display = 'block';
+        menu.style.left = Math.max(8, Math.min(x, window.innerWidth - menu.offsetWidth - 8)) + 'px';
+        menu.style.top = Math.max(8, Math.min(y, window.innerHeight - menu.offsetHeight - 8)) + 'px';
+        menu.querySelector('button').focus();
+    }
+
+    function initTicketArchive() {
+        document.getElementById('ticketArchiveRow').addEventListener('click', () => {
+            ticketArchiveMode = !ticketArchiveMode;
+            document.getElementById('ticketContextMenu').style.display = 'none';
+            refreshTicketArchive();
+        });
+        const table = document.getElementById('ticketsTable');
+        table.addEventListener('contextmenu', event => {
+            const row = event.target.closest('tr[data-ticket-id]');
+            if (!row) return;
+            event.preventDefault();
+            showTicketContext(row, event.clientX, event.clientY);
+        });
+        let timer, startX, startY, longPressed = false;
+        table.addEventListener('touchstart', event => {
+            const row = event.target.closest('tr[data-ticket-id]');
+            if (!row || event.touches.length !== 1 || event.target.closest('button, a, input, select, summary')) return;
+            const touch = event.touches[0];
+            startX = touch.clientX; startY = touch.clientY;
+            clearTimeout(timer);
+            timer = setTimeout(() => { longPressed = true; showTicketContext(row, startX, startY); }, 550);
+        }, { passive: true });
+        table.addEventListener('touchmove', event => {
+            const touch = event.touches[0];
+            if (!touch || Math.hypot(touch.clientX - startX, touch.clientY - startY) > 10) clearTimeout(timer);
+        }, { passive: true });
+        table.addEventListener('touchend', () => clearTimeout(timer));
+        table.addEventListener('touchcancel', () => clearTimeout(timer));
+        table.addEventListener('click', event => {
+            if (longPressed) { event.preventDefault(); event.stopPropagation(); longPressed = false; }
+        }, true);
+        document.addEventListener('click', event => {
+            if (!event.target.closest('#ticketContextMenu')) document.getElementById('ticketContextMenu').style.display = 'none';
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') document.getElementById('ticketContextMenu').style.display = 'none';
+        });
+        document.getElementById('ticketArchiveAction').addEventListener('click', async () => {
+            const id = ticketContextId;
+            document.getElementById('ticketContextMenu').style.display = 'none';
+            if (!id) return;
+            try {
+                const response = await fetch(`/api/ticket/${id}/toggle_archive`, { method: 'POST' });
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.error || 'Archive request failed');
+                const row = ticketsTable.rows().nodes().toArray().find(node => Number(node.dataset.ticketId) === id);
+                if (row) row.dataset.archived = result.is_archived ? '1' : '0';
+                refreshTicketArchive();
+            } catch (error) {
+                console.error(error);
+                showToast({{ get_text('error_occurred')|tojson }}, 'danger');
+            }
+        });
+        refreshTicketArchive();
+    }
 
     $(document).ready(function() {
         const lang = '{{ session.get("lang", "ru") }}';
@@ -672,6 +777,8 @@
             pageLength: 25,
             order: [[0, 'asc'], [1, 'asc']]
         });
+
+        initTicketArchive();
 
         // Пересчет ширины колонок DataTables при смене вкладки
         $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
@@ -715,11 +822,9 @@
             if (settings.nTable.id !== 'ticketsTable') return true;
 
             const selectedStatus = $('.filter-btn.active').data('status');
-            if (!selectedStatus || selectedStatus === 'all') return true;
-
-            const row = ticketsTable.row(dataIndex).node();
-            const rowStatus = $(row).attr('data-status');
-            return rowStatus === selectedStatus;
+            const row = settings.aoData[dataIndex].nTr;
+            if (!row || (row.dataset.archived === '1') !== ticketArchiveMode) return false;
+            return !selectedStatus || selectedStatus === 'all' || row.dataset.status === selectedStatus;
         }
     );
 

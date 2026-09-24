@@ -1820,6 +1820,20 @@ def api_update_report_status(report_id):
     success = run_async(db.update_affiliate_report_status(report_id, status))
     return jsonify({'success': success})
 
+@app.route('/api/ticket/<int:request_id>/toggle_archive', methods=['POST'])
+@login_required
+def api_toggle_ticket_archive(request_id):
+    if session.get('role') != 'admin' and 'event' not in session.get('groups', []):
+        return jsonify({'error': 'Access denied'}), 403
+    try:
+        is_archived = run_async(db.toggle_ticket_request_archive(request_id))
+        if is_archived is None:
+            return jsonify({'error': 'Request not found'}), 404
+        return jsonify({'success': True, 'is_archived': is_archived})
+    except Exception:
+        logger.exception('Error toggling ticket request archive %s', request_id)
+        return jsonify({'error': 'Could not update archive'}), 500
+
 @app.route('/api/ticket/<int:request_id>/status', methods=['POST'])
 @login_required
 def api_update_ticket_status(request_id):

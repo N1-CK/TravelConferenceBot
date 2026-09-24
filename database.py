@@ -218,7 +218,8 @@ class Database:
                         visa_request_status TEXT DEFAULT 'pending',
                         flight_request_status TEXT DEFAULT 'pending',
                         created_at TIMESTAMP DEFAULT NOW(),
-                        updated_at TIMESTAMP DEFAULT NOW()
+                        updated_at TIMESTAMP DEFAULT NOW(),
+                        is_archived BOOLEAN NOT NULL DEFAULT FALSE
                     )
                     ''',
 
@@ -324,6 +325,7 @@ class Database:
                         phone TEXT,
                         country TEXT,
                         status TEXT DEFAULT 'pending',
+                        is_archived BOOLEAN NOT NULL DEFAULT FALSE,
                         created_at TIMESTAMP DEFAULT NOW(),
                         updated_at TIMESTAMP DEFAULT NOW()
                     )
@@ -573,9 +575,8 @@ class Database:
                     except Exception as e:
                         logger.warning(f"Table might already exist: {e}")
 
-                # Existing installations need the column as well as new databases.
                 await conn.execute(f"""
-                    ALTER TABLE {self.db_schema_travel}.travel_flight_request
+                    ALTER TABLE {self.db_schema_event}.event_ticket_requests
                     ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE
                 """)
 
@@ -821,6 +822,16 @@ class Database:
             logger.error(f"Error getting ticket requests: {e}")
             return []
 
+    async def toggle_ticket_request_archive(self, request_id: int):
+        """Return the new archive state, or None if the ticket request is absent."""
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval(f"""
+                UPDATE {self.db_schema_event}.event_ticket_requests
+                SET is_archived = NOT is_archived, updated_at = NOW()
+                WHERE id = $1
+                RETURNING is_archived
+            """, request_id)
+
     async def update_ticket_request_status(self, request_id: int, status: str) -> bool:
         """Обновить статус заявки на билет"""
         try:
@@ -874,18 +885,19 @@ class Database:
             async with self.pool.acquire() as conn:
                 total = await conn.fetchval(f"""
                     SELECT COUNT(*) FROM {self.db_schema_event}.event_ticket_requests
+                    WHERE is_archived = FALSE
                 """) or 0
                 pending = await conn.fetchval(f"""
                     SELECT COUNT(*) FROM {self.db_schema_event}.event_ticket_requests 
-                    WHERE status = 'pending'
+                    WHERE status = 'pending' AND is_archived = FALSE
                 """) or 0
                 in_progress = await conn.fetchval(f"""
                     SELECT COUNT(*) FROM {self.db_schema_event}.event_ticket_requests 
-                    WHERE status = 'in_progress'
+                    WHERE status = 'in_progress' AND is_archived = FALSE
                 """) or 0
                 ready = await conn.fetchval(f"""
                     SELECT COUNT(*) FROM {self.db_schema_event}.event_ticket_requests 
-                    WHERE status = 'ready'
+                    WHERE status = 'ready' AND is_archived = FALSE
                 """) or 0
 
                 return {
