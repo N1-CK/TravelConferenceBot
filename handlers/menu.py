@@ -93,6 +93,7 @@ async def change_conference_handler(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "menu_pr")
 async def show_pr_menu(callback: CallbackQuery, state: FSMContext):
     """Переход в раздел PR с локализацией и отображением конференции"""
+    await state.clear()
     user_id = callback.from_user.id
     await db.set_chat_department(user_id, 'pr')
     selected_conf = await db.get_selected_conference(user_id)
@@ -108,6 +109,7 @@ async def show_pr_menu(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "menu_event")
 async def show_event_menu(callback: CallbackQuery, state: FSMContext):
     """Переход в раздел EVENT с локализацией и отображением конференции"""
+    await state.clear()
     user_id = callback.from_user.id
     await db.set_chat_department(user_id, 'event')
     selected_conf = await db.get_selected_conference(user_id)
@@ -133,6 +135,7 @@ async def show_event_menu(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "menu_travel")
 async def show_travel_menu(callback: CallbackQuery, state: FSMContext):
     """Переход в раздел TRAVEL с локализацией и отображением конференции"""
+    await state.clear()
     user_id = callback.from_user.id
     await db.set_chat_department(user_id, 'travel')
     selected_conf = await db.get_selected_conference(user_id)
