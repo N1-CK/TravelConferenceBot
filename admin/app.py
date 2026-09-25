@@ -1290,11 +1290,28 @@ def reset_manager_password(manager_id):
 # ЧАТЫ И ПАПКИ МЕНЕДЖЕРА
 # ============================================
 
+def chat_departments():
+    if session.get('role') == 'admin':
+        return ['pr', 'event', 'travel', 'legacy']
+    if session.get('role') != 'manager':
+        return []
+    return [d for d in session.get('groups', []) if d in ('pr', 'event', 'travel')]
+
+
+def chat_allowed(user_id, department, write=False):
+    if department not in chat_departments() or (write and department == 'legacy'):
+        return False
+    return run_async(db.has_chat(user_id, department)) is True
+
+
+def requested_chat_department():
+    return request.values.get('department') or (request.get_json(silent=True) or {}).get('department')
+
 @app.route('/user_chats')
 @login_required
 def user_chats():
     manager_id = session.get('manager_id', 0)
-    conversations = run_async(db.get_user_conversations(manager_id=manager_id))
+    conversations = run_async(db.get_user_conversations(manager_id=manager_id, departments=chat_departments()))
     folders = run_async(db.get_manager_folders(manager_id=manager_id)) or []
     return render_template('user_chats.html', conversations=conversations, folders=folders)
 
@@ -1302,7 +1319,7 @@ def user_chats():
 @login_required
 def api_get_conversations():
     manager_id = session.get('manager_id', 0)
-    conversations = run_async(db.get_user_conversations(manager_id=manager_id))
+    conversations = run_async(db.get_user_conversations(manager_id=manager_id, departments=chat_departments()))
     for conv in conversations:
         if conv.get('last_message_time'):
             conv['last_message_time'] = conv['last_message_time'].isoformat()
@@ -1311,22 +1328,31 @@ def api_get_conversations():
 @app.route('/api/chat/<int:user_id>/toggle_unread', methods=['POST'])
 @login_required
 def api_toggle_chat_unread(user_id):
+    department = requested_chat_department()
+    if not chat_allowed(user_id, department):
+        return jsonify({'error': 'Access denied'}), 403
     manager_id = session.get('manager_id', 0)
-    is_unread = run_async(db.toggle_chat_unread(manager_id, user_id))
+    is_unread = run_async(db.toggle_chat_unread(manager_id, user_id, department))
     return jsonify({'success': True, 'is_unread': is_unread})
 
 @app.route('/api/chat/<int:user_id>/toggle_archive', methods=['POST'])
 @login_required
 def api_toggle_chat_archive(user_id):
+    department = requested_chat_department()
+    if not chat_allowed(user_id, department):
+        return jsonify({'error': 'Access denied'}), 403
     manager_id = session.get('manager_id', 0)
-    is_archived = run_async(db.toggle_chat_archive(manager_id, user_id))
+    is_archived = run_async(db.toggle_chat_archive(manager_id, user_id, department))
     return jsonify({'success': True, 'is_archived': is_archived})
 
 @app.route('/api/chat/<int:user_id>/toggle_mute', methods=['POST'])
 @login_required
 def api_toggle_chat_mute(user_id):
+    department = requested_chat_department()
+    if not chat_allowed(user_id, department):
+        return jsonify({'error': 'Access denied'}), 403
     manager_id = session.get('manager_id', 0)
-    is_muted = run_async(db.toggle_chat_mute(manager_id, user_id))
+    is_muted = run_async(db.toggle_chat_mute(manager_id, user_id, department))
     return jsonify({'success': True, 'is_muted': is_muted})
 
 
@@ -1363,16 +1389,22 @@ def api_toggle_folder_user(folder_id):
     manager_id = session.get('manager_id', 0)
     data = request.get_json() or {}
     user_id = data.get('user_id')
+    department = data.get('department')
     if not user_id:
         return jsonify({'error': 'user_id required'}), 400
-    res = run_async(db.toggle_user_in_folder(manager_id, folder_id, int(user_id)))
+    if not chat_allowed(int(user_id), department):
+        return jsonify({'error': 'Access denied'}), 403
+    res = run_async(db.toggle_user_in_folder(manager_id, folder_id, int(user_id), department))
     return jsonify(res)
 
 @app.route('/api/user_folders/<int:user_id>', methods=['GET'])
 @login_required
 def api_get_user_folders(user_id):
+    department = requested_chat_department()
+    if not chat_allowed(user_id, department):
+        return jsonify({'error': 'Access denied'}), 403
     manager_id = session.get('manager_id', 0)
-    folders_map = run_async(db.get_manager_user_folders_map(manager_id)) or {}
+    folders_map = run_async(db.get_manager_user_folders_map(manager_id, department)) or {}
     return jsonify({'user_id': user_id, 'folder_ids': folders_map.get(user_id, [])})
 
 @app.route('/api/questions/forward', methods=['POST'])
@@ -1449,7 +1481,10 @@ def api_get_available_departments_for_forward(question_id):
 @app.route('/api/user_messages/<int:user_id>')
 @login_required
 def api_get_user_messages(user_id):
-    messages = run_async(db.get_user_messages(user_id, limit=100))
+    department = requested_chat_department()
+    if not chat_allowed(user_id, department):
+        return jsonify({'error': 'Access denied'}), 403
+    messages = run_async(db.get_user_messages(user_id, department, limit=100))
     user_data = run_async(db.get_user_data(user_id))
 
     formatted_messages = []
@@ -1468,6 +1503,7 @@ def api_get_user_messages(user_id):
 
     return jsonify({
         'user_id': user_id,
+        'department': department,
         'username': user_data.get('username') if user_data else str(user_id),
         'full_name': user_data.get('full_name', ''),
         'messages': formatted_messages
@@ -1476,7 +1512,10 @@ def api_get_user_messages(user_id):
 @app.route('/api/user_messages/<int:user_id>/read', methods=['POST'])
 @login_required
 def api_mark_messages_read(user_id):
-    success = run_async(db.mark_messages_read(user_id, session.get('manager_id')))
+    department = requested_chat_department()
+    if not chat_allowed(user_id, department):
+        return jsonify({'error': 'Access denied'}), 403
+    success = run_async(db.mark_messages_read(user_id, session.get('manager_id'), department))
     return jsonify({'success': success})
 
 @app.route('/admin/send_message_to_user', methods=['POST'])
@@ -1489,6 +1528,8 @@ def send_message_to_user():
     if not user_id:
         flash(get_text('error_user_not_found'), "danger")
         return redirect(url_for('travel_panel'))
+    if 'travel' not in chat_departments():
+        return jsonify({'error': 'Access denied'}), 403
 
     manager_username = session.get('username', 'Manager')
     manager_full_name = session.get('full_name', 'Manager')
@@ -1511,7 +1552,8 @@ def send_message_to_user():
                 message_text=final_text,
                 file_type=uploaded_file.content_type if uploaded_file and uploaded_file.filename else None,
                 file_id=file_id_to_save,
-                direction='outgoing'
+                direction='outgoing',
+                department='travel'
             ))
             flash(get_text('message_sent_success'), "success")
         else:
@@ -1532,6 +1574,9 @@ def api_send_message():
     message = request.form.get('message', '')
     if not user_id:
         return jsonify({'success': False, 'error': 'User ID required'}), 400
+    department = requested_chat_department()
+    if not user_id.isdigit() or not chat_allowed(int(user_id), department, write=True):
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
 
     files = request.files.getlist('files')
     if not files and 'file' in request.files:
@@ -1563,13 +1608,13 @@ def api_send_message():
                         (int(user_id), sender_name, 'outgoing', text_to_save, None, tg_file_id)
                     )
             if messages_to_insert:
-                run_async(db.save_user_messages_bulk(messages_to_insert), timeout=60)
+                run_async(db.save_user_messages_bulk(messages_to_insert, department=department), timeout=60)
         else:
             res = run_async(bot.send_message(user_id, message), timeout=60)
             if res:
                 run_async(db.save_user_messages_bulk([
                     (int(user_id), sender_name, 'outgoing', message, None, None)
-                ]), timeout=60)
+                ], department=department), timeout=60)
             else:
                 return jsonify({'success': False, 'error': 'Не удалось отправить сообщение'}), 500
 
@@ -1588,6 +1633,8 @@ def api_send_message():
 @app.route('/api/file/<file_id>')
 @login_required
 def api_get_file(file_id):
+    if not run_async(db.file_in_departments(file_id, chat_departments())):
+        return 'Access denied', 403
     bot_token = os.getenv('TG_BOT_TOKEN')
     if not bot_token or not file_id:
         return "Ошибка конфигурации", 500
