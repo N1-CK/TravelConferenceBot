@@ -1,11 +1,24 @@
-from aiogram import Router
+from aiogram import Router, F
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from database import db
+from utility.lang_utils import t
 import logging
 
 router = Router()
 logger = logging.getLogger(__name__)
+
+
+@router.callback_query(F.data.startswith('chat_department_'))
+async def select_chat_department(callback: CallbackQuery):
+    department = callback.data[len('chat_department_'):]
+    if department not in ('pr', 'event', 'travel'):
+        await callback.answer(await t(callback.from_user.id, 'chat_department_invalid'), show_alert=True)
+        return
+    await db.set_chat_department(callback.from_user.id, department)
+    await callback.message.answer(await t(callback.from_user.id, 'chat_department_confirmed', department=department.upper()))
+    await callback.answer()
 
 
 @router.message()
@@ -15,12 +28,26 @@ async def handle_user_message(message: Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state:
         return
+    if message.chat.type != 'private' or (message.text or '').startswith('/'):
+        return
 
     user_id = message.from_user.id
     username = message.from_user.username or message.from_user.first_name
     text = message.text or message.caption or ""
     file_type = None
     file_id = None
+
+    department = await db.get_chat_department(user_id)
+    if not department:
+        await message.answer(
+            await t(user_id, 'chat_department_prompt'),
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text='✈️ Travel', callback_data='chat_department_travel')],
+                [InlineKeyboardButton(text='🎪 Event', callback_data='chat_department_event')],
+                [InlineKeyboardButton(text='📢 PR', callback_data='chat_department_pr')],
+            ])
+        )
+        return
 
     if message.photo:
         file_type = 'photo'
@@ -48,10 +75,13 @@ async def handle_user_message(message: Message, state: FSMContext):
             message_text=text,
             file_type=file_type,
             file_id=file_id,
-            direction='incoming'
+            direction='incoming',
+            department=department
         )
     except Exception as e:
         logger.error(f"Error saving user message: {e}")
+        await message.answer(await t(user_id, 'chat_delivery_error'))
+        return
 
-    # Пересылаем сообщение в TG_ADMIN_CHAT_ID (или чат по умолчанию)
-    # await forward_user_message_to_admin(bot=message.bot, message=message, department='admin')
+    from handlers.managers_chat import forward_user_message_to_admin
+    await forward_user_message_to_admin(bot=message.bot, message=message, department=department)

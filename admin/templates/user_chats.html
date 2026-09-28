@@ -558,21 +558,21 @@
             <div id="conversationsList">
                 {% for conv in conversations %}
                 <div class="conversation-item"
-                     data-user-id="{{ conv.user_id }}"
+                     data-user-id="{{ conv.user_id }}" data-department="{{ conv.department }}"
                      data-search="{{ conv.full_name or conv.username }}"
                      data-unread="{{ conv.unread_count }}"
                      data-archived="{{ '1' if conv.is_archived else '0' }}"
                      data-manual-unread="{{ '1' if conv.is_manual_unread else '0' }}"
                      data-muted="{{ '1' if conv.is_muted else '0' }}"
                      data-folders='{{ conv.folder_ids | default([]) | tojson }}'
-                     oncontextmenu="handleChatContextMenu(event, {{ conv.user_id }})"
-                     onclick="loadChat({{ conv.user_id }})">
+                     oncontextmenu="handleChatContextMenu(event, {{ conv.user_id }}, '{{ conv.department }}')"
+                     onclick="loadChat({{ conv.user_id }}, false, '{{ conv.department }}')">
                     <div class="d-flex align-items-center">
                         <div class="conversation-avatar me-3">{{ (conv.full_name or conv.username or '?')[0]|upper }}</div>
                         <div class="flex-grow-1" style="min-width: 0;">
                             <div class="d-flex justify-content-between align-items-center">
                                 <strong class="text-truncate" style="max-width: 100%; display: block;">
-                                    {{ conv.full_name or conv.username }}
+                                    {{ conv.full_name or conv.username }} <span class="badge bg-secondary">{{ conv.department | upper }}</span>
                                     <i class="bi bi-bell-slash text-muted ms-1 mute-indicator" style="font-size: 0.8rem; display: {{ 'inline' if conv.is_muted else 'none' }};"></i>
                                 </strong>
                                 {% if conv.unread_count > 0 %}<span class="unread-badge">{{ conv.unread_count }}</span>{% endif %}
@@ -877,6 +877,8 @@
     };
 
     let currentUserId = null;
+    let currentDepartment = null;
+    const chatItem = (userId, dept) => document.querySelector(`.conversation-item[data-user-id="${userId}"][data-department="${dept}"]`);
     let renderedMessageUids = new Set();
     let isPolling = false;
     let chatPollTimer = null;
@@ -888,6 +890,7 @@
     let managerFoldersCache = [];
     let inArchiveMode = false;
     let contextTargetUserId = null;
+    let contextTargetDepartment = null;
 
     const urlParams = new URLSearchParams(window.location.search);
     const openUserId = urlParams.get('open') || urlParams.get('user');
@@ -903,7 +906,7 @@
 
     if (openUserId) {
         setTimeout(() => {
-            loadChat(parseInt(openUserId));
+            loadChat(parseInt(openUserId), false, urlParams.get('department'));
         }, 500);
     }
 
@@ -918,12 +921,13 @@
     // КОНТЕКСТНОЕ МЕНЮ (ПКМ), НЕПРОЧИТАННЫЕ И АРХИВ
     // ============================================
 
-    function handleChatContextMenu(e, userId) {
+    function handleChatContextMenu(e, userId, department) {
         e.preventDefault();
         e.stopPropagation();
         contextTargetUserId = userId;
+        contextTargetDepartment = department;
 
-        const item = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
+        const item = chatItem(userId, department);
         if (!item) return;
 
         const isUnread = parseInt(item.getAttribute('data-unread') || '0', 10) > 0;
@@ -980,13 +984,14 @@
     async function executeContextAction(action) {
         if (!contextTargetUserId) return;
         const uid = contextTargetUserId;
+        const dept = contextTargetDepartment;
 
         if (action === 'unread') {
             try {
-                const resp = await fetch(`/api/chat/${uid}/toggle_unread`, { method: 'POST' });
+                const resp = await fetch(`/api/chat/${uid}/toggle_unread?department=${dept}`, { method: 'POST' });
                 const res = await resp.json();
                 if (res.success) {
-                    const item = document.querySelector(`.conversation-item[data-user-id="${uid}"]`);
+                    const item = chatItem(uid, dept);
                     if (item) {
                         item.setAttribute('data-unread', res.is_unread ? '1' : '0');
                         item.setAttribute('data-manual-unread', res.is_unread ? '1' : '0');
@@ -1009,10 +1014,10 @@
             }
         } else if (action === 'archive') {
             try {
-                const resp = await fetch(`/api/chat/${uid}/toggle_archive`, { method: 'POST' });
+                const resp = await fetch(`/api/chat/${uid}/toggle_archive?department=${dept}`, { method: 'POST' });
                 const res = await resp.json();
                 if (res.success) {
-                    const item = document.querySelector(`.conversation-item[data-user-id="${uid}"]`);
+                    const item = chatItem(uid, dept);
                     if (item) {
                         item.setAttribute('data-archived', res.is_archived ? '1' : '0');
                     }
@@ -1024,10 +1029,10 @@
             }
         } else if (action === 'mute') {
             try {
-                const resp = await fetch(`/api/chat/${uid}/toggle_mute`, { method: 'POST' });
+                const resp = await fetch(`/api/chat/${uid}/toggle_mute?department=${dept}`, { method: 'POST' });
                 const res = await resp.json();
                 if (res.success) {
-                    const item = document.querySelector(`.conversation-item[data-user-id="${uid}"]`);
+                    const item = chatItem(uid, dept);
                     if (item) {
                         item.setAttribute('data-muted', res.is_muted ? '1' : '0');
                         const icon = item.querySelector('.mute-indicator');
@@ -1176,7 +1181,7 @@
             return;
         }
 
-        const convItem = document.querySelector(`.conversation-item[data-user-id="${currentUserId}"]`);
+        const convItem = chatItem(currentUserId, currentDepartment);
         const userFolders = JSON.parse(convItem?.getAttribute('data-folders') || '[]');
 
         listDiv.innerHTML = managerFoldersCache.map(f => {
@@ -1202,11 +1207,11 @@
             const resp = await fetch(`/api/folders/${folderId}/toggle`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: currentUserId })
+                body: JSON.stringify({ user_id: currentUserId, department: currentDepartment })
             });
             const data = await resp.json();
             if (data && data.user_folders !== undefined) {
-                const convItem = document.querySelector(`.conversation-item[data-user-id="${currentUserId}"]`);
+                const convItem = chatItem(currentUserId, currentDepartment);
                 if (convItem) {
                     convItem.setAttribute('data-folders', JSON.stringify(data.user_folders));
                 }
@@ -1354,15 +1359,15 @@
         if (!userId) return;
         const text = replyMessageInput.value;
         if (text && text.trim().length > 0) {
-            localStorage.setItem(`chat_draft_${userId}`, text);
+            localStorage.setItem(`chat_draft_${userId}_${currentDepartment}`, text);
         } else {
-            localStorage.removeItem(`chat_draft_${userId}`);
+            localStorage.removeItem(`chat_draft_${userId}_${currentDepartment}`);
         }
     }
 
     function restoreDraft(userId) {
         if (!userId) return;
-        const draft = localStorage.getItem(`chat_draft_${userId}`) || '';
+        const draft = localStorage.getItem(`chat_draft_${userId}_${currentDepartment}`) || '';
         replyMessageInput.value = draft;
         autoResizeTextarea(replyMessageInput);
         updateChatPreview();
@@ -1370,7 +1375,7 @@
 
     function clearDraft(userId) {
         if (!userId) return;
-        localStorage.removeItem(`chat_draft_${userId}`);
+        localStorage.removeItem(`chat_draft_${userId}_${currentDepartment}`);
     }
 
     if (replyMessageInput) {
@@ -1555,7 +1560,10 @@
         });
     }
 
-    async function loadChat(userId, isPollingReq = false) {
+    async function loadChat(userId, isPollingReq = false, department = null) {
+        department = department || (currentUserId === userId ? currentDepartment :
+            document.querySelector(`.conversation-item[data-user-id="${userId}"]`)?.dataset.department);
+        if (!department) return;
         if (isPollingReq && isUploadingFile) {
             chatPollTimer = setTimeout(() => loadChat(userId, true), 2500);
             return;
@@ -1565,9 +1573,10 @@
         if (chatContainer) chatContainer.classList.add('mobile-chat-open');
 
         if (!isPollingReq) {
-            if (currentUserId && currentUserId !== userId) saveDraft(currentUserId);
+            if (currentUserId && (currentUserId !== userId || currentDepartment !== department)) saveDraft(currentUserId);
 
             currentUserId = userId;
+            currentDepartment = department;
             renderedMessageUids.clear();
             isPolling = true;
             clearTimeout(chatPollTimer);
@@ -1576,7 +1585,7 @@
 
             document.querySelectorAll('.conversation-item').forEach(item => {
                 item.classList.remove('active');
-                if (item.dataset.userId == userId) item.classList.add('active');
+                if (item.dataset.userId == userId && item.dataset.department === department) item.classList.add('active');
             });
 
             document.getElementById('btnManageChatFolders').style.display = 'inline-block';
@@ -1584,9 +1593,10 @@
         }
 
         try {
-            const resp = await fetch(`/api/user_messages/${userId}`);
+            const resp = await fetch(`/api/user_messages/${userId}?department=${department}`);
             if (!resp.ok) throw new Error('Network error');
             const data = await resp.json();
+            if (currentUserId !== userId || currentDepartment !== department) return;
 
             if (!isPollingReq) messagesDiv.innerHTML = '';
 
@@ -1600,8 +1610,8 @@
                 const headerName = userFullName ? `${userFullName} (@${data.username || userId})` : `@${data.username || userId}`;
                 document.getElementById('currentUserName').textContent = headerName;
                 initUserCardTrigger();
-                document.getElementById('currentUserInfo').textContent = `ID: ${userId}`;
-                document.getElementById('chatInput').style.display = 'block';
+                document.getElementById('currentUserInfo').textContent = `ID: ${userId} · ${department.toUpperCase()}`;
+                document.getElementById('chatInput').style.display = department === 'legacy' ? 'none' : 'block';
             }
 
             const groupedMessages = [];
@@ -1649,7 +1659,7 @@
 
                     if (msg.source_type && msg.source_type.includes('_question')) {
                         const dept = msg.source_type.replace('_question', '').toUpperCase();
-                        content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">[${locales.questionFrom} ${dept}]</small><br>${msg.message_text}`;
+                        content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">[${locales.questionFrom} ${dept}]</small><br>${escapeHtml(msg.message_text)}`;
                     } else {
                         if (msg.files && msg.files.length > 0) {
                             const isSingle = msg.files.length === 1;
@@ -1694,7 +1704,7 @@
                         }
 
                         if (msg.message_text) {
-                            content += `<div style="margin-top: ${msg.files && msg.files.length > 0 ? '4px' : '0'};">${msg.message_text}</div>`;
+                            content += `<div style="margin-top: ${msg.files && msg.files.length > 0 ? '4px' : '0'};">${msg.direction === 'incoming' ? escapeHtml(msg.message_text) : msg.message_text}</div>`;
                         }
                     }
 
@@ -1712,8 +1722,8 @@
                 setTimeout(() => scrollToBottomForce(false), 450);
 
                 if (messages.length > 0) {
-                    fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
-                    const convItem = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
+                    fetch(`/api/user_messages/${userId}/read?department=${department}`, {method: 'POST'});
+                    const convItem = chatItem(userId, department);
                     if (convItem) {
                         const badge = convItem.querySelector('.unread-badge');
                         if (badge) badge.remove();
@@ -1725,7 +1735,7 @@
             } else if (hasAnyNew) {
                 if (isScrolledToBottom) scrollToBottomForce(true);
                 if (hasNewIncoming) {
-                    const convItem = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
+                    const convItem = chatItem(userId, department);
                     const isMuted = convItem && convItem.getAttribute('data-muted') === '1';
 
                     // Пищим только если чат не заглушен
@@ -1733,7 +1743,7 @@
                         playNotificationBeep();
                     }
 
-                    fetch(`/api/user_messages/${userId}/read`, {method: 'POST'});
+                    fetch(`/api/user_messages/${userId}/read?department=${department}`, {method: 'POST'});
                     if (convItem) {
                         const badge = convItem.querySelector('.unread-badge');
                         if (badge) badge.remove();
@@ -1748,7 +1758,7 @@
             console.error(e);
         }
 
-        if (isPolling && currentUserId === userId) {
+        if (isPolling && currentUserId === userId && currentDepartment === department) {
             chatPollTimer = setTimeout(() => loadChat(userId, true), 2500);
         }
     }
@@ -1828,6 +1838,7 @@
 
         const formData = new FormData();
         formData.append('user_id', currentUserId);
+        formData.append('department', currentDepartment);
         formData.append('message', msgInput.value);
 
         if (selectedFilesQueue.length > 0) {
@@ -1923,7 +1934,7 @@
             let html = '';
 
             conversations.forEach(conv => {
-                const isActive = conv.user_id == currentUserId ? 'active' : '';
+                const isActive = conv.user_id == currentUserId && conv.department === currentDepartment ? 'active' : '';
                 const displayName = conv.full_name ? `${conv.username} (${conv.full_name})` : `@${conv.username}`;
                 const time = conv.last_message_time ? new Date(conv.last_message_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
 
@@ -1934,21 +1945,21 @@
                 const isMuted = conv.is_muted ? '1' : '0';
                 html += `
                 <div class="conversation-item ${isActive}"
-                     data-user-id="${conv.user_id}"
-                     data-search="${displayName}"
+                     data-user-id="${conv.user_id}" data-department="${conv.department}"
+                     data-search="${escapeHtml(displayName)}"
                      data-unread="${conv.unread_count}"
                      data-archived="${conv.is_archived ? '1' : '0'}"
                      data-manual-unread="${conv.is_manual_unread ? '1' : '0'}"
                      data-muted="${isMuted}"
                      data-folders='${JSON.stringify(conv.folder_ids || [])}'
-                     oncontextmenu="handleChatContextMenu(event, ${conv.user_id})"
-                     onclick="loadChat(${conv.user_id})">
+                     oncontextmenu="handleChatContextMenu(event, ${conv.user_id}, '${conv.department}')"
+                     onclick="loadChat(${conv.user_id}, false, '${conv.department}')">
                     <div class="d-flex align-items-center">
-                        <div class="conversation-avatar me-3">${(conv.full_name || conv.username || '?')[0].toUpperCase()}</div>
+                        <div class="conversation-avatar me-3">${escapeHtml((conv.full_name || conv.username || '?')[0].toUpperCase())}</div>
                         <div class="flex-grow-1" style="min-width: 0;">
                             <div class="d-flex justify-content-between">
                                 <strong class="text-truncate" style="max-width: 100%; display: block;">
-                                    ${displayName}
+                                    ${escapeHtml(displayName)} <span class="badge bg-secondary">${conv.department.toUpperCase()}</span>
                                     <i class="bi bi-bell-slash text-muted ms-1 mute-indicator" style="font-size: 0.8rem; display: ${conv.is_muted ? 'inline' : 'none'};"></i>
                                 </strong>
                                 <small class="text-muted">${time}</small>
@@ -2127,6 +2138,7 @@
 
         const formData = new FormData();
         formData.append('user_id', userId);
+        formData.append('department', document.getElementById('replyDept').value);
         formData.append('message', `<b>${locales.yourQuestionPrefix}</b><br><i>${questionText}</i><br><br><b>${locales.managerAnswerPrefix}</b><br>${answer}`);
 
         try {
@@ -2139,7 +2151,7 @@
 
                 showToast(locales.answerSent, 'success');
                 switchTab('chats');
-                loadChat(userId);
+                loadChat(userId, false, document.getElementById('replyDept').value);
             } else {
                 showToast(locales.errorSending, 'danger');
             }

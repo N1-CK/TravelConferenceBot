@@ -40,6 +40,14 @@ COMMON_TEXTS = {
         'select_conference_button': "Выбрать конференцию",
         'switch_conference': "🔄 Сменить конференцию",
         'conference_selected': "Выбрана конференция: *{conference}*",
+        'conference_status': "Выбранная конференция: {conference}",
+        'conference_not_selected': "Не выбрана",
+        'department_status': "Выбранный отдел: {department}",
+        'department_not_selected': "Не выбран",
+        'chat_department_prompt': "Выберите отдел для переписки и отправьте сообщение ещё раз:",
+        'chat_department_confirmed': "✅ Выбран отдел {department}. Теперь можете написать сообщение.",
+        'chat_department_invalid': "Неизвестный отдел",
+        'chat_delivery_error': "Не удалось доставить сообщение. Попробуйте ещё раз.",
         'back_to_conferences': "◀️ Назад к списку конференций",
         'conference_details_template': "📋 *{name}*\n\n📍 Город: {city}\n📅 Даты конференции: {conf_start} - {conf_end}\n✈️ Даты поездки: {trip_start} - {trip_end}",
 
@@ -504,6 +512,14 @@ COMMON_TEXTS = {
         'select_conference_button': "Select conference",
         'switch_conference': "🔄 Switch conference",
         'conference_selected': "Selected conference: {conference}",
+        'conference_status': "Selected conference: {conference}",
+        'conference_not_selected': "Not selected",
+        'department_status': "Selected department: {department}",
+        'department_not_selected': "Not selected",
+        'chat_department_prompt': "Choose a department and send your message again:",
+        'chat_department_confirmed': "✅ {department} selected. You can now send a message.",
+        'chat_department_invalid': "Unknown department",
+        'chat_delivery_error': "Couldn't deliver the message. Please try again.",
         'back_to_conferences': "◀️ Back to conferences",
         'conference_details_template': "📋 *{name}*\n\n📍 City: {city}\n📅 Conference dates: {conf_start} - {conf_end}\n✈️ Trip dates: {trip_start} - {trip_end}",
 
@@ -978,3 +994,27 @@ def get_text_sync(lang: str, key: str, **kwargs) -> str:
         except KeyError as e:
             logger.warning(f"Missing format key {e} in text '{key}'")
     return text
+
+
+_CONFERENCE_UNSET = object()
+
+
+async def format_main_menu_text(user_id: int, selected_conf=_CONFERENCE_UNSET,
+                                include_welcome: bool = True) -> str:
+    """Показать действующее направление переписки рядом с конференцией."""
+    from database import db
+
+    if selected_conf is _CONFERENCE_UNSET:
+        selected_conf = await db.get_selected_conference(user_id)
+    department = await db.get_chat_department(user_id)
+    lang = await get_user_lang(user_id)
+    conference = selected_conf or get_text_sync(lang, 'conference_not_selected')
+    department_name = department.upper() if department else get_text_sync(lang, 'department_not_selected')
+    status = '\n'.join((
+        get_text_sync(lang, 'conference_status', conference=conference),
+        get_text_sync(lang, 'department_status', department=department_name),
+    ))
+    title = get_text_sync(lang, 'main_menu_title')
+    if include_welcome:
+        return f"{get_text_sync(lang, 'welcome')}\n\n{status}\n\n{title}"
+    return f"{status}\n\n{title}"

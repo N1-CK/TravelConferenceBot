@@ -1,6 +1,7 @@
 # handlers/managers_chat.py - ПОЛНАЯ ВЕРСИЯ С ПОДДЕРЖКОЙ ПЕРЕСЫЛКИ
 
 import os
+from html import escape
 from typing import Union
 
 from aiogram import Router, F, Bot
@@ -30,15 +31,19 @@ ADMIN_CHAT_ID = int(os.getenv("TG_ADMIN_CHAT_ID", "0"))
 
 
 def get_manager_chat_id(department: str) -> int:
-    """Получить ID чата по отделу или общий админ-чат"""
+    """Получить чат отдела; общий чат не может служить маршрутом разных отделов."""
     mapping = {
         'pr': PR_MANAGER_CHAT_ID,
         'event': EVENT_MANAGER_CHAT_ID,
         'travel': TRAVEL_MANAGER_CHAT_ID,
         'admin': ADMIN_CHAT_ID
     }
-    # Если чат отдела не задан, шлем в TG_ADMIN_CHAT_ID
-    return mapping.get(department) or ADMIN_CHAT_ID
+    chat_id = mapping.get(department, 0)
+    if department in ('pr', 'event', 'travel') and chat_id:
+        if sum(mapping[d] == chat_id for d in ('pr', 'event', 'travel')) != 1:
+            logger.error('Одинаковый Telegram-чат назначен нескольким отделам; пересылка отключена')
+            return 0
+    return chat_id
 
 
 async def send_question_to_manager(bot: Bot, manager_chat_id: int, user_data: dict,
@@ -52,9 +57,9 @@ async def send_question_to_manager(bot: Bot, manager_chat_id: int, user_data: di
 
     message_text = (
         f"❓ <b>Новый вопрос ({dept.upper()})</b>\n\n"
-        f"<b>Пользователь:</b> @{user_data.get('username') or 'без username'}\n"
+        f"<b>Пользователь:</b> @{escape(user_data.get('username') or 'без username')}\n"
         f"<b>ID:</b> <code>{user_data.get('user_id')}</code>\n\n"
-        f"💬 <b>Вопрос:</b>\n{question_text}"
+        f"💬 <b>Вопрос:</b>\n{escape(question_text)}"
     )
 
     try:
@@ -79,20 +84,20 @@ async def forward_user_message_to_admin(bot: Bot, message: Message, department: 
         )]
     ])
 
-    user_info = f"📩 <b>Сообщение от @{message.from_user.username or message.from_user.first_name}</b> (ID: <code>{message.from_user.id}</code>)\n\n"
+    user_info = f"📩 <b>Сообщение от @{escape(message.from_user.username or message.from_user.first_name)}</b> (ID: <code>{message.from_user.id}</code>)\n\n"
 
     try:
         # Если это просто текст
         if message.text:
             await bot.send_message(
                 chat_id=target_chat,
-                text=user_info + message.text,
+                text=user_info + escape(message.text),
                 reply_markup=keyboard,
                 parse_mode="HTML"
             )
         else:
             # Если это фото, документ, голос и т.д.
-            caption = user_info + (message.caption or "")
+            caption = user_info + escape(message.caption or "")
             await bot.copy_message(
                 chat_id=target_chat,
                 from_chat_id=message.chat.id,
@@ -160,6 +165,9 @@ async def start_reply_to_user(callback: CallbackQuery, state: FSMContext, bot: B
     data_parts = callback.data.split("_")
     user_id = int(data_parts[2])
     question_type = data_parts[3] if len(data_parts) > 3 else "general"
+    if question_type not in ('pr', 'event', 'travel') or callback.message.chat.id != get_manager_chat_id(question_type):
+        await callback.answer('Нет доступа к отделу', show_alert=True)
+        return
 
     await state.set_state(ManagerReplyForm.waiting_for_reply)
     await state.update_data(
@@ -308,10 +316,10 @@ async def send_reply_to_user(message: Message, state: FSMContext):
         # Сохраняем в БД
         await db.save_user_message(
             user_id=user_id,
-            username=str(user_id),
+            username=message.from_user.username or str(message.from_user.id),
             message_text=reply_text,
             direction='outgoing',
-            manager_id=message.from_user.id
+            department=data.get('question_type')
         )
 
         # Уведомляем менеджера

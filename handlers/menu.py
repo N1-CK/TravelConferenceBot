@@ -10,7 +10,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from keyboards import get_event_menu_keyboard, get_pr_menu_keyboard, get_travel_menu_keyboard
 from database import db
 import logging
-from utility.lang_utils import get_text_sync, get_user_lang, t
+from utility.lang_utils import get_text_sync, get_user_lang, t, format_main_menu_text
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -38,14 +38,8 @@ def escape_md(text: str) -> str:
 async def show_main_menu(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     user_id = callback.from_user.id
-    lang = await get_user_lang(user_id)
 
-    # Получаем выбранную конференцию
-    selected_conf = await db.get_selected_conference(user_id)
-    conf_text = selected_conf if selected_conf else "Не выбрана"
-
-    welcome_text = await t(user_id, 'welcome')
-    text = f"{welcome_text}\n\nВыбранная конференция: *{conf_text}*"
+    text = await format_main_menu_text(user_id)
 
     from keyboards import get_main_menu_keyboard
 
@@ -54,7 +48,7 @@ async def show_main_menu(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(
             text,
             reply_markup=markup,
-            parse_mode="Markdown"
+            parse_mode=None
         )
         await callback.answer()
     except TelegramBadRequest:
@@ -62,7 +56,7 @@ async def show_main_menu(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer(
             text,
             reply_markup=markup,
-            parse_mode="Markdown"
+            parse_mode=None
         )
 
 
@@ -93,7 +87,9 @@ async def change_conference_handler(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "menu_pr")
 async def show_pr_menu(callback: CallbackQuery, state: FSMContext):
     """Переход в раздел PR с локализацией и отображением конференции"""
+    await state.clear()
     user_id = callback.from_user.id
+    await db.set_chat_department(user_id, 'pr')
     selected_conf = await db.get_selected_conference(user_id)
 
     conf_text = f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}" if selected_conf else ""
@@ -107,7 +103,9 @@ async def show_pr_menu(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "menu_event")
 async def show_event_menu(callback: CallbackQuery, state: FSMContext):
     """Переход в раздел EVENT с локализацией и отображением конференции"""
+    await state.clear()
     user_id = callback.from_user.id
+    await db.set_chat_department(user_id, 'event')
     selected_conf = await db.get_selected_conference(user_id)
 
     conf_text = f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}" if selected_conf else ""
@@ -131,7 +129,9 @@ async def show_event_menu(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "menu_travel")
 async def show_travel_menu(callback: CallbackQuery, state: FSMContext):
     """Переход в раздел TRAVEL с локализацией и отображением конференции"""
+    await state.clear()
     user_id = callback.from_user.id
+    await db.set_chat_department(user_id, 'travel')
     selected_conf = await db.get_selected_conference(user_id)
     conf_text = (
         f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}"
