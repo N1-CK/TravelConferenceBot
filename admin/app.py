@@ -17,7 +17,7 @@ import openpyxl
 import requests
 from aiogram.client.session import aiohttp
 from dotenv import load_dotenv
-from flask import Flask, flash, jsonify, redirect, render_template, request, send_file, session, url_for
+from flask import Flask, abort, flash, jsonify, redirect, render_template, request, send_file, session, url_for
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from werkzeug.utils import secure_filename
@@ -25,6 +25,8 @@ from werkzeug.utils import secure_filename
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import db
+from utility.chat_routing import prepare_department_message
+from utility.telegram_files import telegram_download_name
 from locales import get_text
 from utility.notifications import (
     notify_banner_status_change,
@@ -58,6 +60,7 @@ def allowed_file(filename):
         return True
     ext = filename.rsplit('.', 1)[1].lower()
     return ext not in FORBIDDEN_EXTENSIONS
+
 
 # ============================================
 # EVENT LOOP ДЛЯ ФОНОВЫХ ЗАДАЧ
@@ -1292,16 +1295,20 @@ def reset_manager_password(manager_id):
 
 def chat_departments():
     if session.get('role') == 'admin':
-        return ['pr', 'event', 'travel', 'legacy']
+        return ['pr', 'event', 'travel']
     if session.get('role') != 'manager':
         return []
-    return [d for d in session.get('groups', []) if d in ('pr', 'event', 'travel')] + ['legacy']
+    return [d for d in session.get('groups', []) if d in ('pr', 'event', 'travel')]
 
 
 def chat_allowed(user_id, department, write=False):
-    if department not in chat_departments() or (write and department == 'legacy'):
+    if write and department not in chat_departments():
         return False
-    return run_async(db.has_chat(user_id, department)) is True
+    if not write and department != 'chat':
+        return False
+    if session.get('role') not in ('admin', 'manager'):
+        return False
+    return run_async(db.has_chat(user_id, chat_departments())) is True
 
 
 def requested_chat_department():
@@ -1310,6 +1317,8 @@ def requested_chat_department():
 @app.route('/user_chats')
 @login_required
 def user_chats():
+    if session.get('role') not in ('admin', 'manager'):
+        abort(403)
     manager_id = session.get('manager_id', 0)
     conversations = run_async(db.get_user_conversations(manager_id=manager_id, departments=chat_departments()))
     folders = run_async(db.get_manager_folders(manager_id=manager_id)) or []
@@ -1318,6 +1327,8 @@ def user_chats():
 @app.route('/api/conversations')
 @login_required
 def api_get_conversations():
+    if session.get('role') not in ('admin', 'manager'):
+        abort(403)
     manager_id = session.get('manager_id', 0)
     conversations = run_async(db.get_user_conversations(manager_id=manager_id, departments=chat_departments()))
     for conv in conversations:
@@ -1484,7 +1495,7 @@ def api_get_user_messages(user_id):
     department = requested_chat_department()
     if not chat_allowed(user_id, department):
         return jsonify({'error': 'Access denied'}), 403
-    messages = run_async(db.get_user_messages(user_id, department, limit=100))
+    messages = run_async(db.get_user_messages(user_id, limit=100))
     user_data = run_async(db.get_user_data(user_id))
 
     formatted_messages = []
@@ -1493,6 +1504,7 @@ def api_get_user_messages(user_id):
             'id': msg['id'],
             'uid': f"{msg.get('source_type', 'msg')}_{msg['id']}",
             'source_type': msg.get('source_type', 'message'),
+            'department': msg.get('department'),
             'direction': msg['direction'],
             'message_text': msg['message_text'],
             'sender_username': msg.get('username', ''),
@@ -1504,6 +1516,8 @@ def api_get_user_messages(user_id):
     return jsonify({
         'user_id': user_id,
         'department': department,
+        'allowed_departments': chat_departments(),
+        'active_department': run_async(db.get_chat_department(user_id)),
         'username': user_data.get('username') if user_data else str(user_id),
         'full_name': user_data.get('full_name', ''),
         'messages': formatted_messages
@@ -1515,7 +1529,7 @@ def api_mark_messages_read(user_id):
     department = requested_chat_department()
     if not chat_allowed(user_id, department):
         return jsonify({'error': 'Access denied'}), 403
-    success = run_async(db.mark_messages_read(user_id, session.get('manager_id'), department))
+    success = run_async(db.mark_messages_read(user_id, session.get('manager_id'), chat_departments()))
     return jsonify({'success': success})
 
 @app.route('/admin/send_message_to_user', methods=['POST'])
@@ -1542,8 +1556,15 @@ def send_message_to_user():
         uploaded_file.save(filepath)
 
     try:
-        tg_res = run_async(bot.send_message(chat_id=user_id, text=final_text, file=filepath))
+        prepared = run_async(prepare_department_message(int(user_id), 'travel', final_text))
+        if prepared is None:
+            flash(get_text('error_sending_tg'), 'danger')
+            return redirect(url_for('travel_panel'))
+        tg_res = run_async(bot.send_message(chat_id=user_id, text=prepared, file=filepath))
         if tg_res:
+            if not run_async(db.set_chat_department(int(user_id), 'travel')):
+                flash(get_text('error_sending_tg'), 'danger')
+                return redirect(url_for('travel_panel'))
             file_id_to_save = tg_res if isinstance(tg_res, str) else None
             manager_display_name = f"{manager_full_name} (@{manager_username})"
             run_async(db.save_user_message(
@@ -1597,9 +1618,12 @@ def api_send_message():
 
     try:
         sender_name = session.get('full_name') or session.get('username') or 'Менеджер'
+        prepared = run_async(prepare_department_message(int(user_id), department, message))
+        if prepared is None:
+            return jsonify({'success': False, 'error': 'Не удалось определить отдел переписки'}), 500
 
         if saved_files:
-            tg_file_ids = run_async(bot.send_documents(user_id, message, saved_files), timeout=300)
+            tg_file_ids = run_async(bot.send_documents(user_id, prepared, saved_files), timeout=300)
             messages_to_insert = []
             if tg_file_ids:
                 for idx, tg_file_id in enumerate(tg_file_ids):
@@ -1607,16 +1631,18 @@ def api_send_message():
                     messages_to_insert.append(
                         (int(user_id), sender_name, 'outgoing', text_to_save, None, tg_file_id)
                     )
-            if messages_to_insert:
-                run_async(db.save_user_messages_bulk(messages_to_insert, department=department), timeout=60)
+            if not messages_to_insert:
+                return jsonify({'success': False, 'error': 'Не удалось отправить файлы'}), 500
         else:
-            res = run_async(bot.send_message(user_id, message), timeout=60)
-            if res:
-                run_async(db.save_user_messages_bulk([
-                    (int(user_id), sender_name, 'outgoing', message, None, None)
-                ], department=department), timeout=60)
-            else:
+            res = run_async(bot.send_message(user_id, prepared), timeout=60)
+            if not res:
                 return jsonify({'success': False, 'error': 'Не удалось отправить сообщение'}), 500
+            messages_to_insert = [(int(user_id), sender_name, 'outgoing', message, None, None)]
+
+        if not run_async(db.set_chat_department(int(user_id), department)):
+            return jsonify({'success': False, 'error': 'Сообщение доставлено, но не удалось обновить отдел'}), 500
+        if not run_async(db.save_user_messages_bulk(messages_to_insert, department=department), timeout=60):
+            return jsonify({'success': False, 'error': 'Сообщение доставлено, но не удалось сохранить историю'}), 500
 
         return jsonify({'success': True})
     except Exception as e:
@@ -1633,7 +1659,7 @@ def api_send_message():
 @app.route('/api/file/<file_id>')
 @login_required
 def api_get_file(file_id):
-    if not run_async(db.file_in_departments(file_id, chat_departments())):
+    if session.get('role') not in ('admin', 'manager') or not run_async(db.file_in_departments(file_id, chat_departments())):
         return 'Access denied', 403
     bot_token = os.getenv('TG_BOT_TOKEN')
     if not bot_token or not file_id:
@@ -1653,7 +1679,9 @@ def api_get_file(file_id):
 
         file_path = file_info['result']['file_path']
         download_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
-        filename = file_path.split('/')[-1]
+        file_data = requests.get(download_url, timeout=60)
+        file_data.raise_for_status()
+        filename = telegram_download_name(file_path, file_id, file_data.content)
 
         mime_type, _ = mimetypes.guess_type(filename)
         if not mime_type:
@@ -1663,8 +1691,6 @@ def api_get_file(file_id):
             else:
                 mime_type = 'application/octet-stream'
 
-        file_data = requests.get(download_url, timeout=60)
-        file_data.raise_for_status()
         force_download = request.args.get('download') == '1'
 
         response = send_file(

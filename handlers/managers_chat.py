@@ -10,6 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from database import db
+from utility.chat_routing import prepare_department_message
 import logging
 
 router = Router()
@@ -307,11 +308,13 @@ async def send_reply_to_user(message: Message, state: FSMContext):
         bot = message.bot
 
         # Отправляем пользователю
+        department = data.get('question_type')
+        prepared_text = await prepare_department_message(user_id, department, reply_text)
         await bot.send_message(
             chat_id=user_id,
-            text=f"📨 Ответ от менеджера:\n\n{reply_text}",
-            parse_mode="Markdown"
+            text=prepared_text
         )
+        await db.set_chat_department(user_id, department)
 
         # Сохраняем в БД
         await db.save_user_message(

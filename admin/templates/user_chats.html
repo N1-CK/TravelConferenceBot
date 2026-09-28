@@ -572,7 +572,7 @@
                         <div class="flex-grow-1" style="min-width: 0;">
                             <div class="d-flex justify-content-between align-items-center">
                                 <strong class="text-truncate" style="max-width: 100%; display: block;">
-                                    {{ conv.full_name or conv.username }} <span class="badge bg-secondary">{{ conv.department | upper }}</span>
+                                    {{ conv.full_name or conv.username }} {% if conv.latest_department %}<span class="badge bg-secondary">{{ conv.latest_department | upper }}</span>{% endif %}
                                     <i class="bi bi-bell-slash text-muted ms-1 mute-indicator" style="font-size: 0.8rem; display: {{ 'inline' if conv.is_muted else 'none' }};"></i>
                                 </strong>
                                 {% if conv.unread_count > 0 %}<span class="unread-badge">{{ conv.unread_count }}</span>{% endif %}
@@ -651,6 +651,14 @@
             </div>
 
             <div class="chat-input" id="chatInput" style="display: none;">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <label class="small text-muted text-nowrap" for="sendDepartment">{{ get_text('send_from_department') }}:</label>
+                    <select id="sendDepartment" class="form-select form-select-sm" style="max-width: 170px;">
+                        {% if session.role == 'admin' or 'pr' in session.get('groups', []) %}<option value="pr">PR</option>{% endif %}
+                        {% if session.role == 'admin' or 'event' in session.get('groups', []) %}<option value="event">Event</option>{% endif %}
+                        {% if session.role == 'admin' or 'travel' in session.get('groups', []) %}<option value="travel">Travel</option>{% endif %}
+                    </select>
+                </div>
                 <div class="format-toolbar mb-2">
                     <button type="button" class="btn btn-outline-secondary" onclick="wrapChatText('<b>', '</b>')" title="{{ get_text('formatting_bold') }} (Ctrl+B)"><i class="bi bi-type-bold"></i></button>
                     <button type="button" class="btn btn-outline-secondary" onclick="wrapChatText('<i>', '</i>')" title="{{ get_text('formatting_italic') }} (Ctrl+I)"><i class="bi bi-type-italic"></i></button>
@@ -906,7 +914,7 @@
 
     if (openUserId) {
         setTimeout(() => {
-            loadChat(parseInt(openUserId), false, urlParams.get('department'));
+            loadChat(parseInt(openUserId));
         }, 500);
     }
 
@@ -1561,9 +1569,8 @@
     }
 
     async function loadChat(userId, isPollingReq = false, department = null) {
-        department = department || (currentUserId === userId ? currentDepartment :
-            document.querySelector(`.conversation-item[data-user-id="${userId}"]`)?.dataset.department);
-        if (!department) return;
+        department = 'chat';
+        if (!document.querySelector(`.conversation-item[data-user-id="${userId}"]`)) return;
         if (isPollingReq && isUploadingFile) {
             chatPollTimer = setTimeout(() => loadChat(userId, true), 2500);
             return;
@@ -1610,8 +1617,12 @@
                 const headerName = userFullName ? `${userFullName} (@${data.username || userId})` : `@${data.username || userId}`;
                 document.getElementById('currentUserName').textContent = headerName;
                 initUserCardTrigger();
-                document.getElementById('currentUserInfo').textContent = `ID: ${userId} · ${department.toUpperCase()}`;
-                document.getElementById('chatInput').style.display = department === 'legacy' ? 'none' : 'block';
+                document.getElementById('currentUserInfo').textContent = `ID: ${userId}`;
+                const sendDepartment = document.getElementById('sendDepartment');
+                const allowed = data.allowed_departments || [];
+                const preferred = data.active_department || [...messages].reverse().find(m => allowed.includes(m.department))?.department;
+                if (preferred && allowed.includes(preferred)) sendDepartment.value = preferred;
+                document.getElementById('chatInput').style.display = allowed.length ? 'block' : 'none';
             }
 
             const groupedMessages = [];
@@ -1621,6 +1632,7 @@
 
                 const isMediaGroupPart = prev &&
                     prev.direction === m.direction &&
+                    prev.department === m.department &&
                     prev.sender_username === m.sender_username &&
                     Math.abs(new Date(prev.created_at) - new Date(m.created_at)) < 4000 &&
                     (m.file_id || prev.files.length > 0);
@@ -1656,6 +1668,7 @@
 
                     let content = `<div class="message-bubble">`;
                     content += `<div class="message-sender">${escapeHtml(senderDisplay)}</div>`;
+                    if (msg.department && !msg.source_type?.includes('_question')) content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">${escapeHtml(msg.department.toUpperCase())}</small><br>`;
 
                     if (msg.source_type && msg.source_type.includes('_question')) {
                         const dept = msg.source_type.replace('_question', '').toUpperCase();
@@ -1838,7 +1851,7 @@
 
         const formData = new FormData();
         formData.append('user_id', currentUserId);
-        formData.append('department', currentDepartment);
+        formData.append('department', document.getElementById('sendDepartment').value);
         formData.append('message', msgInput.value);
 
         if (selectedFilesQueue.length > 0) {
@@ -1959,7 +1972,7 @@
                         <div class="flex-grow-1" style="min-width: 0;">
                             <div class="d-flex justify-content-between">
                                 <strong class="text-truncate" style="max-width: 100%; display: block;">
-                                    ${escapeHtml(displayName)} <span class="badge bg-secondary">${conv.department.toUpperCase()}</span>
+                                    ${escapeHtml(displayName)} ${conv.latest_department ? `<span class="badge bg-secondary">${escapeHtml(conv.latest_department.toUpperCase())}</span>` : ''}
                                     <i class="bi bi-bell-slash text-muted ms-1 mute-indicator" style="font-size: 0.8rem; display: ${conv.is_muted ? 'inline' : 'none'};"></i>
                                 </strong>
                                 <small class="text-muted">${time}</small>
@@ -2151,7 +2164,7 @@
 
                 showToast(locales.answerSent, 'success');
                 switchTab('chats');
-                loadChat(userId, false, document.getElementById('replyDept').value);
+                loadChat(userId);
             } else {
                 showToast(locales.errorSending, 'danger');
             }
