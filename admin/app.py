@@ -491,7 +491,17 @@ def broadcast():
             if not conferences_selected:
                 flash('Выберите хотя бы одну конференцию', 'danger')
                 return render_template('broadcast.html', companies=companies, conferences=conferences, users=users)
-            users_to_send = run_async(db.get_users_by_conference_list(conferences_selected))
+            try:
+                selected_ids = {int(uid) for uid in request.form.getlist('conference_users')}
+            except ValueError:
+                flash('Некорректный список участников', 'danger')
+                return render_template('broadcast.html', companies=companies, conferences=conferences, users=users)
+            if not selected_ids:
+                flash(get_text('select_user_warning'), 'danger')
+                return render_template('broadcast.html', companies=companies, conferences=conferences, users=users)
+            conference_users = run_async(db.get_users_by_conference_list(conferences_selected)) or []
+            # Only selected users who still belong to the chosen conferences may receive it.
+            users_to_send = [user for user in conference_users if user['user_id'] in selected_ids]
 
         if not users_to_send:
             flash('Нет пользователей для рассылки', 'warning')
@@ -1585,6 +1595,32 @@ def api_send_message():
             except Exception:
                 pass
 
+def resolve_file_metadata(file_path, content, content_type=None):
+    """Recover image/PDF type when Telegram supplies a generic document path."""
+    filename = os.path.basename(file_path) or 'attachment'
+    mime_type, _ = mimetypes.guess_type(filename)
+    detected_type = None
+    if content.startswith(b'\xff\xd8\xff'):
+        detected_type = 'image/jpeg'
+    elif content.startswith(b'\x89PNG\r\n\x1a\n'):
+        detected_type = 'image/png'
+    elif content.startswith((b'GIF87a', b'GIF89a')):
+        detected_type = 'image/gif'
+    elif content[:4] == b'RIFF' and content[8:12] == b'WEBP':
+        detected_type = 'image/webp'
+    elif content.startswith(b'%PDF-'):
+        detected_type = 'application/pdf'
+    header_type = (content_type or '').split(';', 1)[0].strip().lower()
+    if header_type == 'application/octet-stream':
+        header_type = None
+    mime_type = detected_type or mime_type or header_type or 'application/octet-stream'
+    extension = {'image/jpeg': '.jpg'}.get(mime_type) or mimetypes.guess_extension(mime_type)
+    stem, suffix = os.path.splitext(filename)
+    if extension and suffix.lower() in {'', '.file', '.bin', '.dat'}:
+        filename = (stem or 'attachment') + extension
+    return filename, mime_type
+
+
 @app.route('/api/file/<file_id>')
 @login_required
 def api_get_file(file_id):
@@ -1606,18 +1642,11 @@ def api_get_file(file_id):
 
         file_path = file_info['result']['file_path']
         download_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
-        filename = file_path.split('/')[-1]
-
-        mime_type, _ = mimetypes.guess_type(filename)
-        if not mime_type:
-            ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
-            if ext in {'jpg', 'jpeg', 'png', 'webp', 'gif'}:
-                mime_type = f'image/{ext if ext != "jpg" else "jpeg"}'
-            else:
-                mime_type = 'application/octet-stream'
-
         file_data = requests.get(download_url, timeout=60)
         file_data.raise_for_status()
+        filename, mime_type = resolve_file_metadata(
+            file_path, file_data.content, file_data.headers.get('Content-Type')
+        )
         force_download = request.args.get('download') == '1'
 
         response = send_file(
