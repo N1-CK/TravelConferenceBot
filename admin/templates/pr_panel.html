@@ -857,6 +857,22 @@
     const lang = '{{ session.get("lang", "ru") }}';
     const datatableLangUrl = `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`;
 
+    function prDateSortValue(value) {
+        const text = String(value || '').replace(/<[^>]*>/g, '').trim();
+        const ru = text.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+        const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?(?:Z|[+-]\d{2}:?\d{2})?$/);
+        const match = ru || iso;
+        if (!match) return Number.NEGATIVE_INFINITY;
+        const year = Number(ru ? match[3] : match[1]);
+        const month = Number(match[2]);
+        const day = Number(ru ? match[1] : match[3]);
+        const hour = Number(match[4] || 0), minute = Number(match[5] || 0), second = Number(match[6] || 0);
+        const date = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+        if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day ||
+            hour > 23 || minute > 59 || second > 59) return Number.NEGATIVE_INFINITY;
+        return date.getTime();
+    }
+
     $(document).ready(function() {
         const dtConfig = {
             language: { url: datatableLangUrl },
@@ -865,11 +881,15 @@
             order: [[0, 'desc']]
         };
 
-        // Инициализируем сразу все 4 таблицы
-        bannersTable = $('#bannersTable').DataTable(dtConfig);
-        cardsTable = $('#cardsTable').DataTable(dtConfig);
-        bookingsTable = $('#bookingsTable').DataTable(dtConfig);
-        reportsTable = $('#reportsTable').DataTable(dtConfig);
+        // Date cells contain localized text/HTML; compare numeric timestamps.
+        $.fn.dataTable.ext.type.order['pr-date-pre'] = prDateSortValue;
+        const dateConfig = column => ({
+            ...dtConfig, columnDefs: [{ targets: column, type: 'pr-date' }]
+        });
+        bannersTable = $('#bannersTable').DataTable(dateConfig(6));
+        cardsTable = $('#cardsTable').DataTable(dateConfig(6));
+        bookingsTable = $('#bookingsTable').DataTable(dateConfig(3));
+        reportsTable = $('#reportsTable').DataTable(dateConfig(3));
 
         // Пересчет размеров колонок при переключении вкладок
         $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function(e) {

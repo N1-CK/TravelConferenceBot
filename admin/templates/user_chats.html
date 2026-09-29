@@ -5,11 +5,11 @@
 {% block extra_css %}
 <style>
     /* Десктопная разметка */
-    .chat-container { display: flex; height: calc(100vh - 150px); background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.08); position: relative; }
+    .chat-container { display: flex; height: calc(100vh - 115px); height: calc(100dvh - 115px); background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.08); position: relative; }
     .chat-sidebar { width: 340px; border-right: 1px solid #dee2e6; overflow-y: auto; background: #f8f9fa; display: flex; flex-direction: column; }
-    .chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; background: white; }
+    .chat-main { min-width: 0; min-height: 0; flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; background: white; }
     .chat-header { padding: 12px 20px; border-bottom: 1px solid #dee2e6; background: white; display: flex; align-items: center; justify-content: space-between; }
-    .chat-messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px; background: #f8f9fa; }
+    .chat-messages { min-height: 0; flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px; background: #f8f9fa; }
 
     /* Панель папок в стиле Telegram */
     .telegram-folders-bar {
@@ -291,7 +291,7 @@
         color: #667eea; background: #f1f5f9; padding: 4px 8px; border-radius: 6px; margin: 12px 0 8px 0;
     }
     .user-info-card .action-buttons { display: flex; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
-    .chat-messages .message-bubble div { white-space: pre-wrap !important; }
+    .chat-messages .message-text { white-space: pre-wrap !important; }
 
     .tg-files-container { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
     .tg-file-card {
@@ -316,6 +316,37 @@
     .tg-voice-player { display: flex; align-items: center; width: 250px; height: 38px; border-radius: 20px; outline: none; margin-bottom: 4px; }
     .message.outgoing .tg-voice-player { filter: invert(1) hue-rotate(180deg); }
 
+    /* Media cards keep the same controls and fit narrow screens. */
+    .chat-messages { background: #eef3f7; }
+    .message-bubble { box-shadow: 0 2px 5px rgba(30, 50, 70, .06); }
+    .message.incoming .message-bubble { border-color: #e5ebf1; border-bottom-left-radius: 6px; }
+    .message.outgoing .message-bubble { background: #4c80b8; border-bottom-right-radius: 6px; }
+    .message-bubble:has(.tg-files-wrapper) { width: min(390px, 70%); }
+    .tg-files-wrapper { width: min(360px, 100%); min-width: 0; }
+    .tg-images-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 360px; gap: 3px; }
+    .tg-images-grid.single { grid-template-columns: minmax(0, 1fr); }
+    .tg-images-grid .tg-img-wrapper { width: 100% !important; min-width: 0; }
+    .tg-images-grid.single .tg-img-wrapper { max-width: 360px; height: auto; }
+    .tg-images-grid.single .tg-chat-image { height: auto; max-height: 360px; object-fit: contain; }
+    .tg-images-grid.multi .tg-img-wrapper { height: auto; aspect-ratio: 1; }
+    .tg-images-grid.multi .tg-chat-image { height: 100%; }
+    .tg-photo-download { position: absolute; right: 7px; bottom: 7px; width: 30px; height: 30px;
+        display: grid; place-items: center; background: rgba(20, 35, 50, .65); color: white; border-radius: 50%; }
+    .tg-photo-download:hover { color: white; background: rgba(20, 35, 50, .9); }
+    .tg-file-card { padding: 12px; gap: 10px; border-radius: 13px; min-width: 0; }
+    .tg-file-icon { width: 44px; height: 44px; min-width: 44px; margin-right: 0; font-size: 1.35rem; }
+    .tg-file-label { min-width: 0; flex: 1; }
+    .tg-voice-card { border-radius: 14px; padding: 10px; display: flex; align-items: center; gap: 8px;
+        background: rgba(125, 155, 185, .12); width: min(340px, 100%); box-sizing: border-box; }
+    .tg-voice-card .tg-voice-player { width: 100%; min-width: 0; height: 42px; margin: 0; flex: 1; }
+    .tg-voice-download { color: inherit; padding: 4px; flex-shrink: 0; }
+    @media (max-width: 767.98px) {
+        .message-bubble:has(.tg-files-wrapper) { width: min(360px, 88%); }
+        .tg-files-wrapper { width: min(330px, 100%); }
+        .tg-voice-card { max-width: 100%; }
+        .tg-images-grid.single .tg-chat-image { max-height: 300px; }
+    }
+
     .file-chip {
         display: inline-flex; align-items: center; background: #eef2ff; border: 1px solid #c7d2fe; color: #4338ca;
         padding: 4px 10px; border-radius: 16px; font-size: 0.8rem; margin: 3px 6px 3px 0;
@@ -328,6 +359,8 @@
     .mobile-chat-back-btn {
         display: none; background: transparent; border: none; color: #475569; font-size: 1.35rem; padding: 0 8px 0 0; cursor: pointer; line-height: 1;
     }
+
+    #chatsTab.chat-tab-hidden, #questionsTab.chat-tab-hidden { display: none !important; }
 
     /* Адаптив для смартфонов */
     @media (max-width: 768px) {
@@ -352,12 +385,12 @@
             margin-bottom: 0 !important;
         }
 
-        /* Главный контейнер вкладки Чаты — вычитаем навбар (56px) и табы (44px) */
+        /* Height is measured from the actual header and visible viewport. */
         #chatsTab {
             display: flex !important;
             flex-direction: column !important;
-            height: calc(100dvh - 56px - 44px) !important;
-            max-height: calc(100dvh - 56px - 44px) !important;
+            height: var(--chat-space, calc(100dvh - 100px)) !important;
+            max-height: var(--chat-space, calc(100dvh - 100px)) !important;
             min-height: 0 !important;
             overflow: hidden !important;
         }
@@ -483,7 +516,7 @@
         }
 
         #questionsTab {
-            height: calc(100dvh - 56px - 44px) !important;
+            height: var(--chat-space, calc(100dvh - 100px)) !important;
             overflow-y: auto !important;
             padding: 8px;
             -webkit-overflow-scrolling: touch !important;
@@ -708,7 +741,6 @@
                     </div>
                     <div class="d-flex justify-content-between px-2 mt-1">
                         <small class="text-muted"><span id="chatCharCounter">0 / 4000</span></small>
-                        <small class="text-muted"><i class="bi bi-code-slash"></i> {{ get_text('html_supported') }}</small>
                     </div>
                 </form>
             </div>
@@ -878,6 +910,11 @@
 
     let currentUserId = null;
     let renderedMessageUids = new Set();
+    const renderedMessageSignatures = new Map();
+    let chatRequestController = null;
+    let chatRequestGeneration = 0;
+    let chatEtag = null;
+    let sidebarEtag = null;
     let isPolling = false;
     let chatPollTimer = null;
     let isScrolledToBottom = true;
@@ -1260,6 +1297,8 @@
         if (chatContainerEl) chatContainerEl.classList.remove('mobile-chat-open');
         clearTimeout(chatPollTimer);
         isPolling = false;
+        chatRequestGeneration++;
+        chatRequestController?.abort();
         if (currentUserId) saveDraft(currentUserId);
     }
 
@@ -1517,7 +1556,7 @@
             .then(res => {
                 const ct = res.headers.get('Content-Type') || '';
                 if (ct.startsWith('audio/') || ct.includes('ogg') || ct.includes('opus')) {
-                    audio.style.display = 'block';
+                    document.getElementById(`voice_${fileId}`).style.display = 'flex';
                 } else {
                     doc.style.display = 'flex';
                 }
@@ -1569,6 +1608,8 @@
 
             currentUserId = userId;
             renderedMessageUids.clear();
+            renderedMessageSignatures.clear();
+            chatEtag = null;
             isPolling = true;
             clearTimeout(chatPollTimer);
 
@@ -1583,10 +1624,22 @@
             restoreDraft(userId);
         }
 
+        clearTimeout(chatPollTimer);
+        chatRequestController?.abort();
+        const controller = new AbortController();
+        chatRequestController = controller;
+        const generation = ++chatRequestGeneration;
         try {
-            const resp = await fetch(`/api/user_messages/${userId}`);
+            const resp = await fetch(`/api/user_messages/${userId}`, {
+                signal: controller.signal,
+                headers: isPollingReq && chatEtag ? { 'If-None-Match': chatEtag } : {}
+            });
+            if (generation !== chatRequestGeneration || currentUserId !== userId) return;
+            if (resp.status === 304) return;
+            chatEtag = resp.headers.get('ETag');
             if (!resp.ok) throw new Error('Network error');
             const data = await resp.json();
+            if (generation !== chatRequestGeneration || currentUserId !== userId) return;
 
             if (!isPollingReq) messagesDiv.innerHTML = '';
 
@@ -1616,26 +1669,30 @@
                     (m.file_id || prev.files.length > 0);
 
                 if (isMediaGroupPart && m.file_id) {
-                    prev.files.push(m.file_id);
+                    prev.files.push({id: m.file_id, type: m.file_type});
                     if (!prev.message_text && m.message_text) {
                         prev.message_text = m.message_text;
                     }
                 } else {
                     groupedMessages.push({
                         ...m,
-                        files: m.file_id ? [m.file_id] : []
+                        files: m.file_id ? [{id: m.file_id, type: m.file_type}] : []
                     });
                 }
             }
 
             for (const msg of groupedMessages) {
                 const msgUid = msg.uid || `${msg.source_type}_${msg.id}`;
-                if (!renderedMessageUids.has(msgUid)) {
+                const signature = JSON.stringify(msg);
+                if (renderedMessageSignatures.get(msgUid) !== signature) {
+                    const existingMessage = Array.from(messagesDiv.children).find(el => el.dataset.uid === msgUid);
+                    renderedMessageSignatures.set(msgUid, signature);
                     renderedMessageUids.add(msgUid);
                     hasAnyNew = true;
                     if (msg.direction === 'incoming') hasNewIncoming = true;
 
                     const messageDiv = document.createElement('div');
+                    messageDiv.dataset.uid = msgUid;
                     messageDiv.className = `message ${msg.direction === 'incoming' ? 'incoming' : 'outgoing'}`;
 
                     const senderDisplay = msg.direction === 'outgoing'
@@ -1656,36 +1713,41 @@
 
                             content += `<div class="tg-files-wrapper mb-1">`;
                             content += `<div class="tg-images-grid ${isSingle ? 'single' : 'multi'}">`;
-                            msg.files.forEach((fId) => {
+                            msg.files.forEach(({id: fId, type}) => {
+                                const isPhoto = type === 'photo' || (type || '').startsWith('image/');
+                                const isUnknown = !type || type === 'document';
+                                if (!isPhoto && !isUnknown) return;
                                 content += `
                                 <div class="tg-img-wrapper" id="img_wrap_${fId}">
-                                    <img src="/api/file/${fId}"
-                                         loading="lazy"
-                                         class="tg-chat-image"
-                                         alt="Image"
-                                         onload="scrollToBottomForce()"
+                                    <img src="/api/file/${fId}" loading="lazy" class="tg-chat-image" alt="Image"
+                                         onload="if (isScrolledToBottom) scrollToBottomForce()"
                                          onclick="openImageModal('${fId}')"
                                          onerror="this.closest('.tg-img-wrapper').remove(); checkAudioOrDoc('${fId}');" />
+                                    <a class="tg-photo-download" href="/api/file/${fId}?download=1" title="${locales.downloadView}"><i class="bi bi-download"></i></a>
                                 </div>`;
                             });
                             content += `</div>`;
-
                             content += `<div class="tg-files-container">`;
-                            msg.files.forEach((fId, index) => {
+                            msg.files.forEach(({id: fId, type}, index) => {
+                                const isAudio = ['voice', 'audio'].includes(type) || (type || '').startsWith('audio/');
+                                const isPhoto = type === 'photo' || (type || '').startsWith('image/');
+                                const isUnknown = !type || type === 'document';
+                                const isDoc = !isAudio && !isPhoto && !isUnknown;
+                                const ext = (type || '').split('/')[1];
                                 content += `
-                                <div id="media_wrap_${fId}" style="display:none; flex-direction:column; gap:4px;">
-                                    <audio controls class="tg-voice-player" id="audio_${fId}" preload="none" style="display:none;">
-                                        <source src="/api/file/${fId}" type="audio/ogg">
-                                        <source src="/api/file/${fId}" type="audio/mp4">
-                                        <source src="/api/file/${fId}" type="audio/mpeg">
-                                    </audio>
-
-                                    <a href="/api/file/${fId}?download=1" target="_blank" id="doc_${fId}" class="tg-file-card" style="display: none;">
+                                <div id="media_wrap_${fId}" style="display:${isAudio || isDoc ? 'flex' : 'none'}; flex-direction:column; gap:6px;">
+                                    <div class="tg-voice-card" id="voice_${fId}" style="display:${isAudio ? 'flex' : 'none'};">
+                                        <i class="bi bi-mic-fill"></i>
+                                        <audio controls class="tg-voice-player" id="audio_${fId}" preload="none" src="/api/file/${fId}"></audio>
+                                        <a href="/api/file/${fId}?download=1" class="tg-voice-download" title="${locales.downloadView}"><i class="bi bi-download"></i></a>
+                                    </div>
+                                    <a href="/api/file/${fId}?download=1" target="_blank" id="doc_${fId}" class="tg-file-card" style="display:${isDoc ? 'flex' : 'none'};">
                                         <div class="tg-file-icon"><i class="bi bi-file-earmark-text-fill"></i></div>
-                                        <div class="text-truncate flex-grow-1" style="max-width: 200px;">
-                                            <div style="font-size: 0.82rem; font-weight: 600; line-height: 1.2;">${locales.attachedFile} ${msg.files.length > 1 ? '#' + (index + 1) : ''}</div>
-                                            <span class="tg-file-badge">${locales.downloadView}</span>
+                                        <div class="tg-file-label">
+                                            <div class="text-truncate fw-semibold">${locales.attachedFile} ${msg.files.length > 1 ? '#' + (index + 1) : ''}</div>
+                                            <span class="tg-file-badge">${ext ? escapeHtml(ext.toUpperCase()) + ' · ' : ''}${locales.downloadView}</span>
                                         </div>
+                                        <i class="bi bi-download"></i>
                                     </a>
                                 </div>`;
                             });
@@ -1694,13 +1756,14 @@
                         }
 
                         if (msg.message_text) {
-                            content += `<div style="margin-top: ${msg.files && msg.files.length > 0 ? '4px' : '0'};">${msg.message_text}</div>`;
+                            content += `<div class="message-text" style="margin-top: ${msg.files && msg.files.length > 0 ? '4px' : '0'};">${msg.message_text}</div>`;
                         }
                     }
 
                     content += `<span class="message-time-inline">${time}</span></div>`;
                     messageDiv.innerHTML = content;
-                    messagesDiv.appendChild(messageDiv);
+                    if (existingMessage) existingMessage.replaceWith(messageDiv);
+                    else messagesDiv.appendChild(messageDiv);
                 }
             }
 
@@ -1745,11 +1808,11 @@
             }
 
         } catch (e) {
-            console.error(e);
-        }
-
-        if (isPolling && currentUserId === userId) {
-            chatPollTimer = setTimeout(() => loadChat(userId, true), 2500);
+            if (e.name !== 'AbortError') console.error(e);
+        } finally {
+            if (generation === chatRequestGeneration && isPolling && currentUserId === userId) {
+                chatPollTimer = setTimeout(() => loadChat(userId, true), document.hidden ? 10000 : 2000);
+            }
         }
     }
 
@@ -1820,6 +1883,8 @@
             return;
         }
 
+        const sendingUserId = currentUserId;
+        const sendingFiles = [...selectedFilesQueue];
         isUploadingFile = true;
         if (submitBtn) {
             submitBtn.disabled = true;
@@ -1827,7 +1892,7 @@
         }
 
         const formData = new FormData();
-        formData.append('user_id', currentUserId);
+        formData.append('user_id', sendingUserId);
         formData.append('message', msgInput.value);
 
         if (selectedFilesQueue.length > 0) {
@@ -1835,8 +1900,8 @@
             progBar.style.width = '10%';
             progBar.textContent = locales.preparingFiles;
 
-            for (let i = 0; i < selectedFilesQueue.length; i++) {
-                const originalFile = selectedFilesQueue[i];
+            for (let i = 0; i < sendingFiles.length; i++) {
+                const originalFile = sendingFiles[i];
                 const fileToSend = await compressImageIfNeeded(originalFile).catch(() => originalFile);
                 formData.append('files', fileToSend);
             }
@@ -1868,7 +1933,8 @@
                 try {
                     const data = JSON.parse(xhr.responseText);
                     if (data.success) {
-                        clearDraft(currentUserId);
+                        clearDraft(sendingUserId);
+                        if (currentUserId !== sendingUserId) return;
                         msgInput.value = '';
                         autoResizeTextarea(msgInput);
                         selectedFilesQueue = [];
@@ -1917,7 +1983,10 @@
         }
 
         try {
-            const resp = await fetch('/api/conversations');
+            const resp = await fetch('/api/conversations', {headers: sidebarEtag ? {'If-None-Match': sidebarEtag} : {}});
+            if (resp.status === 304) return;
+            if (!resp.ok) throw new Error('Sidebar unavailable');
+            sidebarEtag = resp.headers.get('ETag');
             const conversations = await resp.json();
             const listDiv = document.getElementById('conversationsList');
             let html = '';
@@ -1965,8 +2034,9 @@
             recalcUnreadCount();
             updateArchiveCounter();
             filterChats();
-        } catch (e) {}
-        setTimeout(updateSidebar, 5000);
+        } catch (e) {} finally {
+            setTimeout(updateSidebar, document.hidden ? 15000 : 5000);
+        }
     }
 
     function escapeHtml(text) {
@@ -1977,7 +2047,9 @@
     }
 
     function switchTab(tab) {
+        document.getElementById('chatsTab').classList.toggle('chat-tab-hidden', tab !== 'chats');
         document.getElementById('chatsTab').style.display = (tab === 'chats') ? 'block' : 'none';
+        document.getElementById('questionsTab').classList.toggle('chat-tab-hidden', tab !== 'questions');
         document.getElementById('questionsTab').style.display = (tab === 'questions') ? 'block' : 'none';
 
         document.querySelectorAll('#chatTabs .nav-link').forEach(btn => {
@@ -2153,27 +2225,22 @@
     loadAllQuestions();
     updateSidebar();
 
-    if (window.visualViewport) {
-        const vv = window.visualViewport;
-        const applyKeyboardFix = () => {
-            const isMobile = window.matchMedia('(max-width: 768px)').matches;
-            if (!isMobile) return;
-            const keyboardHeight = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-            document.documentElement.style.setProperty('--kb-height', keyboardHeight + 'px');
-            if (keyboardHeight > 50) {
-                document.querySelectorAll('.chat-input').forEach(el => {
-                    el.style.paddingBottom = `calc(10px + ${keyboardHeight}px + env(safe-area-inset-bottom, 0px))`;
-                });
-                scrollToBottomForce(false);
-            } else {
-                document.querySelectorAll('.chat-input').forEach(el => {
-                    el.style.paddingBottom = '';
-                });
-            }
-        };
-        vv.addEventListener('resize', applyKeyboardFix);
-        vv.addEventListener('scroll', applyKeyboardFix);
+    function fitChatViewport() {
+        if (!window.matchMedia('(max-width: 768px)').matches) return;
+        const viewport = window.visualViewport;
+        const bottom = viewport ? viewport.height + viewport.offsetTop : window.innerHeight;
+        const tabs = document.querySelector('.chat-nav-tabs-wrapper');
+        const top = tabs ? tabs.getBoundingClientRect().bottom : 100;
+        document.documentElement.style.setProperty('--chat-space', Math.max(180, bottom - top) + 'px');
+        if (viewport && window.innerHeight - viewport.height > 50 && isScrolledToBottom) scrollToBottomForce();
     }
+    window.addEventListener('resize', fitChatViewport);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', fitChatViewport);
+        window.visualViewport.addEventListener('scroll', fitChatViewport);
+    }
+    requestAnimationFrame(fitChatViewport);
+
 </script>
 
 <div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true" style="background: rgba(0,0,0,0.85);">

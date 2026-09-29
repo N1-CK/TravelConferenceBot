@@ -584,6 +584,26 @@ class Database:
                     ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE
                 """)
 
+                # Serialize new indexes across simultaneous Gunicorn worker starts.
+                async with conn.transaction():
+                    await conn.execute("SELECT pg_advisory_xact_lock(739218403)")
+                    # Cover the frequent chat-history and unread queries.
+                    for schema, table in (
+                        (self.db_schema, 'user_messages'),
+                        (self.db_schema_pr, 'pr_questions'),
+                        (self.db_schema_event, 'event_questions'),
+                        (self.db_schema_travel, 'travel_questions'),
+                    ):
+                        await conn.execute(f"""
+                            CREATE INDEX IF NOT EXISTS idx_{table}_user_time_id
+                            ON {schema}.{table} (user_id, created_at DESC, id DESC)
+                        """)
+                    await conn.execute(f"""
+                        CREATE INDEX IF NOT EXISTS idx_user_messages_unread
+                        ON {self.db_schema}.user_messages (user_id)
+                        WHERE direction = 'incoming' AND read_at IS NULL
+                    """)
+
                 logger.info("All tables created successfully")
                 return True
 
@@ -3477,13 +3497,19 @@ class Database:
                         p.full_name as full_name,
                         m.created_at as last_message_time,
                         m.message_text as last_message,
-                        (SELECT COUNT(*) FROM {self.db_schema}.user_messages WHERE user_id = m.user_id AND direction = 'incoming' AND read_at IS NULL) as unread_count
+                        COALESCE(unread.unread_count, 0) as unread_count
                     FROM (
                         SELECT DISTINCT ON (user_id) user_id, username, created_at, message_text
                         FROM {self.db_schema}.user_messages
-                        ORDER BY user_id, created_at DESC
+                        ORDER BY user_id, created_at DESC, id DESC
                     ) m
                     LEFT JOIN {self.db_schema_config}.user_profiles p ON m.user_id = p.user_id
+                    LEFT JOIN (
+                        SELECT user_id, COUNT(*) as unread_count
+                        FROM {self.db_schema}.user_messages
+                        WHERE direction = 'incoming' AND read_at IS NULL
+                        GROUP BY user_id
+                    ) unread ON unread.user_id = m.user_id
                 """)
 
                 pr_questions = await conn.fetch(f"""
@@ -3497,7 +3523,7 @@ class Database:
                     FROM (
                         SELECT DISTINCT ON (user_id) user_id, username, created_at, question
                         FROM {self.db_schema_pr}.pr_questions
-                        ORDER BY user_id, created_at DESC
+                        ORDER BY user_id, created_at DESC, id DESC
                     ) q
                     LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
                 """)
@@ -3513,7 +3539,7 @@ class Database:
                     FROM (
                         SELECT DISTINCT ON (user_id) user_id, username, created_at, question
                         FROM {self.db_schema_event}.event_questions
-                        ORDER BY user_id, created_at DESC
+                        ORDER BY user_id, created_at DESC, id DESC
                     ) q
                     LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
                 """)
@@ -3529,7 +3555,7 @@ class Database:
                     FROM (
                         SELECT DISTINCT ON (user_id) user_id, username, created_at, question
                         FROM {self.db_schema_travel}.travel_questions
-                        ORDER BY user_id, created_at DESC
+                        ORDER BY user_id, created_at DESC, id DESC
                     ) q
                     LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
                 """)
@@ -3610,65 +3636,35 @@ class Database:
             return []
 
     async def get_user_messages(self, user_id: int, limit: int = 50) -> list:
-        """Получить историю сообщений пользователя (включая вопросы)"""
+        """Fetch only the latest rows, with one round trip and stable ordering."""
         try:
+            limit = max(1, min(int(limit), 500))
+            sources = [(self.db_schema, 'user_messages', 'message')]
+            sources.extend((schema, table, source) for schema, table, source in (
+                (self.db_schema_pr, 'pr_questions', 'pr_question'),
+                (self.db_schema_event, 'event_questions', 'event_question'),
+                (self.db_schema_travel, 'travel_questions', 'travel_question'),
+            ))
+            queries = []
+            for schema, table, source in sources:
+                fields = (
+                    "manager_id, direction, message_text, file_type, file_id, read_at, NULL::text as category"
+                    if source == 'message' else
+                    "NULL::integer as manager_id, 'incoming' as direction, question as message_text, "
+                    "NULL::text as file_type, NULL::text as file_id, NULL::timestamp as read_at, category"
+                )
+                queries.append(f"""(
+                    SELECT id, user_id, username, created_at, {fields}, '{source}' as source_type
+                    FROM {schema}.{table} WHERE user_id = $1
+                    ORDER BY created_at DESC, id DESC LIMIT $2
+                )""")
+            query = ' UNION ALL '.join(queries)
             async with self.pool.acquire() as conn:
-                messages = await conn.fetch(f"""
-                    SELECT 
-                        id, user_id, username, manager_id, direction, 
-                        message_text, file_type, file_id, created_at, read_at,
-                        'message' as source_type, NULL as category
-                    FROM {self.db_schema}.user_messages
-                    WHERE user_id = $1
-                """, user_id)
-
-                pr_questions = await conn.fetch(f"""
-                    SELECT 
-                        id, user_id, username, NULL as manager_id,
-                        'incoming' as direction,
-                        question as message_text,
-                        NULL as file_type, NULL as file_id, created_at, NULL as read_at,
-                        'pr_question' as source_type, category
-                    FROM {self.db_schema_pr}.pr_questions
-                    WHERE user_id = $1
-                """, user_id)
-
-                event_questions = await conn.fetch(f"""
-                    SELECT 
-                        id, user_id, username, NULL as manager_id,
-                        'incoming' as direction,
-                        question as message_text,
-                        NULL as file_type, NULL as file_id, created_at, NULL as read_at,
-                        'event_question' as source_type, category
-                    FROM {self.db_schema_event}.event_questions
-                    WHERE user_id = $1
-                """, user_id)
-
-                travel_questions = await conn.fetch(f"""
-                    SELECT 
-                        id, user_id, username, NULL as manager_id,
-                        'incoming' as direction,
-                        question as message_text,
-                        NULL as file_type, NULL as file_id, created_at, NULL as read_at,
-                        'travel_question' as source_type, category
-                    FROM {self.db_schema_travel}.travel_questions
-                    WHERE user_id = $1
-                """, user_id)
-
-                all_messages = []
-                for row in messages:
-                    msg = dict(row)
-                    msg['category'] = None
-                    all_messages.append(msg)
-                for row in pr_questions:
-                    all_messages.append(dict(row))
-                for row in event_questions:
-                    all_messages.append(dict(row))
-                for row in travel_questions:
-                    all_messages.append(dict(row))
-
-                all_messages.sort(key=lambda x: x['created_at'], reverse=True)
-                return all_messages[:limit]
+                rows = await conn.fetch(
+                    f"SELECT * FROM ({query}) history "
+                    "ORDER BY created_at DESC, id DESC, source_type DESC LIMIT $2", user_id, limit
+                )
+                return [dict(row) for row in rows]
         except Exception as e:
             logger.error(f"Error getting messages: {e}")
             return []
