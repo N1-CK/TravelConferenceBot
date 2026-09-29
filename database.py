@@ -3442,7 +3442,7 @@ class Database:
             return False
 
     async def toggle_chat_mute(self, manager_id: int, user_id: int) -> bool:
-        """Переключить статус отключения уведомлений (mute/unmute) для менеджера"""
+        """Переключить статус отключения уведомлений (mute/unmute)  для менеджера"""
         try:
             async with self.pool.acquire() as conn:
                 exists = await conn.fetchval(f"""
