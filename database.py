@@ -3512,13 +3512,13 @@ class Database:
                 ORDER BY created_at DESC, id DESC LIMIT 1
             """, user_id)
 
-    async def has_chat(self, user_id: int, departments: list[str]) -> bool:
-        """A manager may open a conversation with activity in their departments or old history."""
+    async def has_chat(self, user_id: int, departments: list[str], include_unassigned: bool = False) -> bool:
+        """A manager may open only conversations with activity in their departments."""
         async with self.pool.acquire() as conn:
             return bool(await conn.fetchval(f"""
                 SELECT EXISTS (
                     SELECT 1 FROM {self.db_schema}.user_messages
-                    WHERE user_id = $1 AND (department = ANY($2::text[]) OR department IS NULL)
+                    WHERE user_id = $1 AND (department = ANY($2::text[]) OR ($3 AND department IS NULL))
                     UNION ALL
                     SELECT 1 FROM {self.db_schema_pr}.pr_questions WHERE user_id = $1 AND 'pr' = ANY($2::text[])
                     UNION ALL
@@ -3526,26 +3526,15 @@ class Database:
                     UNION ALL
                     SELECT 1 FROM {self.db_schema_travel}.travel_questions WHERE user_id = $1 AND 'travel' = ANY($2::text[])
                 )
-            """, user_id, departments))
+            """, user_id, departments, include_unassigned))
 
-    async def file_in_departments(self, file_id: str, departments: list[str]) -> bool:
+    async def file_in_departments(self, file_id: str, departments: list[str], include_unassigned: bool = False) -> bool:
         async with self.pool.acquire() as conn:
             return bool(await conn.fetchval(f"""
-                SELECT EXISTS (
-                    SELECT 1 FROM {self.db_schema}.user_messages file_msg
-                    WHERE file_msg.file_id = $1 AND (
-                        EXISTS (SELECT 1 FROM {self.db_schema}.user_messages m
-                                WHERE m.user_id = file_msg.user_id
-                                  AND (m.department = ANY($2::text[]) OR m.department IS NULL))
-                        OR ('pr' = ANY($2::text[]) AND EXISTS
-                            (SELECT 1 FROM {self.db_schema_pr}.pr_questions q WHERE q.user_id = file_msg.user_id))
-                        OR ('event' = ANY($2::text[]) AND EXISTS
-                            (SELECT 1 FROM {self.db_schema_event}.event_questions q WHERE q.user_id = file_msg.user_id))
-                        OR ('travel' = ANY($2::text[]) AND EXISTS
-                            (SELECT 1 FROM {self.db_schema_travel}.travel_questions q WHERE q.user_id = file_msg.user_id))
-                    )
-                )
-            """, file_id, departments))
+                SELECT EXISTS (SELECT 1 FROM {self.db_schema}.user_messages
+                               WHERE file_id = $1
+                                 AND (department = ANY($2::text[]) OR ($3 AND department IS NULL)))
+            """, file_id, departments, include_unassigned))
 
     async def save_user_message(self, user_id: int, username: str,
                                 message_text: str = None, file_type: str = None,
@@ -3595,36 +3584,37 @@ class Database:
             return True
 
     async def get_user_conversations(self, manager_id: int = None,
-                                     departments: list[str] = None) -> list:
-        """One conversation per user, visible through an assigned department or old history."""
+                                     departments: list[str] = None,
+                                     include_unassigned: bool = False) -> list:
+        """One conversation per user, based on messages visible to this manager."""
         departments = departments or []
+        if not departments and not include_unassigned:
+            return []
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(f"""
                 WITH activity AS (
                     SELECT user_id, username, department, message_text AS body, created_at
                     FROM {self.db_schema}.user_messages
+                    WHERE department = ANY($1::text[]) OR ($3 AND department IS NULL)
                     UNION ALL
                     SELECT user_id, username, 'pr', question, created_at
-                    FROM {self.db_schema_pr}.pr_questions
+                    FROM {self.db_schema_pr}.pr_questions WHERE 'pr' = ANY($1::text[])
                     UNION ALL
                     SELECT user_id, username, 'event', question, created_at
-                    FROM {self.db_schema_event}.event_questions
+                    FROM {self.db_schema_event}.event_questions WHERE 'event' = ANY($1::text[])
                     UNION ALL
                     SELECT user_id, username, 'travel', question, created_at
-                    FROM {self.db_schema_travel}.travel_questions
-                ), visible AS (
-                    SELECT DISTINCT user_id FROM activity
-                    WHERE department = ANY($1::text[]) OR department IS NULL
+                    FROM {self.db_schema_travel}.travel_questions WHERE 'travel' = ANY($1::text[])
                 ), newest AS (
                     SELECT DISTINCT ON (a.user_id) a.user_id, a.username, a.body, a.created_at, a.department
-                    FROM activity a JOIN visible v ON v.user_id = a.user_id
+                    FROM activity a
                     ORDER BY a.user_id, a.created_at DESC
                 )
                 SELECT l.user_id, 'chat' AS department, l.department AS latest_department,
                        COALESCE(p.username, l.username) AS username,
                        p.full_name, l.body AS last_message, l.created_at AS last_message_time,
                        (SELECT COUNT(*) FROM {self.db_schema}.user_messages m
-                        WHERE m.user_id = l.user_id AND (m.department = ANY($1::text[]) OR m.department IS NULL)
+                        WHERE m.user_id = l.user_id AND (m.department = ANY($1::text[]) OR ($3 AND m.department IS NULL))
                           AND m.direction = 'incoming' AND m.read_at IS NULL) AS unread_count,
                        EXISTS (SELECT 1 FROM {self.db_schema_admin}.manager_archived_chats a
                                WHERE a.manager_id = $2 AND a.user_id = l.user_id
@@ -3642,7 +3632,7 @@ class Database:
                 FROM newest l
                 LEFT JOIN {self.db_schema_config}.user_profiles p ON p.user_id = l.user_id
                 ORDER BY l.created_at DESC
-            """, departments, manager_id or 0)
+            """, departments, manager_id or 0, include_unassigned)
             result = [dict(row) for row in rows]
             for row in result:
                 if row['is_manual_unread'] and row['unread_count'] == 0:
@@ -3650,7 +3640,8 @@ class Database:
                 row['last_message'] = (row['last_message'] or '')[:100]
             return result
 
-    async def get_user_messages(self, user_id: int, limit: int = 100) -> list:
+    async def get_user_messages(self, user_id: int, departments: list[str],
+                                limit: int = 100, include_unassigned: bool = False) -> list:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(f"""
                 SELECT * FROM (
@@ -3658,33 +3649,34 @@ class Database:
                            message_text, file_type, file_id, created_at, read_at,
                            'message' AS source_type, NULL::text AS category, department
                     FROM {self.db_schema}.user_messages
-                    WHERE user_id = $1
+                    WHERE user_id = $1 AND (department = ANY($2::text[]) OR ($4 AND department IS NULL))
                     UNION ALL
                     SELECT id, user_id, username, NULL::integer, 'incoming', question,
                            NULL::text, NULL::text, created_at, NULL::timestamp,
                            'pr_question', category, 'pr'
-                    FROM {self.db_schema_pr}.pr_questions WHERE user_id = $1
+                    FROM {self.db_schema_pr}.pr_questions WHERE user_id = $1 AND 'pr' = ANY($2::text[])
                     UNION ALL
                     SELECT id, user_id, username, NULL::integer, 'incoming', question,
                            NULL::text, NULL::text, created_at, NULL::timestamp,
                            'event_question', category, 'event'
-                    FROM {self.db_schema_event}.event_questions WHERE user_id = $1
+                    FROM {self.db_schema_event}.event_questions WHERE user_id = $1 AND 'event' = ANY($2::text[])
                     UNION ALL
                     SELECT id, user_id, username, NULL::integer, 'incoming', question,
                            NULL::text, NULL::text, created_at, NULL::timestamp,
                            'travel_question', category, 'travel'
-                    FROM {self.db_schema_travel}.travel_questions WHERE user_id = $1
-                ) history ORDER BY created_at DESC, id DESC LIMIT $2
-            """, user_id, limit)
+                    FROM {self.db_schema_travel}.travel_questions WHERE user_id = $1 AND 'travel' = ANY($2::text[])
+                ) history ORDER BY created_at DESC, id DESC LIMIT $3
+            """, user_id, departments, limit, include_unassigned)
             return [dict(row) for row in rows]
 
-    async def mark_messages_read(self, user_id: int, manager_id: int, departments: list[str]) -> bool:
+    async def mark_messages_read(self, user_id: int, manager_id: int, departments: list[str],
+                                 include_unassigned: bool = False) -> bool:
         async with self.pool.acquire() as conn:
             await conn.execute(f"""
                 UPDATE {self.db_schema}.user_messages SET read_at = NOW(), manager_id = $1
-                WHERE user_id = $2 AND (department = ANY($3::text[]) OR department IS NULL)
+                WHERE user_id = $2 AND (department = ANY($3::text[]) OR ($4 AND department IS NULL))
                   AND direction = 'incoming' AND read_at IS NULL
-            """, manager_id, user_id, departments)
+            """, manager_id, user_id, departments, include_unassigned)
             await conn.execute(f"""
                 DELETE FROM {self.db_schema_admin}.manager_unread_chats
                 WHERE manager_id = $1 AND user_id = $2 AND department = 'chat'

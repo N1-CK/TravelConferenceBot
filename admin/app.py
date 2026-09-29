@@ -1301,6 +1301,10 @@ def chat_departments():
     return [d for d in session.get('groups', []) if d in ('pr', 'event', 'travel')]
 
 
+def can_view_unassigned_chat_messages():
+    return session.get('role') == 'admin'
+
+
 def chat_allowed(user_id, department, write=False):
     if write and department not in chat_departments():
         return False
@@ -1308,7 +1312,8 @@ def chat_allowed(user_id, department, write=False):
         return False
     if session.get('role') not in ('admin', 'manager'):
         return False
-    return run_async(db.has_chat(user_id, chat_departments())) is True
+    return run_async(db.has_chat(user_id, chat_departments(),
+                                 include_unassigned=can_view_unassigned_chat_messages())) is True
 
 
 def requested_chat_department():
@@ -1320,7 +1325,8 @@ def user_chats():
     if session.get('role') not in ('admin', 'manager'):
         abort(403)
     manager_id = session.get('manager_id', 0)
-    conversations = run_async(db.get_user_conversations(manager_id=manager_id, departments=chat_departments()))
+    conversations = run_async(db.get_user_conversations(manager_id=manager_id, departments=chat_departments(),
+                                                        include_unassigned=can_view_unassigned_chat_messages()))
     folders = run_async(db.get_manager_folders(manager_id=manager_id)) or []
     return render_template('user_chats.html', conversations=conversations, folders=folders)
 
@@ -1330,7 +1336,8 @@ def api_get_conversations():
     if session.get('role') not in ('admin', 'manager'):
         abort(403)
     manager_id = session.get('manager_id', 0)
-    conversations = run_async(db.get_user_conversations(manager_id=manager_id, departments=chat_departments()))
+    conversations = run_async(db.get_user_conversations(manager_id=manager_id, departments=chat_departments(),
+                                                        include_unassigned=can_view_unassigned_chat_messages()))
     for conv in conversations:
         if conv.get('last_message_time'):
             conv['last_message_time'] = conv['last_message_time'].isoformat()
@@ -1495,8 +1502,11 @@ def api_get_user_messages(user_id):
     department = requested_chat_department()
     if not chat_allowed(user_id, department):
         return jsonify({'error': 'Access denied'}), 403
-    messages = run_async(db.get_user_messages(user_id, limit=100))
+    departments = chat_departments()
+    messages = run_async(db.get_user_messages(user_id, departments, limit=100,
+                                               include_unassigned=can_view_unassigned_chat_messages()))
     user_data = run_async(db.get_user_data(user_id))
+    active_department = run_async(db.get_chat_department(user_id))
 
     formatted_messages = []
     for msg in messages:
@@ -1516,8 +1526,8 @@ def api_get_user_messages(user_id):
     return jsonify({
         'user_id': user_id,
         'department': department,
-        'allowed_departments': chat_departments(),
-        'active_department': run_async(db.get_chat_department(user_id)),
+        'allowed_departments': departments,
+        'active_department': active_department if active_department in departments else None,
         'username': user_data.get('username') if user_data else str(user_id),
         'full_name': user_data.get('full_name', ''),
         'messages': formatted_messages
@@ -1529,7 +1539,8 @@ def api_mark_messages_read(user_id):
     department = requested_chat_department()
     if not chat_allowed(user_id, department):
         return jsonify({'error': 'Access denied'}), 403
-    success = run_async(db.mark_messages_read(user_id, session.get('manager_id'), chat_departments()))
+    success = run_async(db.mark_messages_read(user_id, session.get('manager_id'), chat_departments(),
+                                              include_unassigned=can_view_unassigned_chat_messages()))
     return jsonify({'success': success})
 
 @app.route('/admin/send_message_to_user', methods=['POST'])
@@ -1659,7 +1670,8 @@ def api_send_message():
 @app.route('/api/file/<file_id>')
 @login_required
 def api_get_file(file_id):
-    if session.get('role') not in ('admin', 'manager') or not run_async(db.file_in_departments(file_id, chat_departments())):
+    if session.get('role') not in ('admin', 'manager') or not run_async(db.file_in_departments(
+            file_id, chat_departments(), include_unassigned=can_view_unassigned_chat_messages())):
         return 'Access denied', 403
     bot_token = os.getenv('TG_BOT_TOKEN')
     if not bot_token or not file_id:

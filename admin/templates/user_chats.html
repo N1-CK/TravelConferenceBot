@@ -241,6 +241,19 @@
     .message-sender { font-size: 0.75rem; font-weight: bold; margin-bottom: 3px; opacity: 0.9; }
     .message.outgoing .message-sender { color: #f8f9fa; }
     .message.incoming .message-sender { color: #4a5568; }
+    .message-department {
+        display: inline-block;
+        margin: 2px 0 5px;
+        padding: 2px 7px;
+        border-radius: 6px;
+        background: #dbeafe;
+        color: #1d4ed8;
+        font-size: 0.74rem;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+    }
+    .message-department.event { background: #dcfce7; color: #166534; }
+    .message-department.travel { background: #ffedd5; color: #9a3412; }
     .message-time-inline { font-size: 0.65rem; opacity: 0.7; float: right; margin-left: 10px; margin-top: 5px; }
 
     .emoji-dropdown {
@@ -260,6 +273,10 @@
     .emoji-item:hover { background: #f1f5f9; transform: scale(1.1); }
     .format-toolbar { position: relative; background: #f8f9fa; border-radius: 10px; padding: 4px 8px; display: inline-flex; gap: 6px; border: 1px solid #dee2e6; align-items: center; }
     .format-toolbar .btn { padding: 5px 9px; font-size: 0.85rem; border-radius: 8px; line-height: 1.2; }
+    .chat-controls { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .chat-controls .format-toolbar { margin-bottom: 0 !important; }
+    .department-picker { display: flex; align-items: center; gap: 8px; margin-left: auto; flex: 0 0 auto; }
+    .department-picker select { width: 110px; }
 
     .user-info-card {
         position: absolute;
@@ -456,10 +473,16 @@
             flex-wrap: nowrap !important;
             overflow-x: auto !important;
             padding: 2px 6px;
-            margin-bottom: 6px !important;
+            margin-bottom: 0 !important;
             gap: 4px;
-            width: 100%;
+            width: auto;
         }
+        .chat-controls { gap: 6px; }
+        .chat-controls .format-toolbar { flex: 1 1 auto; min-width: 0; }
+        .chat-controls .format-toolbar .btn { flex: 0 0 auto; padding: 5px 7px; }
+        .department-picker { margin-left: 0; gap: 0; }
+        .department-picker label { display: none; }
+        .department-picker select { width: 91px; min-width: 91px; }
 
         #chatEmojiPicker {
             position: fixed !important;
@@ -651,15 +674,8 @@
             </div>
 
             <div class="chat-input" id="chatInput" style="display: none;">
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <label class="small text-muted text-nowrap" for="sendDepartment">{{ get_text('send_from_department') }}:</label>
-                    <select id="sendDepartment" class="form-select form-select-sm" style="max-width: 170px;">
-                        {% if session.role == 'admin' or 'pr' in session.get('groups', []) %}<option value="pr">PR</option>{% endif %}
-                        {% if session.role == 'admin' or 'event' in session.get('groups', []) %}<option value="event">Event</option>{% endif %}
-                        {% if session.role == 'admin' or 'travel' in session.get('groups', []) %}<option value="travel">Travel</option>{% endif %}
-                    </select>
-                </div>
-                <div class="format-toolbar mb-2">
+                <div class="chat-controls mb-2">
+                  <div class="format-toolbar">
                     <button type="button" class="btn btn-outline-secondary" onclick="wrapChatText('<b>', '</b>')" title="{{ get_text('formatting_bold') }} (Ctrl+B)"><i class="bi bi-type-bold"></i></button>
                     <button type="button" class="btn btn-outline-secondary" onclick="wrapChatText('<i>', '</i>')" title="{{ get_text('formatting_italic') }} (Ctrl+I)"><i class="bi bi-type-italic"></i></button>
                     <button type="button" class="btn btn-outline-secondary" onclick="wrapChatText('<code>', '</code>')" title="{{ get_text('formatting_code') }}"><i class="bi bi-code-slash"></i></button>
@@ -693,6 +709,15 @@
                             <div class="emoji-item" onclick="insertChatEmoji('🙏')">🙏</div>
                         </div>
                     </div>
+                  </div>
+                  <div class="department-picker">
+                    <label class="small text-muted text-nowrap" for="sendDepartment">{{ get_text('send_from_department') }}:</label>
+                    <select id="sendDepartment" class="form-select form-select-sm" aria-label="{{ get_text('send_from_department') }}">
+                        {% if session.role == 'admin' or 'pr' in session.get('groups', []) %}<option value="pr">PR</option>{% endif %}
+                        {% if session.role == 'admin' or 'event' in session.get('groups', []) %}<option value="event">Event</option>{% endif %}
+                        {% if session.role == 'admin' or 'travel' in session.get('groups', []) %}<option value="travel">Travel</option>{% endif %}
+                    </select>
+                  </div>
                 </div>
 
                 <div id="chatPreview" class="mb-2 p-2" style="display: none; background: #f8f9fa; border-left: 4px solid #667eea; border-radius: 8px; font-size: 0.9em; max-height: 120px; overflow-y: auto;"></div>
@@ -716,7 +741,6 @@
                     </div>
                     <div class="d-flex justify-content-between px-2 mt-1">
                         <small class="text-muted"><span id="chatCharCounter">0 / 4000</span></small>
-                        <small class="text-muted"><i class="bi bi-code-slash"></i> {{ get_text('html_supported') }}</small>
                     </div>
                 </form>
             </div>
@@ -1668,11 +1692,14 @@
 
                     let content = `<div class="message-bubble">`;
                     content += `<div class="message-sender">${escapeHtml(senderDisplay)}</div>`;
-                    if (msg.department && !msg.source_type?.includes('_question')) content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">${escapeHtml(msg.department.toUpperCase())}</small><br>`;
+                    if (msg.department && !msg.source_type?.includes('_question')) {
+                        const deptClass = ['pr', 'event', 'travel'].includes(msg.department) ? msg.department : '';
+                        content += `<span class="message-department ${deptClass}">[${escapeHtml(msg.department.toUpperCase())}]</span><br>`;
+                    }
 
                     if (msg.source_type && msg.source_type.includes('_question')) {
                         const dept = msg.source_type.replace('_question', '').toUpperCase();
-                        content += `<small class="text-muted" style="color: inherit !important; opacity: 0.8;">[${locales.questionFrom} ${dept}]</small><br>${escapeHtml(msg.message_text)}`;
+                        content += `<span class="message-department ${escapeHtml(msg.department || '')}">[${locales.questionFrom} ${dept}]</span><br>${escapeHtml(msg.message_text)}`;
                     } else {
                         if (msg.files && msg.files.length > 0) {
                             const isSingle = msg.files.length === 1;
