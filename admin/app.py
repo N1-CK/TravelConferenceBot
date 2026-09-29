@@ -1,6 +1,11 @@
 import asyncio
 import csv
 import io
+import hashlib
+import json
+import tempfile
+import time
+from contextlib import asynccontextmanager
 import logging
 import mimetypes
 import os
@@ -92,8 +97,10 @@ def init_db():
     global _db_initialized
     if not _db_initialized:
         try:
-            run_async(db.create_pool())
-            run_async(db.create_managers_tables())
+            if not run_async(db.create_pool(), timeout=120):
+                raise RuntimeError('Database initialization failed')
+            if not run_async(db.create_managers_tables(), timeout=120):
+                raise RuntimeError('Managers tables initialization failed')
             _db_initialized = True
             print("✅ Database connection initialized")
             print("✅ Managers tables created")
@@ -166,11 +173,23 @@ class TelegramBot:
     def __init__(self, bot_token):
         self.bot_token = bot_token
         self.api_url = f"https://api.telegram.org/bot{bot_token}"
+        self._session = None
+
+    @asynccontextmanager
+    async def client_session(self):
+        import aiohttp
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=300, connect=20, sock_read=300),
+                connector=aiohttp.TCPConnector(limit=32, limit_per_host=16, ttl_dns_cache=300),
+            )
+        yield self._session
+
 
     async def send_message(self, chat_id, text, file=None):
         import aiohttp
         timeout = aiohttp.ClientTimeout(total=300, connect=20, sock_read=300)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with self.client_session() as session:
             if file:
                 ext = file.rsplit('.', 1)[-1].lower() if '.' in file else ''
                 if ext in {'ogg', 'oga', 'opus'}:
@@ -251,7 +270,7 @@ class TelegramBot:
 
             form_data.add_field('media', json.dumps(media_group))
 
-            async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with self.client_session() as session:
                 url = f"{self.api_url}/sendMediaGroup"
                 async with session.post(url, data=form_data) as resp:
                     res_json = await resp.json()
@@ -294,7 +313,7 @@ class TelegramBot:
 
             try:
                 html_message = message if message else ""
-                async with aiohttp.ClientSession() as session:
+                async with self.client_session() as session:
                     if files and len(files) > 0:
                         for idx, file_path in enumerate(files):
                             if os.path.exists(file_path):
@@ -457,9 +476,7 @@ def broadcast():
                 if not allowed_file(file.filename):
                     flash(f'Файл {file.filename} имеет запрещенный формат!', 'danger')
                     continue
-                filename = secure_filename(file.filename)
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(filepath)
+                filepath = save_chat_upload(file)
                 saved_files.append(filepath)
 
         if not message and not saved_files:
@@ -532,7 +549,7 @@ def broadcast():
 
         for filepath in saved_files:
             try:
-                os.remove(filepath)
+                remove_chat_upload(filepath)
             except Exception:
                 pass
 
@@ -1308,6 +1325,14 @@ def user_chats():
     folders = run_async(db.get_manager_folders(manager_id=manager_id)) or []
     return render_template('user_chats.html', conversations=conversations, folders=folders)
 
+def chat_json_response(payload):
+    response = jsonify(payload)
+    response.set_etag(hashlib.sha256(response.get_data()).hexdigest())
+    response.headers['Cache-Control'] = 'private, no-cache'
+    response.headers['Vary'] = 'Cookie'
+    return response.make_conditional(request)
+
+
 @app.route('/api/conversations')
 @login_required
 def api_get_conversations():
@@ -1316,7 +1341,7 @@ def api_get_conversations():
     for conv in conversations:
         if conv.get('last_message_time'):
             conv['last_message_time'] = conv['last_message_time'].isoformat()
-    return jsonify(conversations)
+    return chat_json_response(conversations)
 
 @app.route('/api/chat/<int:user_id>/toggle_unread', methods=['POST'])
 @login_required
@@ -1459,8 +1484,14 @@ def api_get_available_departments_for_forward(question_id):
 @app.route('/api/user_messages/<int:user_id>')
 @login_required
 def api_get_user_messages(user_id):
-    messages = run_async(db.get_user_messages(user_id, limit=100))
-    user_data = run_async(db.get_user_data(user_id))
+    async def fetch_chat():
+        return await asyncio.gather(db.get_user_messages(user_id, limit=100), db.get_user_data(user_id))
+
+    result = run_async(fetch_chat())
+    if result is None:
+        return chat_json_response({'error': 'Chat temporarily unavailable'}), 503
+    messages, user_data = result
+    user_data = user_data or {}
 
     formatted_messages = []
     for msg in messages:
@@ -1476,7 +1507,7 @@ def api_get_user_messages(user_id):
             'created_at': msg['created_at'].isoformat()
         })
 
-    return jsonify({
+    return chat_json_response({
         'user_id': user_id,
         'username': user_data.get('username') if user_data else str(user_id),
         'full_name': user_data.get('full_name', ''),
@@ -1506,9 +1537,7 @@ def send_message_to_user():
 
     filepath = None
     if uploaded_file and uploaded_file.filename:
-        filename = secure_filename(uploaded_file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        uploaded_file.save(filepath)
+        filepath = save_chat_upload(uploaded_file)
 
     try:
         tg_res = run_async(bot.send_message(chat_id=user_id, text=final_text, file=filepath))
@@ -1531,7 +1560,7 @@ def send_message_to_user():
         flash(f"{get_text('error_occurred')}: {e}", "danger")
     finally:
         if filepath and os.path.exists(filepath):
-            os.remove(filepath)
+            remove_chat_upload(filepath)
 
     return redirect(url_for('travel_panel'))
 
@@ -1550,27 +1579,29 @@ def api_send_message():
     if len(files) > 10:
         return jsonify({'success': False, 'error': 'Максимум 10 файлов за раз'}), 400
 
-    saved_files = []
-    for file in files:
-        if file and file.filename:
-            if not allowed_file(file.filename):
-                return jsonify({'success': False, 'error': f'Запрещенный формат: {file.filename}'}), 400
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            saved_files.append(filepath)
+    if any(file.filename and not allowed_file(file.filename) for file in files):
+        return jsonify({'success': False, 'error': 'Запрещенный формат файла'}), 400
+    if not message.strip() and not any(file.filename for file in files):
+        return jsonify({'success': False, 'error': 'Пустое сообщение'}), 400
 
+    saved_files = []
     try:
+        for file in files:
+            if file and file.filename:
+                saved_files.append(save_chat_upload(file))
         sender_name = session.get('full_name') or session.get('username') or 'Менеджер'
 
         if saved_files:
             tg_file_ids = run_async(bot.send_documents(user_id, message, saved_files), timeout=300)
+            if not tg_file_ids or len(tg_file_ids) != len(saved_files):
+                return jsonify({'success': False, 'error': 'Не удалось отправить вложения'}), 502
             messages_to_insert = []
             if tg_file_ids:
                 for idx, tg_file_id in enumerate(tg_file_ids):
                     text_to_save = message if idx == 0 else ""
                     messages_to_insert.append(
-                        (int(user_id), sender_name, 'outgoing', text_to_save, None, tg_file_id)
+                        (int(user_id), sender_name, 'outgoing', text_to_save,
+                         mimetypes.guess_type(saved_files[idx])[0], tg_file_id)
                     )
             if messages_to_insert:
                 run_async(db.save_user_messages_bulk(messages_to_insert), timeout=60)
@@ -1591,9 +1622,35 @@ def api_send_message():
         for fp in saved_files:
             try:
                 if os.path.exists(fp):
-                    os.remove(fp)
+                    remove_chat_upload(fp)
             except Exception:
                 pass
+
+def save_chat_upload(upload):
+    filename = secure_filename(upload.filename) or 'attachment'
+    extension = os.path.splitext(upload.filename)[1].lower()
+    if extension and not os.path.splitext(filename)[1]:
+        filename = 'attachment' + extension
+    # One directory per file prevents collisions between managers and duplicate names.
+    directory = tempfile.mkdtemp(prefix='tc-upload-', dir=app.config['UPLOAD_FOLDER'])
+    path = os.path.join(directory, filename)
+    try:
+        upload.save(path)
+    except Exception:
+        if os.path.exists(path):
+            os.remove(path)
+        os.rmdir(directory)
+        raise
+    return path
+
+
+def remove_chat_upload(path):
+    try:
+        os.remove(path)
+    finally:
+        if os.path.basename(os.path.dirname(path)).startswith('tc-upload-'):
+            os.rmdir(os.path.dirname(path))
+
 
 def resolve_file_metadata(file_path, content, content_type=None):
     """Recover image/PDF type when Telegram supplies a generic document path."""
@@ -1621,6 +1678,85 @@ def resolve_file_metadata(file_path, content, content_type=None):
     return filename, mime_type
 
 
+# The byte cache is shared by workers. Atomic replacement prevents partial reads.
+_FILE_LOCKS = [threading.Lock() for _ in range(64)]
+_FILE_CACHE_TTL = 86400
+_FILE_CACHE_MAX_BYTES = 512 * 1024 * 1024
+
+
+def cached_telegram_file(bot_token, file_id):
+    namespace = hashlib.sha256(bot_token.encode()).hexdigest()[:16]
+    directory = os.path.join(tempfile.gettempdir(), 'tc-media-' + namespace)
+    os.makedirs(directory, mode=0o700, exist_ok=True)
+    key = hashlib.sha256(file_id.encode()).hexdigest()
+    path = os.path.join(directory, key)
+    metadata_path = path + '.json'
+    with _FILE_LOCKS[int(key[:8], 16) % len(_FILE_LOCKS)]:
+        try:
+            with open(metadata_path, encoding='utf-8') as handle:
+                metadata = json.load(handle)
+            if os.path.exists(path) and time.time() - os.path.getmtime(path) < _FILE_CACHE_TTL:
+                return path, metadata['filename'], metadata['mime_type']
+        except (OSError, ValueError, KeyError):
+            pass
+
+        # Reclaim expired/old cached files; keep storage bounded without holding bytes in RAM.
+        entries = []
+        for item in os.scandir(directory):
+            if item.name.endswith('.json') or item.name.startswith('pending-'):
+                continue
+            try:
+                stat = item.stat()
+                entries.append((stat.st_mtime, stat.st_size, item.path))
+            except FileNotFoundError:
+                pass
+        total = sum(size for _, size, _ in entries)
+        for modified, size, candidate in sorted(entries):
+            if time.time() - modified < _FILE_CACHE_TTL and total <= _FILE_CACHE_MAX_BYTES - 50 * 1024 * 1024:
+                continue
+            for obsolete in (candidate, candidate + '.json'):
+                try:
+                    os.remove(obsolete)
+                except FileNotFoundError:
+                    pass
+            total -= size
+
+        with requests.Session() as http:
+            info = http.get(f"https://api.telegram.org/bot{bot_token}/getFile",
+                            params={'file_id': file_id}, timeout=20)
+            info.raise_for_status()
+            result = info.json()
+            if not result.get('ok'):
+                raise FileNotFoundError('Telegram file unavailable')
+            telegram_path = result['result']['file_path']
+            pending_path = None
+            try:
+                with http.get(f"https://api.telegram.org/file/bot{bot_token}/{telegram_path}",
+                              stream=True, timeout=60) as download:
+                    download.raise_for_status()
+                    prefix = b''
+                    with tempfile.NamedTemporaryFile(dir=directory, prefix='pending-', delete=False) as handle:
+                        pending_path = handle.name
+                        for chunk in download.iter_content(64 * 1024):
+                            if len(prefix) < 512:
+                                prefix += chunk[:512 - len(prefix)]
+                            handle.write(chunk)
+                    filename, mime_type = resolve_file_metadata(
+                        telegram_path, prefix, download.headers.get('Content-Type'))
+                os.replace(pending_path, path)
+                pending_path = None
+                with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=directory,
+                                                 prefix='pending-', delete=False) as handle:
+                    pending_path = handle.name
+                    json.dump({'filename': filename, 'mime_type': mime_type}, handle)
+                os.replace(pending_path, metadata_path)
+                pending_path = None
+                return path, filename, mime_type
+            finally:
+                if pending_path and os.path.exists(pending_path):
+                    os.remove(pending_path)
+
+
 @app.route('/api/file/<file_id>')
 @login_required
 def api_get_file(file_id):
@@ -1629,36 +1765,18 @@ def api_get_file(file_id):
         return "Ошибка конфигурации", 500
     if len(file_id) < 20:
         return "Этот файл был удален с сервера и не имеет ID в Telegram", 404
-
     try:
-        file_info_response = requests.get(
-            f"https://api.telegram.org/bot{bot_token}/getFile?file_id={file_id}",
-            timeout=20,
-        )
-        file_info_response.raise_for_status()
-        file_info = file_info_response.json()
-        if not file_info.get('ok'):
-            return "Файл не найден в Telegram", 404
-
-        file_path = file_info['result']['file_path']
-        download_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
-        file_data = requests.get(download_url, timeout=60)
-        file_data.raise_for_status()
-        filename, mime_type = resolve_file_metadata(
-            file_path, file_data.content, file_data.headers.get('Content-Type')
-        )
-        force_download = request.args.get('download') == '1'
-
-        response = send_file(
-            io.BytesIO(file_data.content),
-            mimetype=mime_type,
-            as_attachment=force_download,
-            download_name=filename
-        )
-        response.headers['Cache-Control'] = 'public, max-age=86400'
+        path, filename, mime_type = cached_telegram_file(bot_token, file_id)
+        response = send_file(path, mimetype=mime_type,
+                             as_attachment=request.args.get('download') == '1',
+                             download_name=filename, conditional=True, max_age=86400)
+        response.headers['Cache-Control'] = 'private, max-age=86400'
+        response.headers['Vary'] = 'Cookie'
         return response
+    except FileNotFoundError:
+        return "Файл не найден в Telegram", 404
     except Exception as e:
-        logger.error(f"Download/View error: {e}")
+        logger.error(f"Download/View error: {type(e).__name__}")
         return "Ошибка при загрузке файла", 500
 
 
