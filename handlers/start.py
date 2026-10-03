@@ -11,7 +11,7 @@ from typing import Union
 from utility.auth import check_whitelist
 from database import db
 from keyboards import get_main_menu_keyboard
-from utility.lang_utils import get_text_sync, get_user_lang, t
+from utility.lang_utils import get_text_sync, get_user_lang, t, format_main_menu_text
 
 router = Router()
 
@@ -69,13 +69,12 @@ async def cmd_start(message: Message, state: FSMContext):
 
         if selected_conf:
             # Конференция есть — показываем главное меню
-            welcome_text = await t(user_id, 'welcome')
-            text = f"{welcome_text}\n\nВыбранная конференция: *{selected_conf}*"
+            text = await format_main_menu_text(user_id, selected_conf=selected_conf)
 
             await message.answer(
                 text,
                 reply_markup=await get_main_menu_keyboard(user_id),
-                parse_mode="Markdown"
+                parse_mode=None
             )
         else:
             # Конференции нет — показываем выбор
@@ -296,7 +295,7 @@ async def process_conference_selection(callback: CallbackQuery, state: FSMContex
 
 @router.callback_query(F.data == "skip_conf_selection")
 async def skip_conference_selection(callback: CallbackQuery, state: FSMContext):
-    await show_main_menu_with_conf_button(callback.message, state)
+    await show_main_menu_with_conf_button(callback.message, state, callback.from_user.id)
 
 
 async def show_main_menu_with_conf_button(message: Message, state: FSMContext, user_id: int = None):
@@ -326,17 +325,17 @@ async def show_main_menu_with_conf_button(message: Message, state: FSMContext, u
 
     if selected_conf:
         conf_text = get_text_sync(lang, 'switch_conference')
-        welcome_text = f"{get_text_sync(lang, 'conference_selected', conference=selected_conf)}\n\n{get_text_sync(lang, 'main_menu_title')}"
     else:
         conf_text = get_text_sync(lang, 'select_conference_button')
-        welcome_text = get_text_sync(lang, 'main_menu_title')
+
+    welcome_text = await format_main_menu_text(user_id, selected_conf=selected_conf, include_welcome=False)
 
     builder.row(InlineKeyboardButton(text=conf_text, callback_data="show_conference_list"))
 
     await message.edit_text(
         welcome_text,
         reply_markup=builder.as_markup(),
-        parse_mode="Markdown" if selected_conf else None
+        parse_mode=None
     )
 
 
@@ -359,7 +358,7 @@ async def show_conference_list(callback: CallbackQuery, state: FSMContext):
 async def return_to_main_menu(callback: CallbackQuery, state: FSMContext):
     await state.clear()
 
-    text = await t(callback.from_user.id, 'welcome')
+    text = await format_main_menu_text(callback.from_user.id)
     markup = await get_main_menu_keyboard(callback.from_user.id)
 
     try:

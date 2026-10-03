@@ -4,7 +4,7 @@ import logging
 import os
 import re
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import asyncpg
 from dotenv import load_dotenv
@@ -98,7 +98,8 @@ class Database:
                 max_size=25
             )
 
-            await self.create_all_tables()
+            if not await self.create_all_tables():
+                raise RuntimeError("Database schema initialization failed")
             logger.info("Database pool created with all tables")
             return True
         except Exception as e:
@@ -489,6 +490,9 @@ class Database:
                     '''
                 ]
 
+                for table_sql in tables:
+                    await conn.execute(table_sql)
+
                 await conn.execute(f"""
                     CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.admin_users (
                         id SERIAL PRIMARY KEY,
@@ -547,6 +551,93 @@ class Database:
                     )
                 """)
 
+                async with conn.transaction():
+                    await conn.execute("SELECT pg_advisory_xact_lock(hashtext('chat_department_migration'))")
+                    # Зафиксировать прежнюю историю только при первом запуске обновления.
+                    # Повторный запуск не должен открывать Travel новые сообщения других отделов.
+                    await conn.execute(f"""
+                        CREATE TABLE IF NOT EXISTS {self.db_schema}.chat_history_watermarks (
+                            source TEXT PRIMARY KEY,
+                            max_id BIGINT NOT NULL,
+                            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+                        )
+                    """)
+                    for source, schema, table in (
+                        ('message', self.db_schema, 'user_messages'),
+                        ('pr_question', self.db_schema_pr, 'pr_questions'),
+                        ('event_question', self.db_schema_event, 'event_questions'),
+                        ('travel_question', self.db_schema_travel, 'travel_questions'),
+                    ):
+                        await conn.execute(f"""
+                            INSERT INTO {self.db_schema}.chat_history_watermarks (source, max_id)
+                            SELECT $1, COALESCE(MAX(id), 0) FROM {schema}.{table}
+                            ON CONFLICT (source) DO NOTHING
+                        """, source)
+                    # Не назначать старым сообщениям искусственный отдел.
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema}.user_messages
+                        ADD COLUMN IF NOT EXISTS department TEXT
+                    """)
+                    await conn.execute(f"""
+                        CREATE TABLE IF NOT EXISTS {self.db_schema}.user_chat_departments (
+                            user_id BIGINT PRIMARY KEY,
+                            department TEXT NOT NULL CHECK (department IN ('pr', 'event', 'travel')),
+                            updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+                        )
+                    """)
+                    await conn.execute(f"""
+                        CREATE INDEX IF NOT EXISTS idx_user_messages_department_user_time
+                        ON {self.db_schema}.user_messages(department, user_id, created_at DESC)
+                    """)
+                    for schema, table in (
+                        (self.db_schema_pr, 'pr_questions'),
+                        (self.db_schema_event, 'event_questions'),
+                        (self.db_schema_travel, 'travel_questions'),
+                    ):
+                        await conn.execute(f"""
+                            CREATE INDEX IF NOT EXISTS idx_{table}_user_created
+                            ON {schema}.{table}(user_id, created_at DESC)
+                        """)
+
+                    # Один диалог пользователя: сворачиваем прежние настройки по отделам.
+                    for table, pk in (
+                        ('manager_folder_items', 'folder_id'),
+                        ('manager_unread_chats', 'manager_id'),
+                        ('manager_archived_chats', 'manager_id'),
+                        ('manager_muted_chats', 'manager_id'),
+                    ):
+                        await conn.execute(f"""
+                            ALTER TABLE {self.db_schema_admin}.{table}
+                            ADD COLUMN IF NOT EXISTS department TEXT NOT NULL DEFAULT 'chat'
+                        """)
+                        await conn.execute(f"""
+                            ALTER TABLE {self.db_schema_admin}.{table}
+                            ALTER COLUMN department SET DEFAULT 'chat'
+                        """)
+                        await conn.execute(f"""
+                            DO $$ BEGIN
+                                IF (SELECT array_length(conkey, 1) FROM pg_constraint
+                                    WHERE conrelid = '{self.db_schema_admin}.{table}'::regclass
+                                      AND contype = 'p') = 2 THEN
+                                    ALTER TABLE {self.db_schema_admin}.{table}
+                                    DROP CONSTRAINT {table}_pkey;
+                                    ALTER TABLE {self.db_schema_admin}.{table}
+                                    ADD PRIMARY KEY ({pk}, user_id, department);
+                                END IF;
+                            END $$
+                        """)
+                        await conn.execute(f"""
+                            INSERT INTO {self.db_schema_admin}.{table} ({pk}, user_id, department)
+                            SELECT {pk}, user_id, 'chat'
+                            FROM {self.db_schema_admin}.{table}
+                            WHERE department <> 'chat'
+                            ON CONFLICT DO NOTHING
+                        """)
+                        await conn.execute(f"""
+                            DELETE FROM {self.db_schema_admin}.{table}
+                            WHERE department <> 'chat'
+                        """)
+
                 # Индексы для быстрого поиска
                 await conn.execute(f"""
                     CREATE INDEX IF NOT EXISTS idx_user_messages_user_id 
@@ -568,12 +659,6 @@ class Database:
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                     ON CONFLICT (username) DO NOTHING
                 """, default_admin, password_hash, 'Administrator', 'admin', True, True, True, True)
-
-                for table_sql in tables:
-                    try:
-                        await conn.execute(table_sql)
-                    except Exception as e:
-                        logger.warning(f"Table might already exist: {e}")
 
                 await conn.execute(f"""
                     ALTER TABLE {self.db_schema_travel}.travel_flight_request
@@ -665,7 +750,7 @@ class Database:
             logger.error(f"Error deleting folder: {e}")
             return False
 
-    async def toggle_user_in_folder(self, manager_id: int, folder_id: int, user_id: int) -> dict:
+    async def toggle_user_in_folder(self, manager_id: int, folder_id: int, user_id: int, department: str) -> dict:
         """Добавить/удалить чат пользователя из папки менеджера"""
         try:
             async with self.pool.acquire() as conn:
@@ -678,28 +763,28 @@ class Database:
 
                 exists = await conn.fetchval(f"""
                     SELECT 1 FROM {self.db_schema_admin}.manager_folder_items
-                    WHERE folder_id = $1 AND user_id = $2
-                """, folder_id, user_id)
+                    WHERE folder_id = $1 AND user_id = $2 AND department = $3
+                """, folder_id, user_id, department)
 
                 if exists:
                     await conn.execute(f"""
                         DELETE FROM {self.db_schema_admin}.manager_folder_items
-                        WHERE folder_id = $1 AND user_id = $2
-                    """, folder_id, user_id)
+                        WHERE folder_id = $1 AND user_id = $2 AND department = $3
+                    """, folder_id, user_id, department)
                     in_folder = False
                 else:
                     await conn.execute(f"""
-                        INSERT INTO {self.db_schema_admin}.manager_folder_items (folder_id, user_id)
-                        VALUES ($1, $2)
-                    """, folder_id, user_id)
+                        INSERT INTO {self.db_schema_admin}.manager_folder_items (folder_id, user_id, department)
+                        VALUES ($1, $2, $3)
+                    """, folder_id, user_id, department)
                     in_folder = True
 
                 folders = await conn.fetch(f"""
                     SELECT fi.folder_id
                     FROM {self.db_schema_admin}.manager_folder_items fi
                     JOIN {self.db_schema_admin}.manager_folders f ON fi.folder_id = f.id
-                    WHERE f.manager_id = $1 AND fi.user_id = $2
-                """, manager_id, user_id)
+                    WHERE f.manager_id = $1 AND fi.user_id = $2 AND fi.department = $3
+                """, manager_id, user_id, department)
 
                 return {
                     'in_folder': in_folder,
@@ -711,57 +796,57 @@ class Database:
             logger.error(f"Error toggling folder item: {e}")
             return {'error': str(e)}
 
-    async def toggle_chat_unread(self, manager_id: int, user_id: int) -> bool:
+    async def toggle_chat_unread(self, manager_id: int, user_id: int, department: str) -> bool:
         """Переключить статус 'Пометить как непрочитанное' для менеджера"""
         try:
             async with self.pool.acquire() as conn:
                 exists = await conn.fetchval(f"""
                     SELECT 1 FROM {self.db_schema_admin}.manager_unread_chats
-                    WHERE manager_id = $1 AND user_id = $2
-                """, manager_id, user_id)
+                    WHERE manager_id = $1 AND user_id = $2 AND department = $3
+                """, manager_id, user_id, department)
                 if exists:
                     await conn.execute(f"""
                         DELETE FROM {self.db_schema_admin}.manager_unread_chats
-                        WHERE manager_id = $1 AND user_id = $2
-                    """, manager_id, user_id)
+                        WHERE manager_id = $1 AND user_id = $2 AND department = $3
+                    """, manager_id, user_id, department)
                     return False  # Снята отметка
                 else:
                     await conn.execute(f"""
-                        INSERT INTO {self.db_schema_admin}.manager_unread_chats (manager_id, user_id)
-                        VALUES ($1, $2)
+                        INSERT INTO {self.db_schema_admin}.manager_unread_chats (manager_id, user_id, department)
+                        VALUES ($1, $2, $3)
                         ON CONFLICT DO NOTHING
-                    """, manager_id, user_id)
+                    """, manager_id, user_id, department)
                     return True  # Помечено как непрочитанное
         except Exception as e:
             logger.error(f"Error toggling chat unread: {e}")
             return False
 
-    async def toggle_chat_archive(self, manager_id: int, user_id: int) -> bool:
+    async def toggle_chat_archive(self, manager_id: int, user_id: int, department: str) -> bool:
         """Переключить архивный статус чата для менеджера"""
         try:
             async with self.pool.acquire() as conn:
                 exists = await conn.fetchval(f"""
                     SELECT 1 FROM {self.db_schema_admin}.manager_archived_chats
-                    WHERE manager_id = $1 AND user_id = $2
-                """, manager_id, user_id)
+                    WHERE manager_id = $1 AND user_id = $2 AND department = $3
+                """, manager_id, user_id, department)
                 if exists:
                     await conn.execute(f"""
                         DELETE FROM {self.db_schema_admin}.manager_archived_chats
-                        WHERE manager_id = $1 AND user_id = $2
-                    """, manager_id, user_id)
+                        WHERE manager_id = $1 AND user_id = $2 AND department = $3
+                    """, manager_id, user_id, department)
                     return False  # Разархивирован
                 else:
                     await conn.execute(f"""
-                        INSERT INTO {self.db_schema_admin}.manager_archived_chats (manager_id, user_id)
-                        VALUES ($1, $2)
+                        INSERT INTO {self.db_schema_admin}.manager_archived_chats (manager_id, user_id, department)
+                        VALUES ($1, $2, $3)
                         ON CONFLICT DO NOTHING
-                    """, manager_id, user_id)
+                    """, manager_id, user_id, department)
                     return True  # Архивирован
         except Exception as e:
             logger.error(f"Error toggling chat archive: {e}")
             return False
 
-    async def get_manager_user_folders_map(self, manager_id: int) -> dict:
+    async def get_manager_user_folders_map(self, manager_id: int, department: str) -> dict:
         """Получить карту {user_id: [folder_id, ...]} для текущего менеджера"""
         try:
             async with self.pool.acquire() as conn:
@@ -769,8 +854,8 @@ class Database:
                     SELECT fi.user_id, fi.folder_id
                     FROM {self.db_schema_admin}.manager_folder_items fi
                     JOIN {self.db_schema_admin}.manager_folders f ON fi.folder_id = f.id
-                    WHERE f.manager_id = $1
-                """, manager_id)
+                    WHERE f.manager_id = $1 AND fi.department = $2
+                """, manager_id, department)
                 res = {}
                 for r in rows:
                     uid = r['user_id']
@@ -2925,18 +3010,20 @@ class Database:
                         m.direction,
                         m.created_at,
                         'message' as type,
-                        NULL as department,
+                        m.department,
                         EXISTS(
                             SELECT 1 FROM {self.db_schema}.user_messages m2 
-                            WHERE m2.user_id = m.user_id 
+                            WHERE m2.user_id = m.user_id
+                              AND m2.department = m.department
                             AND m2.direction = 'incoming' 
                             AND m2.read_at IS NULL
                         ) as has_unread
                     FROM {self.db_schema}.user_messages m
                     WHERE m.direction = 'incoming'
+                      AND m.department = ANY($2::text[])
                     ORDER BY m.created_at DESC
                     LIMIT $1
-                """, limit)
+                """, limit, manager_groups)
 
                 all_questions.extend([dict(row) for row in messages])
                 all_questions.sort(key=lambda x: x['created_at'], reverse=True)
@@ -3427,266 +3514,247 @@ class Database:
             logger.error(f"Error getting managers: {e}")
             return []
 
+    async def set_chat_department(self, user_id: int, department: str) -> bool:
+        if department not in ('pr', 'event', 'travel'):
+            raise ValueError('Invalid department')
+        async with self.pool.acquire() as conn:
+            await conn.execute(f"""
+                INSERT INTO {self.db_schema}.user_chat_departments (user_id, department)
+                VALUES ($1, $2) ON CONFLICT (user_id) DO UPDATE
+                SET department = EXCLUDED.department, updated_at = NOW()
+            """, user_id, department)
+            return True
+
+    async def get_chat_department(self, user_id: int) -> Optional[str]:
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval(f"""
+                SELECT d.department
+                FROM {self.db_schema}.user_chat_departments d
+                WHERE d.user_id = $1
+                  AND GREATEST(
+                      d.updated_at,
+                      COALESCE((SELECT MAX(created_at) FROM {self.db_schema}.user_messages
+                                WHERE user_id = $1 AND department = d.department), d.updated_at),
+                      COALESCE((SELECT MAX(created_at) FROM {self.db_schema_pr}.pr_questions
+                                WHERE user_id = $1 AND d.department = 'pr'), d.updated_at),
+                      COALESCE((SELECT MAX(created_at) FROM {self.db_schema_event}.event_questions
+                                WHERE user_id = $1 AND d.department = 'event'), d.updated_at),
+                      COALESCE((SELECT MAX(created_at) FROM {self.db_schema_travel}.travel_questions
+                                WHERE user_id = $1 AND d.department = 'travel'), d.updated_at)
+                  ) >= NOW() - INTERVAL '24 hours'
+            """, user_id)
+
+    async def get_last_outgoing_department(self, user_id: int) -> Optional[str]:
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval(f"""
+                SELECT department FROM {self.db_schema}.user_messages
+                WHERE user_id = $1 AND direction = 'outgoing' AND department IS NOT NULL
+                ORDER BY created_at DESC, id DESC LIMIT 1
+            """, user_id)
+
+    def _chat_visibility(self, source: str, departments_param: str,
+                         history_param: str, alias: str = '') -> str:
+        """Shared visibility for lists, history, read receipts and attachments.
+
+        include_unassigned is enabled only for Travel/admin by the web layer.
+        It includes legacy messages and the fixed, pre-upgrade history.
+        """
+        if source not in ('message', 'pr_question', 'event_question', 'travel_question'):
+            raise ValueError('Invalid chat source')
+        prefix = f'{alias}.' if alias else ''
+        previous = (f"{prefix}id <= COALESCE((SELECT max_id FROM "
+                    f"{self.db_schema}.chat_history_watermarks WHERE source = '{source}'), 0)")
+        if source == 'message':
+            own_department = f'{prefix}department = ANY({departments_param}::text[])'
+            previous = f'{prefix}department IS NULL OR {previous}'
+        else:
+            own_department = f"'{source.removesuffix('_question')}' = ANY({departments_param}::text[])"
+        return f'({own_department} OR ({history_param} AND ({previous})))'
+
+    async def has_chat(self, user_id: int, departments: list[str], include_unassigned: bool = False) -> bool:
+        sources = (
+            (self.db_schema, 'user_messages', 'message'),
+            (self.db_schema_pr, 'pr_questions', 'pr_question'),
+            (self.db_schema_event, 'event_questions', 'event_question'),
+            (self.db_schema_travel, 'travel_questions', 'travel_question'),
+        )
+        query = ' UNION ALL '.join(
+            f"SELECT 1 FROM {schema}.{table} WHERE user_id = $1 "
+            f"AND {self._chat_visibility(source, '$2', '$3')}"
+            for schema, table, source in sources
+        )
+        async with self.pool.acquire() as conn:
+            return bool(await conn.fetchval(f'SELECT EXISTS ({query})', user_id, departments, include_unassigned))
+
+    async def file_in_departments(self, file_id: str, departments: list[str], include_unassigned: bool = False) -> bool:
+        async with self.pool.acquire() as conn:
+            return bool(await conn.fetchval(f"""
+                SELECT EXISTS (SELECT 1 FROM {self.db_schema}.user_messages
+                               WHERE file_id = $1
+                                 AND {self._chat_visibility('message', '$2', '$3')})
+            """, file_id, departments, include_unassigned))
+
     async def save_user_message(self, user_id: int, username: str,
                                 message_text: str = None, file_type: str = None,
-                                file_id: str = None, direction: str = 'incoming') -> int:
-        """Сохранить сообщение пользователя"""
-        try:
-            async with self.pool.acquire() as conn:
-                msg_id = await conn.fetchval(f"""
-                    INSERT INTO {self.db_schema}.user_messages 
-                    (user_id, username, direction, message_text, file_type, file_id, created_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, NOW())
-                    RETURNING id
-                """, user_id, username, direction, message_text, file_type, file_id)
-                return msg_id
-        except Exception as e:
-            logger.error(f"Error saving user message: {e}")
-            return 0
+                                file_id: str = None, direction: str = 'incoming',
+                                department: Optional[str] = None, manager_id: Optional[int] = None) -> int:
+        if department not in (None, 'pr', 'event', 'travel'):
+            raise ValueError('Invalid department')
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval(f"""
+                INSERT INTO {self.db_schema}.user_messages
+                (user_id, username, direction, message_text, file_type, file_id,
+                 department, manager_id, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW()) RETURNING id
+            """, user_id, username or str(user_id), direction, message_text,
+                 file_type, file_id, department, manager_id)
 
-    async def save_user_messages_bulk(self, messages_data: list) -> bool:
-        """Массовое сохранение сообщений за один запрос к БД"""
+    async def save_user_messages_bulk(self, messages_data: list, department: Optional[str] = None) -> bool:
         if not messages_data:
             return True
-        try:
-            async with self.pool.acquire() as conn:
-                query = f"""
-                    INSERT INTO {self.db_schema}.user_messages 
-                    (user_id, username, direction, message_text, file_type, file_id, created_at)
-                    VALUES ($1, $2, $3, $4, $5, $6, NOW())
-                """
-                await conn.executemany(query, messages_data)
-                return True
-        except Exception as e:
-            logger.error(f"Error bulk saving messages: {e}")
-            return False
+        if department not in (None, 'pr', 'event', 'travel'):
+            raise ValueError('Invalid department')
+        async with self.pool.acquire() as conn:
+            await conn.executemany(f"""
+                INSERT INTO {self.db_schema}.user_messages
+                (user_id, username, direction, message_text, file_type, file_id,
+                 department, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+            """, [tuple(row) + (department,) for row in messages_data])
+        return True
 
-    async def toggle_chat_mute(self, manager_id: int, user_id: int) -> bool:
-        """Переключить статус отключения уведомлений (mute/unmute)  для менеджера"""
-        try:
-            async with self.pool.acquire() as conn:
-                exists = await conn.fetchval(f"""
-                    SELECT 1 FROM {self.db_schema_admin}.manager_muted_chats
-                    WHERE manager_id = $1 AND user_id = $2
-                """, manager_id, user_id)
-                if exists:
-                    await conn.execute(f"""
-                        DELETE FROM {self.db_schema_admin}.manager_muted_chats
-                        WHERE manager_id = $1 AND user_id = $2
-                    """, manager_id, user_id)
-                    return False
-                else:
-                    await conn.execute(f"""
-                        INSERT INTO {self.db_schema_admin}.manager_muted_chats (manager_id, user_id)
-                        VALUES ($1, $2)
-                        ON CONFLICT DO NOTHING
-                    """, manager_id, user_id)
-                    return True
-        except Exception as e:
-            logger.error(f"Error toggling chat mute: {e}")
-            return False
-
-    async def get_user_conversations(self, manager_id: int = None) -> list:
-        """Получить список всех активных чатов с привязкой папок текущего менеджера"""
-        try:
-            async with self.pool.acquire() as conn:
-                messages = await conn.fetch(f"""
-                    SELECT 
-                        m.user_id,
-                        COALESCE(p.username, m.username) as username,
-                        p.full_name as full_name,
-                        m.created_at as last_message_time,
-                        m.message_text as last_message,
-                        COALESCE(unread.unread_count, 0) as unread_count
-                    FROM (
-                        SELECT DISTINCT ON (user_id) user_id, username, created_at, message_text
-                        FROM {self.db_schema}.user_messages
-                        ORDER BY user_id, created_at DESC, id DESC
-                    ) m
-                    LEFT JOIN {self.db_schema_config}.user_profiles p ON m.user_id = p.user_id
-                    LEFT JOIN (
-                        SELECT user_id, COUNT(*) as unread_count
-                        FROM {self.db_schema}.user_messages
-                        WHERE direction = 'incoming' AND read_at IS NULL
-                        GROUP BY user_id
-                    ) unread ON unread.user_id = m.user_id
-                """)
-
-                pr_questions = await conn.fetch(f"""
-                    SELECT 
-                        q.user_id,
-                        COALESCE(p.username, q.username) as username,
-                        p.full_name as full_name,
-                        q.created_at as last_message_time,
-                        q.question as last_message,
-                        0 as unread_count
-                    FROM (
-                        SELECT DISTINCT ON (user_id) user_id, username, created_at, question
-                        FROM {self.db_schema_pr}.pr_questions
-                        ORDER BY user_id, created_at DESC, id DESC
-                    ) q
-                    LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
-                """)
-
-                event_questions = await conn.fetch(f"""
-                    SELECT 
-                        q.user_id,
-                        COALESCE(p.username, q.username) as username,
-                        p.full_name as full_name,
-                        q.created_at as last_message_time,
-                        q.question as last_message,
-                        0 as unread_count
-                    FROM (
-                        SELECT DISTINCT ON (user_id) user_id, username, created_at, question
-                        FROM {self.db_schema_event}.event_questions
-                        ORDER BY user_id, created_at DESC, id DESC
-                    ) q
-                    LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
-                """)
-
-                travel_questions = await conn.fetch(f"""
-                    SELECT 
-                        q.user_id,
-                        COALESCE(p.username, q.username) as username,
-                        p.full_name as full_name,
-                        q.created_at as last_message_time,
-                        q.question as last_message,
-                        0 as unread_count
-                    FROM (
-                        SELECT DISTINCT ON (user_id) user_id, username, created_at, question
-                        FROM {self.db_schema_travel}.travel_questions
-                        ORDER BY user_id, created_at DESC, id DESC
-                    ) q
-                    LEFT JOIN {self.db_schema_config}.user_profiles p ON q.user_id = p.user_id
-                """)
-
-                folders_map = {}
-                if manager_id:
-                    folder_rows = await conn.fetch(f"""
-                        SELECT fi.user_id, fi.folder_id
-                        FROM {self.db_schema_admin}.manager_folder_items fi
-                        JOIN {self.db_schema_admin}.manager_folders f ON fi.folder_id = f.id
-                        WHERE f.manager_id = $1
-                    """, manager_id)
-                    for fr in folder_rows:
-                        folders_map.setdefault(fr['user_id'], []).append(fr['folder_id'])
-
-                all_users = {}
-                archived_set = set()
-                manual_unread_set = set()
-                muted_set = set()
-                if manager_id:
-                    # Загружаем архивированные чаты менеджера
-                    arch_rows = await conn.fetch(f"""
-                        SELECT user_id FROM {self.db_schema_admin}.manager_archived_chats WHERE manager_id = $1
-                    """, manager_id)
-                    archived_set = {r['user_id'] for r in arch_rows}
-
-                    # Загружаем чаты, помеченные менеджером вручную как непрочитанные
-                    unr_rows = await conn.fetch(f"""
-                        SELECT user_id FROM {self.db_schema_admin}.manager_unread_chats WHERE manager_id = $1
-                    """, manager_id)
-                    manual_unread_set = {r['user_id'] for r in unr_rows}
-
-                    mute_rows = await conn.fetch(f"""
-                            SELECT user_id FROM {self.db_schema_admin}.manager_muted_chats WHERE manager_id = $1
-                        """, manager_id)
-                    muted_set = {r['user_id'] for r in mute_rows}
-
-                def update_user_dict(row, prefix=""):
-                    user_id = row['user_id']
-                    msg_text = row['last_message'] or ''
-                    msg_preview = f"{prefix} {msg_text[:80]}" if prefix and msg_text else (
-                        msg_text[:100] if msg_text else '')
-                    is_manual_unread = user_id in manual_unread_set
-                    calculated_unread = row['unread_count'] + (
-                        1 if (is_manual_unread and row['unread_count'] == 0) else 0)
-
-                    if user_id not in all_users:
-                        all_users[user_id] = {
-                            'user_id': user_id,
-                            'username': row['username'],
-                            'full_name': row['full_name'],
-                            'last_message_time': row['last_message_time'],
-                            'last_message': msg_preview,
-                            'unread_count': calculated_unread,
-                            'is_manual_unread': is_manual_unread,
-                            'is_archived': user_id in archived_set,
-                            'is_muted': user_id in muted_set,
-                            'folder_ids': folders_map.get(user_id, [])
-                        }
-                    else:
-                        if row['last_message_time'] and (
-                                not all_users[user_id]['last_message_time'] or row['last_message_time'] >
-                                all_users[user_id]['last_message_time']):
-                            all_users[user_id]['last_message_time'] = row['last_message_time']
-                            all_users[user_id]['last_message'] = msg_preview
-                        all_users[user_id]['unread_count'] += row['unread_count']
-
-                for row in messages: update_user_dict(row)
-                for row in pr_questions: update_user_dict(row, "[Вопрос PR]")
-                for row in event_questions: update_user_dict(row, "[Вопрос EVENT]")
-                for row in travel_questions: update_user_dict(row, "[Вопрос TRAVEL]")
-
-                result = list(all_users.values())
-                result.sort(key=lambda x: x.get('last_message_time') or datetime.min, reverse=True)
-                return result
-        except Exception as e:
-            logger.error(f"Error getting conversations: {e}")
-            return []
-
-    async def get_user_messages(self, user_id: int, limit: int = 50) -> list:
-        """Fetch only the latest rows, with one round trip and stable ordering."""
-        try:
-            limit = max(1, min(int(limit), 500))
-            sources = [(self.db_schema, 'user_messages', 'message')]
-            sources.extend((schema, table, source) for schema, table, source in (
-                (self.db_schema_pr, 'pr_questions', 'pr_question'),
-                (self.db_schema_event, 'event_questions', 'event_question'),
-                (self.db_schema_travel, 'travel_questions', 'travel_question'),
-            ))
-            queries = []
-            for schema, table, source in sources:
-                fields = (
-                    "manager_id, direction, message_text, file_type, file_id, read_at, NULL::text as category"
-                    if source == 'message' else
-                    "NULL::integer as manager_id, 'incoming' as direction, question as message_text, "
-                    "NULL::text as file_type, NULL::text as file_id, NULL::timestamp as read_at, category"
-                )
-                queries.append(f"""(
-                    SELECT id, user_id, username, created_at, {fields}, '{source}' as source_type
-                    FROM {schema}.{table} WHERE user_id = $1
-                    ORDER BY created_at DESC, id DESC LIMIT $2
-                )""")
-            query = ' UNION ALL '.join(queries)
-            async with self.pool.acquire() as conn:
-                rows = await conn.fetch(
-                    f"SELECT * FROM ({query}) history "
-                    "ORDER BY created_at DESC, id DESC, source_type DESC LIMIT $2", user_id, limit
-                )
-                return [dict(row) for row in rows]
-        except Exception as e:
-            logger.error(f"Error getting messages: {e}")
-            return []
-
-    async def mark_messages_read(self, user_id: int, manager_id: int) -> bool:
-        """Отметить сообщения как прочитанные"""
-        try:
-            async with self.pool.acquire() as conn:
+    async def toggle_chat_mute(self, manager_id: int, user_id: int, department: str) -> bool:
+        async with self.pool.acquire() as conn:
+            exists = await conn.fetchval(f"""
+                SELECT 1 FROM {self.db_schema_admin}.manager_muted_chats
+                WHERE manager_id = $1 AND user_id = $2 AND department = $3
+            """, manager_id, user_id, department)
+            if exists:
                 await conn.execute(f"""
-                    UPDATE {self.db_schema}.user_messages
-                    SET read_at = NOW(), manager_id = $1
-                    WHERE user_id = $2 AND direction = 'incoming' AND read_at IS NULL
-                """, manager_id, user_id)
+                    DELETE FROM {self.db_schema_admin}.manager_muted_chats
+                    WHERE manager_id = $1 AND user_id = $2 AND department = $3
+                """, manager_id, user_id, department)
+                return False
+            await conn.execute(f"""
+                INSERT INTO {self.db_schema_admin}.manager_muted_chats
+                (manager_id, user_id, department) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING
+            """, manager_id, user_id, department)
+            return True
 
-                await conn.execute(f"""
-                    DELETE FROM {self.db_schema_admin}.manager_unread_chats
-                    WHERE manager_id = $1 AND user_id = $2
-                """, manager_id, user_id)
-                return True
-        except Exception as e:
-            logger.error(f"Error marking messages read: {e}")
-            return False
+    async def get_user_conversations(self, manager_id: int = None,
+                                     departments: list[str] = None,
+                                     include_unassigned: bool = False) -> list:
+        """One conversation per user, based on messages visible to this manager."""
+        departments = departments or []
+        if not departments and not include_unassigned:
+            return []
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(f"""
+                WITH activity AS (
+                    SELECT id, user_id, username, department, message_text AS body, created_at,
+                           'message'::text AS source_type
+                    FROM {self.db_schema}.user_messages
+                    WHERE {self._chat_visibility('message', '$1', '$3')}
+                    UNION ALL
+                    SELECT id, user_id, username, 'pr', question, created_at, 'pr_question'
+                    FROM {self.db_schema_pr}.pr_questions
+                    WHERE {self._chat_visibility('pr_question', '$1', '$3')}
+                    UNION ALL
+                    SELECT id, user_id, username, 'event', question, created_at, 'event_question'
+                    FROM {self.db_schema_event}.event_questions
+                    WHERE {self._chat_visibility('event_question', '$1', '$3')}
+                    UNION ALL
+                    SELECT id, user_id, username, 'travel', question, created_at, 'travel_question'
+                    FROM {self.db_schema_travel}.travel_questions
+                    WHERE {self._chat_visibility('travel_question', '$1', '$3')}
+                ), newest AS (
+                    SELECT DISTINCT ON (a.user_id) a.user_id, a.username, a.body, a.created_at, a.department
+                    FROM activity a
+                    ORDER BY a.user_id, a.created_at DESC, a.id DESC, a.source_type DESC
+                ), unread AS (
+                    SELECT m.user_id, COUNT(*) AS unread_count
+                    FROM {self.db_schema}.user_messages m
+                    WHERE {self._chat_visibility('message', '$1', '$3', 'm')}
+                      AND m.direction = 'incoming' AND m.read_at IS NULL
+                    GROUP BY m.user_id
+                )
+                SELECT l.user_id, 'chat' AS department, l.department AS latest_department,
+                       COALESCE(p.username, l.username) AS username,
+                       p.full_name, l.body AS last_message, l.created_at AS last_message_time,
+                       COALESCE(unread.unread_count, 0) AS unread_count,
+                       EXISTS (SELECT 1 FROM {self.db_schema_admin}.manager_archived_chats a
+                               WHERE a.manager_id = $2 AND a.user_id = l.user_id
+                                 AND a.department = 'chat') AS is_archived,
+                       EXISTS (SELECT 1 FROM {self.db_schema_admin}.manager_unread_chats u
+                               WHERE u.manager_id = $2 AND u.user_id = l.user_id
+                                 AND u.department = 'chat') AS is_manual_unread,
+                       EXISTS (SELECT 1 FROM {self.db_schema_admin}.manager_muted_chats mu
+                               WHERE mu.manager_id = $2 AND mu.user_id = l.user_id
+                                 AND mu.department = 'chat') AS is_muted,
+                       ARRAY(SELECT fi.folder_id FROM {self.db_schema_admin}.manager_folder_items fi
+                             JOIN {self.db_schema_admin}.manager_folders f ON f.id = fi.folder_id
+                             WHERE f.manager_id = $2 AND fi.user_id = l.user_id
+                               AND fi.department = 'chat') AS folder_ids
+                FROM newest l
+                LEFT JOIN unread ON unread.user_id = l.user_id
+                LEFT JOIN {self.db_schema_config}.user_profiles p ON p.user_id = l.user_id
+                ORDER BY l.created_at DESC
+            """, departments, manager_id or 0, include_unassigned)
+            result = [dict(row) for row in rows]
+            for row in result:
+                if row['is_manual_unread'] and row['unread_count'] == 0:
+                    row['unread_count'] = 1
+                row['last_message'] = (row['last_message'] or '')[:100]
+            return result
+
+    async def get_user_messages(self, user_id: int, departments: list[str],
+                                limit: int = 100, include_unassigned: bool = False) -> list:
+        """Bound each source before UNION, preserving develop's fast history query."""
+        limit = max(1, min(int(limit), 500))
+        sources = (
+            (self.db_schema, 'user_messages', 'message'),
+            (self.db_schema_pr, 'pr_questions', 'pr_question'),
+            (self.db_schema_event, 'event_questions', 'event_question'),
+            (self.db_schema_travel, 'travel_questions', 'travel_question'),
+        )
+        queries = []
+        for schema, table, source in sources:
+            fields = (
+                "manager_id, direction, message_text, file_type, file_id, read_at, "
+                "NULL::text AS category, department"
+                if source == 'message' else
+                "NULL::integer AS manager_id, 'incoming' AS direction, question AS message_text, "
+                "NULL::text AS file_type, NULL::text AS file_id, NULL::timestamp AS read_at, "
+                f"category, '{source.removesuffix('_question')}'::text AS department"
+            )
+            queries.append(f"""(
+                SELECT id, user_id, username, created_at, {fields}, '{source}' AS source_type
+                FROM {schema}.{table} WHERE user_id = $1
+                  AND {self._chat_visibility(source, '$2', '$4')}
+                ORDER BY created_at DESC, id DESC LIMIT $3
+            )""")
+        query = ' UNION ALL '.join(queries)
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                f'SELECT * FROM ({query}) history '
+                'ORDER BY created_at DESC, id DESC, source_type DESC LIMIT $3',
+                user_id, departments, limit, include_unassigned,
+            )
+            return [dict(row) for row in rows]
+
+    async def mark_messages_read(self, user_id: int, manager_id: int, departments: list[str],
+                                 include_unassigned: bool = False) -> bool:
+        async with self.pool.acquire() as conn:
+            await conn.execute(f"""
+                UPDATE {self.db_schema}.user_messages SET read_at = NOW(), manager_id = $1
+                WHERE user_id = $2 AND {self._chat_visibility('message', '$3', '$4')}
+                  AND direction = 'incoming' AND read_at IS NULL
+            """, manager_id, user_id, departments, include_unassigned)
+            await conn.execute(f"""
+                DELETE FROM {self.db_schema_admin}.manager_unread_chats
+                WHERE manager_id = $1 AND user_id = $2 AND department = 'chat'
+            """, manager_id, user_id)
+            return True
 
     async def close(self):
         """Закрыть пул соединений"""
