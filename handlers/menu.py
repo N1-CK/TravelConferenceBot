@@ -84,68 +84,105 @@ async def change_conference_handler(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@router.callback_query(F.data == "menu_pr")
-async def show_pr_menu(callback: CallbackQuery, state: FSMContext):
-    """Переход в раздел PR с локализацией и отображением конференции"""
+async def render_department_menu(update, state: FSMContext, department: str, cancelled=False):
+    """All department entry/return paths share the same screen and routing."""
     await state.clear()
-    user_id = callback.from_user.id
-    await db.set_chat_department(user_id, 'pr')
+    user_id = update.from_user.id
+    await db.set_chat_department(user_id, department)
     selected_conf = await db.get_selected_conference(user_id)
-
-    conf_text = f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}" if selected_conf else ""
-
-    await callback.message.edit_text(
-        f"{await t(user_id, 'pr_title')}{conf_text}",
-        reply_markup=await get_pr_menu_keyboard(user_id)
-    )
-
-
-@router.callback_query(F.data == "menu_event")
-async def show_event_menu(callback: CallbackQuery, state: FSMContext):
-    """Переход в раздел EVENT с локализацией и отображением конференции"""
-    await state.clear()
-    user_id = callback.from_user.id
-    await db.set_chat_department(user_id, 'event')
-    selected_conf = await db.get_selected_conference(user_id)
-
-    conf_text = f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}" if selected_conf else ""
-    text = f"{await t(user_id, 'event_title')}{conf_text}"
-    reply_markup = await get_event_menu_keyboard(user_id)
-
+    text = await t(user_id, f'{department}_title')
+    text += "\n\n" + await t(user_id, 'department_menu_prompt')
+    if selected_conf:
+        text += "\n\n" + await t(user_id, 'conference_selected', conference=selected_conf)
+    if cancelled:
+        text = await t(user_id, 'form_cancelled') + "\n\n" + text
+    keyboard_factory = {'pr': get_pr_menu_keyboard, 'event': get_event_menu_keyboard,
+                        'travel': get_travel_menu_keyboard}[department]
+    keyboard = await keyboard_factory(user_id)
+    if isinstance(update, Message):
+        await update.answer(text, reply_markup=keyboard)
+        return
     try:
-        await callback.message.edit_text(
-            text,
-            reply_markup=reply_markup
-        )
-    except TelegramBadRequest:
-        # Если редактирование текста невозможно (например, предыдущее сообщение было с фото стенда)
-        await callback.message.delete()
-        await callback.message.answer(
-            text,
-            reply_markup=reply_markup
-        )
+        await update.message.edit_text(text, reply_markup=keyboard)
+    except TelegramBadRequest as exc:
+        if 'message is not modified' not in str(exc).lower():
+            # A photo/document cannot be edited into a text menu.
+            try:
+                await update.message.edit_reply_markup(reply_markup=None)
+            except TelegramBadRequest:
+                pass
+            await update.message.answer(text, reply_markup=keyboard)
+    await update.answer()
 
 
-@router.callback_query(F.data == "menu_travel")
+@router.callback_query(F.data.in_({'menu_pr', 'pr_menu', 'back_to_menu_pr'}))
+async def show_pr_menu(callback: CallbackQuery, state: FSMContext):
+    await render_department_menu(callback, state, 'pr')
+
+
+@router.callback_query(F.data.in_({'menu_event', 'back_to_menu_event'}))
+async def show_event_menu(callback: CallbackQuery, state: FSMContext):
+    await render_department_menu(callback, state, 'event')
+
+
+@router.callback_query(F.data.in_({'menu_travel', 'travel_back_to_menu', 'back_to_menu_travel'}))
 async def show_travel_menu(callback: CallbackQuery, state: FSMContext):
-    """Переход в раздел TRAVEL с локализацией и отображением конференции"""
+    await render_department_menu(callback, state, 'travel')
+
+
+def form_department(current_state):
+    group = (current_state or '').split(':', 1)[0]
+    if group in {'PRBannerForm', 'BusinessCardsForm', 'PRQuestionForm'}:
+        return 'pr'
+    if group in {'EventTicketForm', 'EventQuestionForm', 'EventCertificateForm'}:
+        return 'event'
+    if group == 'TravelStates':
+        return 'travel'
+    return None
+
+
+@router.callback_query((F.data == 'cancel_form') | F.data.startswith('cancel_form:'))
+async def cancel_form(callback: CallbackQuery, state: FSMContext):
+    # New buttons carry their owner; old buttons resolve it from the active FSM.
+    department = callback.data.partition(':')[2]
+    if department not in {'pr', 'event', 'travel'}:
+        department = form_department(await state.get_state())
+    if not department:
+        department = await db.get_chat_department(callback.from_user.id)
+    if department in {'pr', 'event', 'travel'}:
+        await render_department_menu(callback, state, department, cancelled=True)
+    else:
+        await show_main_menu(callback, state)
+
+
+async def cancel_edit(message: Message, state: FSMContext):
+    """Handle /cancel before text handlers can consume it as a form answer."""
+    current_state = await state.get_state()
+    group = (current_state or '').split(':', 1)[0]
+    department = form_department(current_state)
     await state.clear()
-    user_id = callback.from_user.id
-    await db.set_chat_department(user_id, 'travel')
-    selected_conf = await db.get_selected_conference(user_id)
-    conf_text = (
-        f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}"
-        if selected_conf else ""
-    )
-    await callback.message.edit_text(
-        f"{await t(user_id, 'travel_title')}{conf_text}",
-        reply_markup=await get_travel_menu_keyboard(user_id)
-    )
+    if group == 'ProfileEditStates':
+        await message.answer(await t(message.from_user.id, 'cancel_edit'))
+        await show_profile_as_new_message(message)
+    elif group in {'BookingStates', 'ReportStates', 'AffiliateAuthStates'}:
+        from handlers.dinner.affiliate_integrated import show_affiliate_main_menu
+        if group == 'AffiliateAuthStates':
+            from handlers.start import cmd_start
+            await cmd_start(message, state)
+        else:
+            await db.set_chat_department(message.from_user.id, 'pr')
+            await show_affiliate_main_menu(message)
+    elif department:
+        await render_department_menu(message, state, department, cancelled=True)
+    else:
+        from handlers.start import cmd_start
+        await cmd_start(message, state)
 
 
 @router.callback_query(F.data == "menu_profile")
-async def show_profile(callback: CallbackQuery):
+async def show_profile(callback: CallbackQuery, state: FSMContext):
     """Показать профиль пользователя с данными из БД"""
+    await state.clear()
     user_id = callback.from_user.id
     username = callback.from_user.username
     lang = await get_user_lang(user_id)
@@ -225,9 +262,9 @@ async def show_profile(callback: CallbackQuery):
 
 
 @router.callback_query(F.data == "profile_refresh")
-async def refresh_profile(callback: CallbackQuery):
+async def refresh_profile(callback: CallbackQuery, state: FSMContext):
     """Обновить отображение профиля"""
-    await show_profile(callback)
+    await show_profile(callback, state)
 
 
 @router.callback_query(F.data == "menu_help")
@@ -265,7 +302,6 @@ async def edit_name_start(callback: CallbackQuery, state: FSMContext):
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
-
 
 
 @router.message(ProfileEditStates.waiting_for_fullname)
@@ -481,7 +517,7 @@ async def process_language_edit(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(confirm_text)
 
         # Возвращаемся к профилю
-        await show_profile(callback)
+        await show_profile(callback, state)
 
     except Exception as e:
         logger.error(f"Error updating language: {e}")
@@ -586,12 +622,3 @@ async def pr_conference_bot_handler(callback: CallbackQuery):
 
 
 # Обработчик отмены
-@router.message(lambda message: message.text == "/cancel")
-async def cancel_edit(message: Message, state: FSMContext):
-    """Отмена редактирования"""
-    current_state = await state.get_state()
-    if current_state is not None:
-        await state.clear()
-        await message.answer(await t(message.from_user.id, 'cancel_edit'))
-        # Показываем профиль
-        await show_profile_as_new_message(message)

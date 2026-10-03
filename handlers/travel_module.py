@@ -12,7 +12,6 @@ from handlers.managers_chat import send_question_to_manager, get_manager_chat_id
 
 from database import db
 import os
-from keyboards import get_travel_menu_keyboard
 from utility.lang_utils import t
 
 TRAVEL_MANAGER_CHAT_ID = int(os.getenv("TG_TRAVEL_MANAGER_CHAT_ID", "0"))
@@ -68,15 +67,15 @@ class TravelStates(StatesGroup):
 # КЛАВИАТУРЫ
 # ============================================
 
-def get_form_back_keyboard(back_to: str, user_id: int = None) -> InlineKeyboardMarkup:
+async def get_form_back_keyboard(back_to: str, user_id: int = None) -> InlineKeyboardMarkup:
     """Универсальная клавиатура для форм с локализацией"""
     builder = InlineKeyboardBuilder()
 
-    # Функция для получения текста будет вызвана в обработчике
-    # Здесь просто создаем кнопки с placeholder, текст заменим позже
+    back_text = await t(user_id, 'back') if user_id else '◀️ Назад'
+    main_text = await t(user_id, 'main_menu') if user_id else '🏠 Главное меню'
     builder.row(
-        InlineKeyboardButton(text="◀️", callback_data=back_to),
-        InlineKeyboardButton(text="🏠", callback_data="menu_main")
+        InlineKeyboardButton(text=back_text, callback_data=back_to),
+        InlineKeyboardButton(text=main_text, callback_data="menu_main")
     )
     return builder.as_markup()
 
@@ -137,36 +136,6 @@ def get_flight_choice_keyboard(flights: List[Dict], user_id: int = None) -> Inli
 # ============================================
 # ГЛАВНОЕ МЕНЮ
 # ============================================
-
-@router.callback_query(F.data == "menu_travel")
-async def show_travel_menu(callback: CallbackQuery, state: FSMContext):
-    """Показать главное меню TRAVEL"""
-    await state.set_state(TravelStates.english)
-    user_id = callback.from_user.id
-
-    # Получаем выбранную конференцию
-    selected_conf = await db.get_selected_conference(user_id)
-    conf_text = f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}" if selected_conf else ""
-
-    await callback.message.edit_text(
-        f"{await t(user_id, 'travel_welcome')}{conf_text}",
-        reply_markup=await get_travel_menu_keyboard(user_id)
-    )
-
-
-@router.callback_query(F.data == "travel_back_to_menu")
-async def back_to_travel_menu(callback: CallbackQuery, state: FSMContext):
-    """Вернуться в главное меню TRAVEL"""
-    await state.set_state(TravelStates.english)
-    user_id = callback.from_user.id
-
-    selected_conf = await db.get_selected_conference(user_id)
-    conf_text = f"\n\n{await t(user_id, 'conference_selected', conference=selected_conf)}" if selected_conf else ""
-
-    await callback.message.edit_text(
-        f"{await t(user_id, 'travel_welcome')}{conf_text}",
-        reply_markup=await get_travel_menu_keyboard(user_id)
-    )
 
 
 # ============================================
@@ -368,7 +337,7 @@ async def show_visa_support(callback: CallbackQuery, state: FSMContext):
     )
 
 
-@router.callback_query(F.data.startswith("visa_"))
+@router.callback_query(F.data.in_({"visa_have", "visa_not_have", "visa_special"}))
 async def process_visa_status(callback: CallbackQuery, state: FSMContext):
     """Обработка статуса визы"""
     user_id = callback.from_user.id
@@ -498,7 +467,7 @@ async def process_passport_consent(callback: CallbackQuery, state: FSMContext):
         )
     else:
         await state.set_state(TravelStates.waiting_for_first_name)
-        keyboard = get_form_back_keyboard("travel_visa_support", user_id)
+        keyboard = await get_form_back_keyboard("travel_visa_support", user_id)
         await callback.message.edit_text(
             await t(user_id, 'passport_step1'),
             reply_markup=keyboard
@@ -539,13 +508,13 @@ async def ask_departure_city(update: Union[Message, CallbackQuery], state: FSMCo
         user_id = update.from_user.id
         await update.answer(
             await t(user_id, 'passport_step9'),
-            reply_markup=get_form_back_keyboard("travel_visa_support", user_id)
+            reply_markup=await get_form_back_keyboard("back_to_expiry_date", user_id)
         )
     else:
         user_id = update.from_user.id
         await update.message.edit_text(
             await t(user_id, 'passport_step9'),
-            reply_markup=get_form_back_keyboard("travel_visa_support", user_id)
+            reply_markup=await get_form_back_keyboard("back_to_expiry_date", user_id)
         )
 
 
@@ -557,7 +526,7 @@ async def process_first_name(message: Message, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_last_name)
     await message.answer(
         await t(user_id, 'passport_step2'),
-        reply_markup=get_form_back_keyboard("travel_visa_support", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_first_name", user_id)
     )
 
 
@@ -569,7 +538,7 @@ async def process_last_name(message: Message, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_phone)
     await message.answer(
         await t(user_id, 'passport_step3'),
-        reply_markup=get_form_back_keyboard("back_to_first_name", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_last_name", user_id)
     )
 
 
@@ -581,7 +550,7 @@ async def process_phone(message: Message, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_passport_number)
     await message.answer(
         await t(user_id, 'passport_step4'),
-        reply_markup=get_form_back_keyboard("back_to_last_name", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_phone", user_id)
     )
 
 
@@ -593,7 +562,7 @@ async def process_passport_number(message: Message, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_birth_date)
     await message.answer(
         await t(user_id, 'passport_step5'),
-        reply_markup=get_form_back_keyboard("back_to_phone", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_passport_number", user_id)
     )
 
 
@@ -608,7 +577,7 @@ async def process_birth_date(message: Message, state: FSMContext):
         await state.set_state(TravelStates.waiting_for_passport_country)
         await message.answer(
             await t(user_id, 'passport_step6'),
-            reply_markup=get_form_back_keyboard("back_to_passport_number", user_id)
+            reply_markup=await get_form_back_keyboard("back_to_birth_date", user_id)
         )
     except ValueError:
         await message.answer(await t(user_id, 'error_wrong_date_format'))
@@ -622,7 +591,7 @@ async def process_passport_country(message: Message, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_issue_date)
     await message.answer(
         await t(user_id, 'passport_step7'),
-        reply_markup=get_form_back_keyboard("back_to_birth_date", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_passport_country", user_id)
     )
 
 
@@ -636,7 +605,7 @@ async def process_issue_date(message: Message, state: FSMContext):
         await state.set_state(TravelStates.waiting_for_expiry_date)
         await message.answer(
             await t(user_id, 'passport_step8'),
-            reply_markup=get_form_back_keyboard("back_to_passport_country", user_id)
+            reply_markup=await get_form_back_keyboard("back_to_issue_date", user_id)
         )
     except ValueError:
         await message.answer(await t(user_id, 'error_wrong_date_format'))
@@ -662,7 +631,7 @@ async def process_departure_from(message: Message, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_return_to)
     await message.answer(
         await t(user_id, 'passport_step10'),
-        reply_markup=get_form_back_keyboard("back_to_departure_from", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_departure_from", user_id)
     )
 
 
@@ -1199,7 +1168,7 @@ async def back_to_first_name(callback: CallbackQuery, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_first_name)
     await callback.message.edit_text(
         await t(user_id, 'passport_step1'),
-        reply_markup=get_form_back_keyboard("travel_back_to_menu", user_id)
+        reply_markup=await get_form_back_keyboard("travel_visa_support", user_id)
     )
 
 
@@ -1210,7 +1179,7 @@ async def back_to_last_name(callback: CallbackQuery, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_last_name)
     await callback.message.edit_text(
         await t(user_id, 'passport_step2'),
-        reply_markup=get_form_back_keyboard("back_to_first_name", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_first_name", user_id)
     )
 
 
@@ -1221,7 +1190,7 @@ async def back_to_phone(callback: CallbackQuery, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_phone)
     await callback.message.edit_text(
         await t(user_id, 'passport_step3'),
-        reply_markup=get_form_back_keyboard("back_to_last_name", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_last_name", user_id)
     )
 
 
@@ -1232,7 +1201,7 @@ async def back_to_passport_number(callback: CallbackQuery, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_passport_number)
     await callback.message.edit_text(
         await t(user_id, 'passport_step4'),
-        reply_markup=get_form_back_keyboard("back_to_phone", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_phone", user_id)
     )
 
 
@@ -1243,7 +1212,7 @@ async def back_to_birth_date(callback: CallbackQuery, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_birth_date)
     await callback.message.edit_text(
         await t(user_id, 'passport_step5'),
-        reply_markup=get_form_back_keyboard("back_to_passport_number", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_passport_number", user_id)
     )
 
 
@@ -1254,7 +1223,7 @@ async def back_to_passport_country(callback: CallbackQuery, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_passport_country)
     await callback.message.edit_text(
         await t(user_id, 'passport_step6'),
-        reply_markup=get_form_back_keyboard("back_to_birth_date", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_birth_date", user_id)
     )
 
 
@@ -1265,7 +1234,7 @@ async def back_to_issue_date(callback: CallbackQuery, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_issue_date)
     await callback.message.edit_text(
         await t(user_id, 'passport_step7'),
-        reply_markup=get_form_back_keyboard("back_to_passport_country", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_passport_country", user_id)
     )
 
 
@@ -1276,7 +1245,7 @@ async def back_to_expiry_date(callback: CallbackQuery, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_expiry_date)
     await callback.message.edit_text(
         await t(user_id, 'passport_step8'),
-        reply_markup=get_form_back_keyboard("back_to_issue_date", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_issue_date", user_id)
     )
 
 
@@ -1287,7 +1256,7 @@ async def back_to_departure_from(callback: CallbackQuery, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_departure_from)
     await callback.message.edit_text(
         await t(user_id, 'passport_step9'),
-        reply_markup=get_form_back_keyboard("back_to_expiry_date", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_expiry_date", user_id)
     )
 
 
@@ -1298,7 +1267,7 @@ async def back_to_return_to(callback: CallbackQuery, state: FSMContext):
     await state.set_state(TravelStates.waiting_for_return_to)
     await callback.message.edit_text(
         await t(user_id, 'passport_step10'),
-        reply_markup=get_form_back_keyboard("back_to_departure_from", user_id)
+        reply_markup=await get_form_back_keyboard("back_to_departure_from", user_id)
     )
 
 

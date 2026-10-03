@@ -109,11 +109,12 @@ COMMON_TEXTS = {
         # PR РАЗДЕЛ
         # ============================================
         'pr_title': "📢 Раздел PR",
+        'department_menu_prompt': "Выберите действие или задайте вопрос отделу:",
         'pr_banner': "🎨 Баннер",
         'pr_business_cards': "📇 Визитки",
         'pr_dinner': "🍽 Партнерский ужин",
-        'pr_conference_bot': "🤖 Бот на конференцию",
-        'pr_conference_rules': "📝 Правила поведения",
+        'pr_conference_bot': "🤖 Бот конференции",
+        'pr_conference_rules': "📝 Правила",
         'pr_question': "❓ Вопрос PR",
         'pr_banner_form_title': "🎨 Заказ баннера для соцсетей",
         'pr_banner_step1': "Шаг 1 из 5\nУкажите ваше имя и фамилию:",
@@ -149,7 +150,7 @@ COMMON_TEXTS = {
         'pr_question_too_long': "❌ *Вопрос слишком длинный*\n\nМаксимальная длина вопроса - 500 символов.\nПожалуйста, сократите ваш вопрос и попробуйте снова.",
 
         # PR Conference Bot
-        'pr_conference_bot_title': "🤖 Бот на конференцию",
+        'pr_conference_bot_title': "🤖 Бот конференции",
         'pr_conference_bot_no_conferences': "У вас нет активных конференций. Обратитесь к администратору.",
         'pr_conference_bot_description': "Выберите конференцию, чтобы перейти в её бота:\n\n📌 *Примечание:* Боты содержат актуальную информацию о расписании,\nспикерах, локациях и другие важные материалы.\n\n👇 Нажмите на кнопку с нужной конференцией:",
         'pr_conference_bot_button': "🤖 {conference}",
@@ -193,7 +194,7 @@ COMMON_TEXTS = {
         # EVENT РАЗДЕЛ
         # ============================================
         'event_title': "🎪 Раздел EVENT",
-        'event_ticket': "🎫 Билет на конференцию",
+        'event_ticket': "🎫 Запрос билета",
         'event_booth': "ℹ️ О стенде",
         'event_info': "ℹ️ О конференции",
         'event_question': "❓ Вопрос Event департаменту",
@@ -582,6 +583,7 @@ COMMON_TEXTS = {
         # PR SECTION
         # ============================================
         'pr_title': "📢 PR Section",
+        'department_menu_prompt': "Choose an action or ask the department a question:",
         'pr_banner': "🎨 Banner",
         'pr_business_cards': "📇 Business Cards",
         'pr_dinner': "🍽 Partner Dinner",
@@ -675,7 +677,7 @@ COMMON_TEXTS = {
         # ============================================
         'event_title': "🎪 EVENT Section",
         'event_ticket': "🎫 Conference Ticket",
-        'event_booth': "ℹ️ Booth information",
+        'event_booth': "ℹ️ About booth",
         'event_info': "ℹ️ Event info",
         'event_question': "❓Question to Event Department",
 

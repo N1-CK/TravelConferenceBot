@@ -33,6 +33,7 @@ async def get_main_menu_keyboard(user_id: int = None) -> InlineKeyboardMarkup:
         help_text = get_text_sync(lang, 'help')
         profile_text = get_text_sync(lang, 'my_profile')
     else:
+        lang = 'ru'
         pr_text = "📢 PR"
         event_text = "🎪 EVENT"
         travel_text = "✈️ TRAVEL"
@@ -139,7 +140,12 @@ async def get_back_next_keyboard(back_to: str, next_disabled: bool = False,
 
     if cancel:
         cancel_text = get_text_sync(lang, 'cancel')
-        builder.row(InlineKeyboardButton(text=cancel_text, callback_data="cancel_form"))
+        # Keep the owner on the button, even if another form is opened later.
+        department = ('event' if back_to.startswith(('menu_event', 'event_', 'ticket_'))
+                      else 'pr' if back_to.startswith(('pr_', 'menu_pr', 'banner_', 'business_cards_'))
+                      else 'travel' if back_to.startswith(('travel_', 'visa_')) else None)
+        cancel_callback = f"cancel_form:{department}" if department else "cancel_form"
+        builder.row(InlineKeyboardButton(text=cancel_text, callback_data=cancel_callback))
 
     return builder.as_markup()
 
