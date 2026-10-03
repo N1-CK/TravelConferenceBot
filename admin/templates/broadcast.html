@@ -128,6 +128,9 @@
         font-size: 0.85rem;
     }
     .recipient-item:last-child { border-bottom: none; }
+    #conferenceRecipientList .recipient-item { cursor: pointer; margin: 0; }
+    .conference-user-checkbox { width: 18px; height: 18px; flex-shrink: 0; }
+    #conferenceRecipientPreview .action-buttons { flex-wrap: wrap; }
     .recipient-avatar {
         width: 28px;
         height: 28px;
@@ -453,9 +456,13 @@
                         {% endfor %}
                     </div>
                     <div id="conferenceRecipientPreview" class="recipient-preview" style="display: none;">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="stats-badge"><i class="bi bi-people-fill"></i> <span id="conferenceCount">0</span> {{ get_text('participants_count') }}</span>
-                            <button type="button" class="btn-soft btn-sm" onclick="toggleConferencePreview()"><i class="bi bi-eye-slash"></i> {{ get_text('hide') }}</button>
+                        <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-2">
+                            <span class="stats-badge"><i class="bi bi-people-fill"></i> {{ get_text('selected') }}: <span id="conferenceCount">0</span> / <span id="conferenceTotal">0</span></span>
+                            <div class="action-buttons">
+                                <button type="button" class="btn-soft btn-sm" onclick="selectConferenceUsers(true)">{{ get_text('select_all') }}</button>
+                                <button type="button" class="btn-soft btn-sm" onclick="selectConferenceUsers(false)">{{ get_text('clear_all') }}</button>
+                                <button type="button" class="btn-soft btn-sm" onclick="toggleConferencePreview(this)"><i class="bi bi-eye-slash"></i> {{ get_text('hide') }}</button>
+                            </div>
                         </div>
                         <div id="conferenceRecipientList" class="recipient-list"></div>
                     </div>
@@ -523,11 +530,6 @@
                 </div>
             </div>
 
-            <div class="alert-modern mt-3" style="background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 20px; padding: 1rem;">
-                <i class="bi bi-exclamation-triangle-fill fs-4" style="color: #f59e0b;"></i>
-                <div><strong>{{ get_text('warning') }}!</strong><br>{{ get_text('broadcast_warning') }}</div>
-            </div>
-
             <div class="footer-actions">
                 <!-- Кнопка "Отмена" удалена - оставлена только кнопка отправки -->
                 <button type="submit" class="btn-modern-primary" id="submitBtn"><i class="bi bi-send-fill me-2"></i> {{ get_text('send_broadcast') }}</button>
@@ -542,6 +544,8 @@
     let currentCompanyRecipients = [];
     let currentConferenceRecipients = [];
     let currentConferenceUsers = [];
+    let conferenceRecipientsRequest = 0;
+    let conferenceRecipientsLoading = false;
     let allUsers = {{ users|tojson }};
 
     function escapeHtml(value) {
@@ -662,64 +666,75 @@
     // CONFERENCE RECIPIENTS PREVIEW - ИСПРАВЛЕНО
     // ============================================
     async function updateConferenceRecipients() {
+        const requestId = ++conferenceRecipientsRequest;
+        const previouslySelected = new Set(Array.from(document.querySelectorAll('.conference-user-checkbox:checked')).map(cb => cb.value));
         const selected = Array.from(document.querySelectorAll('#conferenceCheckboxes input[type="checkbox"]:checked')).map(cb => cb.value);
+        currentConferenceUsers = [];
+        renderConferencePreview(previouslySelected);
+        conferenceRecipientsLoading = selected.length > 0;
         if (selected.length === 0) {
             document.getElementById('conferenceRecipientPreview').style.display = 'none';
-            document.getElementById('conferenceCount').textContent = '0';
             return;
         }
 
         try {
-            // Получаем количество участников
-            const countResponse = await fetch('/api/users/count', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ conferences: selected })
-            });
-            const countData = await countResponse.json();
-            document.getElementById('conferenceCount').textContent = countData.count;
-
             // Получаем детальный список участников конференций
             const usersResponse = await fetch('/api/users/by_conferences', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ conferences: selected })
             });
+            if (!usersResponse.ok) throw new Error('Failed to load participants');
             const usersData = await usersResponse.json();
-            currentConferenceUsers = usersData;
-            renderConferencePreview();
+            if (requestId !== conferenceRecipientsRequest) return;
+            currentConferenceUsers = Array.from(new Map(usersData.map(user => [String(user.user_id), user])).values());
+            renderConferencePreview(previouslySelected);
             document.getElementById('conferenceRecipientPreview').style.display = 'block';
-        } catch(e) { console.error('Error loading conference recipients:', e); }
+        } catch(e) {
+            if (requestId === conferenceRecipientsRequest) alert(broadcastLocales.selectUserWarning);
+            console.error('Error loading conference recipients:', e);
+        } finally {
+            if (requestId === conferenceRecipientsRequest) conferenceRecipientsLoading = false;
+        }
     }
 
-    function renderConferencePreview() {
+    function renderConferencePreview(selectedIds = new Set()) {
         const container = document.getElementById('conferenceRecipientList');
         if (!container) return;
+        document.getElementById('conferenceTotal').textContent = currentConferenceUsers.length;
+        document.getElementById('conferenceCount').textContent = '0';
         if (!currentConferenceUsers || currentConferenceUsers.length === 0) {
             container.innerHTML = `<div class="text-muted text-center p-3">${broadcastLocales.noData}</div>`;
             return;
         }
         let html = '';
-        currentConferenceUsers.slice(0, 30).forEach(user => {
+        currentConferenceUsers.forEach(user => {
             html += `
-                <div class="recipient-item">
+                <label class="recipient-item">
+                    <input type="checkbox" class="conference-user-checkbox" name="conference_users" value="${escapeHtml(user.user_id)}" ${selectedIds.has(String(user.user_id)) ? 'checked' : ''} onchange="updateConferenceUserCount()">
                     <div class="recipient-avatar">${escapeHtml((user.username || 'U')[0].toUpperCase())}</div>
                     <div class="recipient-info">
                         <div class="recipient-username">@${escapeHtml(user.username || user.user_id)}</div>
                         <div class="recipient-company">${escapeHtml(user.company || '')}</div>
                     </div>
-                </div>
+                </label>
             `;
         });
-        if (currentConferenceUsers.length > 30) {
-            html += `<div class="text-center text-muted p-2">${broadcastLocales.andMoreParticipants.replace('{}', currentConferenceUsers.length - 30)}</div>`;
-        }
         container.innerHTML = html;
+        updateConferenceUserCount();
     }
 
-    function toggleConferencePreview() {
+    function updateConferenceUserCount() {
+        document.getElementById('conferenceCount').textContent = document.querySelectorAll('.conference-user-checkbox:checked').length;
+    }
+
+    function selectConferenceUsers(checked) {
+        document.querySelectorAll('.conference-user-checkbox').forEach(cb => cb.checked = checked);
+        updateConferenceUserCount();
+    }
+
+    function toggleConferencePreview(btn) {
         const list = document.getElementById('conferenceRecipientList');
-        const btn = event.target.closest('button');
         if (list.style.display === 'none') {
             list.style.display = 'block';
             btn.innerHTML = `<i class="bi bi-eye-slash"></i> ${broadcastLocales.hide}`;
@@ -909,7 +924,9 @@
         } else if (targetType === 'conference') {
             const conferences = Array.from(document.querySelectorAll('#conferenceCheckboxes input:checked')).map(cb => cb.value);
             if (!conferences.length) { alert(broadcastLocales.selectConferenceWarning); e.preventDefault(); return; }
-            confirmText = broadcastLocales.confirmConferences.replace('{}', conferences.join(', '));
+            const selected = document.querySelectorAll('.conference-user-checkbox:checked').length;
+            if (conferenceRecipientsLoading || !selected) { alert(broadcastLocales.selectUserWarning); e.preventDefault(); return; }
+            confirmText = broadcastLocales.confirmUsers.replace('{}', selected);
         }
 
         if (!confirm(confirmText)) e.preventDefault();
@@ -920,3 +937,4 @@
     updatePreview();
 </script>
 {% endblock %}
+

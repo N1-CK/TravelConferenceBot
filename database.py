@@ -553,7 +553,27 @@ class Database:
 
                 async with conn.transaction():
                     await conn.execute("SELECT pg_advisory_xact_lock(hashtext('chat_department_migration'))")
-                    # У старых сообщений отдел неизвестен. Они остаются в общей истории.
+                    # Зафиксировать прежнюю историю только при первом запуске обновления.
+                    # Повторный запуск не должен открывать Travel новые сообщения других отделов.
+                    await conn.execute(f"""
+                        CREATE TABLE IF NOT EXISTS {self.db_schema}.chat_history_watermarks (
+                            source TEXT PRIMARY KEY,
+                            max_id BIGINT NOT NULL,
+                            created_at TIMESTAMP NOT NULL DEFAULT NOW()
+                        )
+                    """)
+                    for source, schema, table in (
+                        ('message', self.db_schema, 'user_messages'),
+                        ('pr_question', self.db_schema_pr, 'pr_questions'),
+                        ('event_question', self.db_schema_event, 'event_questions'),
+                        ('travel_question', self.db_schema_travel, 'travel_questions'),
+                    ):
+                        await conn.execute(f"""
+                            INSERT INTO {self.db_schema}.chat_history_watermarks (source, max_id)
+                            SELECT $1, COALESCE(MAX(id), 0) FROM {schema}.{table}
+                            ON CONFLICT (source) DO NOTHING
+                        """, source)
+                    # Не назначать старым сообщениям искусственный отдел.
                     await conn.execute(f"""
                         ALTER TABLE {self.db_schema}.user_messages
                         ADD COLUMN IF NOT EXISTS department TEXT
@@ -648,6 +668,26 @@ class Database:
                     ALTER TABLE {self.db_schema_event}.event_ticket_requests
                     ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE
                 """)
+
+                # Serialize new indexes across simultaneous Gunicorn worker starts.
+                async with conn.transaction():
+                    await conn.execute("SELECT pg_advisory_xact_lock(739218403)")
+                    # Cover the frequent chat-history and unread queries.
+                    for schema, table in (
+                        (self.db_schema, 'user_messages'),
+                        (self.db_schema_pr, 'pr_questions'),
+                        (self.db_schema_event, 'event_questions'),
+                        (self.db_schema_travel, 'travel_questions'),
+                    ):
+                        await conn.execute(f"""
+                            CREATE INDEX IF NOT EXISTS idx_{table}_user_time_id
+                            ON {schema}.{table} (user_id, created_at DESC, id DESC)
+                        """)
+                    await conn.execute(f"""
+                        CREATE INDEX IF NOT EXISTS idx_user_messages_unread
+                        ON {self.db_schema}.user_messages (user_id)
+                        WHERE direction = 'incoming' AND read_at IS NULL
+                    """)
 
                 logger.info("All tables created successfully")
                 return True
@@ -3512,28 +3552,46 @@ class Database:
                 ORDER BY created_at DESC, id DESC LIMIT 1
             """, user_id)
 
+    def _chat_visibility(self, source: str, departments_param: str,
+                         history_param: str, alias: str = '') -> str:
+        """Shared visibility for lists, history, read receipts and attachments.
+
+        include_unassigned is enabled only for Travel/admin by the web layer.
+        It includes legacy messages and the fixed, pre-upgrade history.
+        """
+        if source not in ('message', 'pr_question', 'event_question', 'travel_question'):
+            raise ValueError('Invalid chat source')
+        prefix = f'{alias}.' if alias else ''
+        previous = (f"{prefix}id <= COALESCE((SELECT max_id FROM "
+                    f"{self.db_schema}.chat_history_watermarks WHERE source = '{source}'), 0)")
+        if source == 'message':
+            own_department = f'{prefix}department = ANY({departments_param}::text[])'
+            previous = f'{prefix}department IS NULL OR {previous}'
+        else:
+            own_department = f"'{source.removesuffix('_question')}' = ANY({departments_param}::text[])"
+        return f'({own_department} OR ({history_param} AND ({previous})))'
+
     async def has_chat(self, user_id: int, departments: list[str], include_unassigned: bool = False) -> bool:
-        """A manager may open only conversations with activity in their departments."""
+        sources = (
+            (self.db_schema, 'user_messages', 'message'),
+            (self.db_schema_pr, 'pr_questions', 'pr_question'),
+            (self.db_schema_event, 'event_questions', 'event_question'),
+            (self.db_schema_travel, 'travel_questions', 'travel_question'),
+        )
+        query = ' UNION ALL '.join(
+            f"SELECT 1 FROM {schema}.{table} WHERE user_id = $1 "
+            f"AND {self._chat_visibility(source, '$2', '$3')}"
+            for schema, table, source in sources
+        )
         async with self.pool.acquire() as conn:
-            return bool(await conn.fetchval(f"""
-                SELECT EXISTS (
-                    SELECT 1 FROM {self.db_schema}.user_messages
-                    WHERE user_id = $1 AND (department = ANY($2::text[]) OR ($3 AND department IS NULL))
-                    UNION ALL
-                    SELECT 1 FROM {self.db_schema_pr}.pr_questions WHERE user_id = $1 AND 'pr' = ANY($2::text[])
-                    UNION ALL
-                    SELECT 1 FROM {self.db_schema_event}.event_questions WHERE user_id = $1 AND 'event' = ANY($2::text[])
-                    UNION ALL
-                    SELECT 1 FROM {self.db_schema_travel}.travel_questions WHERE user_id = $1 AND 'travel' = ANY($2::text[])
-                )
-            """, user_id, departments, include_unassigned))
+            return bool(await conn.fetchval(f'SELECT EXISTS ({query})', user_id, departments, include_unassigned))
 
     async def file_in_departments(self, file_id: str, departments: list[str], include_unassigned: bool = False) -> bool:
         async with self.pool.acquire() as conn:
             return bool(await conn.fetchval(f"""
                 SELECT EXISTS (SELECT 1 FROM {self.db_schema}.user_messages
                                WHERE file_id = $1
-                                 AND (department = ANY($2::text[]) OR ($3 AND department IS NULL)))
+                                 AND {self._chat_visibility('message', '$2', '$3')})
             """, file_id, departments, include_unassigned))
 
     async def save_user_message(self, user_id: int, username: str,
@@ -3593,29 +3651,37 @@ class Database:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(f"""
                 WITH activity AS (
-                    SELECT user_id, username, department, message_text AS body, created_at
+                    SELECT id, user_id, username, department, message_text AS body, created_at,
+                           'message'::text AS source_type
                     FROM {self.db_schema}.user_messages
-                    WHERE department = ANY($1::text[]) OR ($3 AND department IS NULL)
+                    WHERE {self._chat_visibility('message', '$1', '$3')}
                     UNION ALL
-                    SELECT user_id, username, 'pr', question, created_at
-                    FROM {self.db_schema_pr}.pr_questions WHERE 'pr' = ANY($1::text[])
+                    SELECT id, user_id, username, 'pr', question, created_at, 'pr_question'
+                    FROM {self.db_schema_pr}.pr_questions
+                    WHERE {self._chat_visibility('pr_question', '$1', '$3')}
                     UNION ALL
-                    SELECT user_id, username, 'event', question, created_at
-                    FROM {self.db_schema_event}.event_questions WHERE 'event' = ANY($1::text[])
+                    SELECT id, user_id, username, 'event', question, created_at, 'event_question'
+                    FROM {self.db_schema_event}.event_questions
+                    WHERE {self._chat_visibility('event_question', '$1', '$3')}
                     UNION ALL
-                    SELECT user_id, username, 'travel', question, created_at
-                    FROM {self.db_schema_travel}.travel_questions WHERE 'travel' = ANY($1::text[])
+                    SELECT id, user_id, username, 'travel', question, created_at, 'travel_question'
+                    FROM {self.db_schema_travel}.travel_questions
+                    WHERE {self._chat_visibility('travel_question', '$1', '$3')}
                 ), newest AS (
                     SELECT DISTINCT ON (a.user_id) a.user_id, a.username, a.body, a.created_at, a.department
                     FROM activity a
-                    ORDER BY a.user_id, a.created_at DESC
+                    ORDER BY a.user_id, a.created_at DESC, a.id DESC, a.source_type DESC
+                ), unread AS (
+                    SELECT m.user_id, COUNT(*) AS unread_count
+                    FROM {self.db_schema}.user_messages m
+                    WHERE {self._chat_visibility('message', '$1', '$3', 'm')}
+                      AND m.direction = 'incoming' AND m.read_at IS NULL
+                    GROUP BY m.user_id
                 )
                 SELECT l.user_id, 'chat' AS department, l.department AS latest_department,
                        COALESCE(p.username, l.username) AS username,
                        p.full_name, l.body AS last_message, l.created_at AS last_message_time,
-                       (SELECT COUNT(*) FROM {self.db_schema}.user_messages m
-                        WHERE m.user_id = l.user_id AND (m.department = ANY($1::text[]) OR ($3 AND m.department IS NULL))
-                          AND m.direction = 'incoming' AND m.read_at IS NULL) AS unread_count,
+                       COALESCE(unread.unread_count, 0) AS unread_count,
                        EXISTS (SELECT 1 FROM {self.db_schema_admin}.manager_archived_chats a
                                WHERE a.manager_id = $2 AND a.user_id = l.user_id
                                  AND a.department = 'chat') AS is_archived,
@@ -3630,6 +3696,7 @@ class Database:
                              WHERE f.manager_id = $2 AND fi.user_id = l.user_id
                                AND fi.department = 'chat') AS folder_ids
                 FROM newest l
+                LEFT JOIN unread ON unread.user_id = l.user_id
                 LEFT JOIN {self.db_schema_config}.user_profiles p ON p.user_id = l.user_id
                 ORDER BY l.created_at DESC
             """, departments, manager_id or 0, include_unassigned)
@@ -3642,31 +3709,37 @@ class Database:
 
     async def get_user_messages(self, user_id: int, departments: list[str],
                                 limit: int = 100, include_unassigned: bool = False) -> list:
+        """Bound each source before UNION, preserving develop's fast history query."""
+        limit = max(1, min(int(limit), 500))
+        sources = (
+            (self.db_schema, 'user_messages', 'message'),
+            (self.db_schema_pr, 'pr_questions', 'pr_question'),
+            (self.db_schema_event, 'event_questions', 'event_question'),
+            (self.db_schema_travel, 'travel_questions', 'travel_question'),
+        )
+        queries = []
+        for schema, table, source in sources:
+            fields = (
+                "manager_id, direction, message_text, file_type, file_id, read_at, "
+                "NULL::text AS category, department"
+                if source == 'message' else
+                "NULL::integer AS manager_id, 'incoming' AS direction, question AS message_text, "
+                "NULL::text AS file_type, NULL::text AS file_id, NULL::timestamp AS read_at, "
+                f"category, '{source.removesuffix('_question')}'::text AS department"
+            )
+            queries.append(f"""(
+                SELECT id, user_id, username, created_at, {fields}, '{source}' AS source_type
+                FROM {schema}.{table} WHERE user_id = $1
+                  AND {self._chat_visibility(source, '$2', '$4')}
+                ORDER BY created_at DESC, id DESC LIMIT $3
+            )""")
+        query = ' UNION ALL '.join(queries)
         async with self.pool.acquire() as conn:
-            rows = await conn.fetch(f"""
-                SELECT * FROM (
-                    SELECT id, user_id, username, manager_id, direction,
-                           message_text, file_type, file_id, created_at, read_at,
-                           'message' AS source_type, NULL::text AS category, department
-                    FROM {self.db_schema}.user_messages
-                    WHERE user_id = $1 AND (department = ANY($2::text[]) OR ($4 AND department IS NULL))
-                    UNION ALL
-                    SELECT id, user_id, username, NULL::integer, 'incoming', question,
-                           NULL::text, NULL::text, created_at, NULL::timestamp,
-                           'pr_question', category, 'pr'
-                    FROM {self.db_schema_pr}.pr_questions WHERE user_id = $1 AND 'pr' = ANY($2::text[])
-                    UNION ALL
-                    SELECT id, user_id, username, NULL::integer, 'incoming', question,
-                           NULL::text, NULL::text, created_at, NULL::timestamp,
-                           'event_question', category, 'event'
-                    FROM {self.db_schema_event}.event_questions WHERE user_id = $1 AND 'event' = ANY($2::text[])
-                    UNION ALL
-                    SELECT id, user_id, username, NULL::integer, 'incoming', question,
-                           NULL::text, NULL::text, created_at, NULL::timestamp,
-                           'travel_question', category, 'travel'
-                    FROM {self.db_schema_travel}.travel_questions WHERE user_id = $1 AND 'travel' = ANY($2::text[])
-                ) history ORDER BY created_at DESC, id DESC LIMIT $3
-            """, user_id, departments, limit, include_unassigned)
+            rows = await conn.fetch(
+                f'SELECT * FROM ({query}) history '
+                'ORDER BY created_at DESC, id DESC, source_type DESC LIMIT $3',
+                user_id, departments, limit, include_unassigned,
+            )
             return [dict(row) for row in rows]
 
     async def mark_messages_read(self, user_id: int, manager_id: int, departments: list[str],
@@ -3674,7 +3747,7 @@ class Database:
         async with self.pool.acquire() as conn:
             await conn.execute(f"""
                 UPDATE {self.db_schema}.user_messages SET read_at = NOW(), manager_id = $1
-                WHERE user_id = $2 AND (department = ANY($3::text[]) OR ($4 AND department IS NULL))
+                WHERE user_id = $2 AND {self._chat_visibility('message', '$3', '$4')}
                   AND direction = 'incoming' AND read_at IS NULL
             """, manager_id, user_id, departments, include_unassigned)
             await conn.execute(f"""
