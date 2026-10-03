@@ -5,6 +5,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from dotenv import load_dotenv
 import os
 from database import db
+from utility.department_status import DepartmentScreenMiddleware, DepartmentStatusMiddleware
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -22,8 +23,10 @@ logger = logging.getLogger(__name__)
 
 # Создаем бота и диспетчер
 bot = Bot(token=os.getenv("TG_BOT_TOKEN"))
+bot.session.middleware(DepartmentStatusMiddleware())
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
+dp.callback_query.middleware(DepartmentScreenMiddleware())
 
 
 async def on_startup():

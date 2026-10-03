@@ -2017,31 +2017,32 @@ class Database:
                 for worksheet in worksheets:
                     sheet_name = worksheet.title
                     records = worksheet.get_all_records()
-                    if not records:
+                    if not records and sheet_name != "Общая информация":
                         continue
 
                     if sheet_name == "Общая информация":
+                        company_names = set()
                         for record in records:
-                            company_name = None
-                            for key, value in record.items():
+                            for value in record.values():
                                 if value and str(value).strip():
                                     company_name = str(value).strip()
+                                    if company_name.lower() not in (
+                                        'список всех компаний и партнерок', 'company', 'companies'
+                                    ):
+                                        company_names.add(company_name)
                                     break
 
-                            if not company_name:
-                                continue
-
-                            if company_name.lower() in ['список всех компаний и партнерок', 'company', 'companies']:
-                                continue
-
-                            await conn.execute(f"""
-                                INSERT INTO {self.db_schema_config}.companies (company_name, is_active)
-                                VALUES ($1, TRUE)
-                                ON CONFLICT (company_name) DO UPDATE
-                                SET is_active = TRUE
-                            """, company_name)
-                            total_companies += 1
-
+                        # Replace the active catalogue atomically, also during periodic sync.
+                        async with conn.transaction():
+                            await conn.execute(f"UPDATE {self.db_schema_config}.companies SET is_active = FALSE")
+                            if company_names:
+                                await conn.executemany(f"""
+                                    INSERT INTO {self.db_schema_config}.companies (company_name, is_active)
+                                    VALUES ($1, TRUE)
+                                    ON CONFLICT (company_name) DO UPDATE
+                                    SET is_active = TRUE, updated_at = NOW()
+                                """, [(name,) for name in sorted(company_names)])
+                        total_companies = len(company_names)
                         logger.info(f"✅ Synced {total_companies} companies from 'Общая информация'")
                         continue
 
@@ -2459,6 +2460,9 @@ class Database:
                 rows = await conn.fetch(f"""
                     SELECT company_name FROM {self.db_schema_config}.companies
                     WHERE is_active = TRUE
+                    UNION
+                    SELECT company FROM {self.db_schema_config}.user_profiles
+                    WHERE company IS NOT NULL AND BTRIM(company) != ''
                     ORDER BY company_name
                 """)
                 return [row['company_name'] for row in rows]
