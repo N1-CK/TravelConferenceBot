@@ -207,7 +207,8 @@
                         <hr class="my-2">
 
                         <button class="btn btn-sm btn-outline-primary w-100"
-                                onclick="showConferenceDetails('{{ conf.name }}')">
+                                data-conference-name="{{ conf.name }}"
+                                onclick="showConferenceDetails(this.dataset.conferenceName)">
                             <i class="bi bi-eye me-1"></i> {{ get_text('view_details') }}
                         </button>
                     </div>
@@ -252,6 +253,7 @@
 
 <script>
 function showConferenceDetails(conferenceName) {
+    const notSpecified = {{ get_text('not_specified') | tojson }};
     // Показываем модальное окно с загрузкой
     const modalBody = document.getElementById('conferenceModalBody');
     modalBody.innerHTML = `
@@ -316,7 +318,7 @@ function showConferenceDetails(conferenceName) {
                     <div class="detail-label">
                         <i class="bi bi-geo-alt me-1"></i> {{ get_text('conference_city') }}:
                     </div>
-                    <div class="detail-value">${escapeHtml(data.city || get_text('not_specified'))}</div>
+                    <div class="detail-value">${escapeHtml(data.city || notSpecified)}</div>
                 </div>
 
                 <div class="detail-row">
@@ -324,7 +326,7 @@ function showConferenceDetails(conferenceName) {
                         <i class="bi bi-calendar-range me-1"></i> {{ get_text('conference_dates') }}:
                     </div>
                     <div class="detail-value">
-                        ${data.start_date ? escapeHtml(data.start_date) : get_text('not_specified')}
+                        ${data.start_date ? escapeHtml(data.start_date) : notSpecified}
                         ${data.end_date ? ' - ' + escapeHtml(data.end_date) : ''}
                     </div>
                 </div>

@@ -224,6 +224,9 @@ async def complete_registration(update: Union[Message, CallbackQuery], state: FS
             details={"company": company, "language": lang}
         )
 
+        target_message = update if isinstance(update, Message) else update.message
+        await target_message.answer(get_text_sync(lang, 'registration_intro'), parse_mode="HTML")
+
         # Показываем выбор конференции (теперь обязательный)
         if isinstance(update, Message):
             await show_conferences_selection(update, username, user_id)

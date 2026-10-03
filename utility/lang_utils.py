@@ -6,6 +6,7 @@ logger = logging.getLogger(__name__)
 # Общие тексты для всего бота
 COMMON_TEXTS = {
     'ru': {
+        'registration_intro': '<b>Спасибо за регистрацию!</b> 🎉\n\nВся дальнейшая коммуникация по вашим командировкам будет проходить только через этого бота.\n\n<b>Travel ✈️</b>\n\nЗапросить авиабилет, забронировать отель и оформить начисление суточных.\nЧтобы запросить авиабилет:\n\n1. Откройте раздел Travel\n2. Выберите «Заявка на авиабилет / Flight request»\n3. Заполните все поля, которые запросит бот\n4. После отправки заявки мы свяжемся с вами, если понадобится дополнительная информация\n\n<b>Event 🎪</b>\n\nЗапросить билет на конференцию и получить информацию о стенде, если он предусмотрен.\n\n<b>PR 📢</b>\n\nЗаказать визитки и баннеры, получить доступ к affiliate-боту и заполнить информацию о партнёрском ужине.',
         # ============================================
         # НАВИГАЦИЯ
         # ============================================
@@ -479,6 +480,7 @@ COMMON_TEXTS = {
         'change_conference': '🔄 Сменить конференцию',
     },
     'en': {
+        'registration_intro': '<b>Thank you for registering!</b> 🎉\n\nAll further communication regarding your business trips will take place exclusively through this bot.\n\n<b>Travel</b>\n\nRequest a flight ticket, book a hotel, and arrange your daily allowance.\n\n<b>To request a flight ticket:</b>\n\n1. Open the <b>Travel</b> section.\n2. Select <b>“Flight Request / Заявка на авиабилет.”</b>\n3. Fill in all the fields requested by the bot.\n4. Submit your request. We’ll contact you if any additional information is needed.\n\n<b>Event 🎪</b>\n\nRequest a conference ticket and get information about the booth, if one is available.\n\n<b>PR 📢</b>\n\nRequest business cards and banners, get access to the affiliate bot, and provide information about the partner dinner.',
         # ============================================
         # NAVIGATION
         # ============================================

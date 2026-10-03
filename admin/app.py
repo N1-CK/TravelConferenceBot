@@ -589,8 +589,8 @@ def conferences_page():
 @login_required
 def users_page():
     try:
-        users = run_async(db.get_all_users_with_details())
-        companies = run_async(db.get_all_companies_from_config())
+        users = run_async(db.get_all_users_with_details()) or []
+        companies = sorted({u['company'] for u in users if u.get('company') and u['company'].strip()}, key=str.casefold)
         conferences = run_async(db.get_conferences_list())
         stats = {
             'total': len(users),
