@@ -11,19 +11,9 @@ from keyboards import get_back_next_keyboard, get_event_menu_keyboard
 from database import db
 from utility.lang_utils import t
 
-EVENT_MANAGER_CHAT_ID = int(os.getenv("TG_EVENT_MANAGER_CHAT_ID", "0"))
 
 router = Router()
 logger = logging.getLogger(__name__)
-
-
-class EventCertificateForm(StatesGroup):
-    waiting_for_name = State()
-    waiting_for_position = State()
-    waiting_for_company = State()
-    waiting_for_company_legal = State()
-    waiting_for_addressee = State()
-    waiting_for_dates = State()
 
 
 class EventQuestionForm(StatesGroup):

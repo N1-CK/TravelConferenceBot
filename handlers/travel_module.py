@@ -1,7 +1,7 @@
 import logging
 import re
 from datetime import datetime
-from typing import Dict, List, Union
+from typing import Union
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
@@ -11,10 +11,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from handlers.managers_chat import send_question_to_manager, get_manager_chat_id, send_request_notification_to_manager
 
 from database import db
-import os
 from utility.lang_utils import t
 
-TRAVEL_MANAGER_CHAT_ID = int(os.getenv("TG_TRAVEL_MANAGER_CHAT_ID", "0"))
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -25,16 +23,10 @@ logger = logging.getLogger(__name__)
 # ============================================
 
 class TravelStates(StatesGroup):
-    english = State()
 
     # Для Flight Request
-    waiting_for_visa_status = State()
     waiting_for_passport_consent = State()
-    waiting_for_passport = State()
-    waiting_for_city_from = State()
-    waiting_for_city_to = State()
     waiting_for_baggage = State()
-    waiting_for_preferences = State()
     waiting_for_hotel_needed = State()
     waiting_for_flight_choice = State()
 
@@ -52,8 +44,6 @@ class TravelStates(StatesGroup):
     waiting_for_expiry_date = State()
     waiting_for_departure_from = State()
     waiting_for_return_to = State()
-    waiting_for_visa_needed = State()
-    waiting_for_visa_dates = State()
 
     # Для Daily allowance
     waiting_for_per_diem_payment_type = State()
@@ -78,64 +68,6 @@ async def get_form_back_keyboard(back_to: str, user_id: int = None) -> InlineKey
         InlineKeyboardButton(text=main_text, callback_data="menu_main")
     )
     return builder.as_markup()
-
-
-def get_baggage_keyboard(back_callback: str = "visa_back_step3", user_id: int = None) -> InlineKeyboardMarkup:
-    """Клавиатура выбора багажа с локализацией"""
-    # Текст будет добавлен в обработчике через await t()
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text="✅", callback_data="baggage_yes"),
-        InlineKeyboardButton(text="❌", callback_data="baggage_no")
-    )
-    builder.row(
-        InlineKeyboardButton(text="◀️", callback_data=back_callback)
-    )
-    return builder.as_markup()
-
-
-def get_visa_keyboard(user_id: int = None) -> InlineKeyboardMarkup:
-    """Клавиатура для визовой поддержки с локализацией"""
-    builder = InlineKeyboardBuilder()
-    builder.row(
-        InlineKeyboardButton(text="✅", callback_data="visa_have")
-    )
-    builder.row(
-        InlineKeyboardButton(text="❌", callback_data="visa_not_have")
-    )
-    builder.row(
-        InlineKeyboardButton(text="🔄", callback_data="visa_special")
-    )
-    builder.row(
-        InlineKeyboardButton(text="◀️", callback_data="travel_back_to_menu")
-    )
-    return builder.as_markup()
-
-
-def get_flight_choice_keyboard(flights: List[Dict], user_id: int = None) -> InlineKeyboardMarkup:
-    """Клавиатура выбора рейса"""
-    builder = InlineKeyboardBuilder()
-
-    for flight in flights:
-        text = f"{flight.get('departure_date')} {flight.get('departure_time')} {flight.get('departure_from')} → {flight.get('arrival_time')} {flight.get('arrival_city')}"
-        builder.row(InlineKeyboardButton(
-            text=text[:60],  # Ограничиваем длину
-            callback_data=f"flight_choose_{flight.get('id')}"
-        ))
-
-    builder.row(InlineKeyboardButton(
-        text="❌",  # Текст будет заменен через t()
-        callback_data="flight_no_suitable"
-    ))
-    builder.row(
-        InlineKeyboardButton(text="◀️", callback_data="travel_back_to_menu")
-    )
-    return builder.as_markup()
-
-
-# ============================================
-# ГЛАВНОЕ МЕНЮ
-# ============================================
 
 
 # ============================================
