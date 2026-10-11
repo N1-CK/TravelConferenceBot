@@ -1,4 +1,5 @@
 from aiogram import Router, F
+from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
@@ -74,7 +75,7 @@ async def cmd_start(message: Message, state: FSMContext):
             await message.answer(
                 text,
                 reply_markup=await get_main_menu_keyboard(user_id),
-                parse_mode=None
+                parse_mode=ParseMode.HTML
             )
         else:
             # Конференции нет — показываем выбор
@@ -338,7 +339,7 @@ async def show_main_menu_with_conf_button(message: Message, state: FSMContext, u
     await message.edit_text(
         welcome_text,
         reply_markup=builder.as_markup(),
-        parse_mode=None
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -365,10 +366,10 @@ async def return_to_main_menu(callback: CallbackQuery, state: FSMContext):
     markup = await get_main_menu_keyboard(callback.from_user.id)
 
     try:
-        await callback.message.edit_text(text, reply_markup=markup)
+        await callback.message.edit_text(text, reply_markup=markup, parse_mode=ParseMode.HTML)
     except TelegramBadRequest:
         try:
             await callback.message.delete()
         except Exception:
             pass
-        await callback.message.answer(text, reply_markup=markup)
+        await callback.message.answer(text, reply_markup=markup, parse_mode=ParseMode.HTML)

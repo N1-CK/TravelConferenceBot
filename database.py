@@ -672,6 +672,40 @@ class Database:
                 # Serialize new indexes across simultaneous Gunicorn worker starts.
                 async with conn.transaction():
                     await conn.execute("SELECT pg_advisory_xact_lock(739218403)")
+                    # Existing installations migrate automatically on bot/web startup.
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_flight_request
+                        ADD COLUMN IF NOT EXISTS conference TEXT,
+                        ADD COLUMN IF NOT EXISTS visa_info TEXT,
+                        ADD COLUMN IF NOT EXISTS hotel_needed BOOLEAN,
+                        ADD COLUMN IF NOT EXISTS selected_flight_id INTEGER,
+                        ADD COLUMN IF NOT EXISTS payment_type TEXT,
+                        ADD COLUMN IF NOT EXISTS payment_details TEXT,
+                        ADD COLUMN IF NOT EXISTS consent_given BOOLEAN
+                    """)
+                    await conn.execute(f"""
+                        CREATE TABLE IF NOT EXISTS {self.db_schema_travel}.travel_per_diem_requests (
+                            id SERIAL PRIMARY KEY,
+                            username TEXT NOT NULL,
+                            user_id BIGINT NOT NULL,
+                            payment_type TEXT,
+                            payment_details TEXT,
+                            status TEXT DEFAULT 'pending',
+                            consent_given BOOLEAN DEFAULT FALSE,
+                            created_at TIMESTAMP DEFAULT NOW(),
+                            updated_at TIMESTAMP DEFAULT NOW()
+                        )
+                    """)
+                    await conn.execute(f"""
+                        ALTER TABLE {self.db_schema_travel}.travel_per_diem_requests
+                        ADD COLUMN IF NOT EXISTS flight_request_id INTEGER
+                            REFERENCES {self.db_schema_travel}.travel_flight_request(id)
+                    """)
+                    await conn.execute(f"""
+                        CREATE UNIQUE INDEX IF NOT EXISTS idx_per_diem_flight_request
+                        ON {self.db_schema_travel}.travel_per_diem_requests(flight_request_id)
+                        WHERE flight_request_id IS NOT NULL
+                    """)
                     # Cover the frequent chat-history and unread queries.
                     for schema, table in (
                         (self.db_schema, 'user_messages'),
@@ -1295,7 +1329,9 @@ class Database:
                     LEFT JOIN LATERAL (
                         SELECT id, payment_type, payment_details, status
                         FROM {self.db_schema_travel}.travel_per_diem_requests
-                        WHERE user_id = tfr.user_id
+                        WHERE flight_request_id = tfr.id
+                           OR (tfr.conference IS NULL AND flight_request_id IS NULL
+                               AND user_id = tfr.user_id)
                         ORDER BY created_at DESC
                         LIMIT 1
                     ) pdr ON true
@@ -1331,7 +1367,9 @@ class Database:
                     LEFT JOIN LATERAL (
                         SELECT id, payment_type, payment_details, status
                         FROM {self.db_schema_travel}.travel_per_diem_requests
-                        WHERE user_id = tfr.user_id
+                        WHERE flight_request_id = tfr.id
+                           OR (tfr.conference IS NULL AND flight_request_id IS NULL
+                               AND user_id = tfr.user_id)
                         ORDER BY created_at DESC
                         LIMIT 1
                     ) pdr ON true
@@ -1609,25 +1647,48 @@ class Database:
             return False
 
     async def save_flight_request(self, flight_data: Dict) -> bool:
-        """Save flight request to database"""
+        """Save the flight and its daily allowance together, or roll both back."""
+        if (not flight_data.get('conference') or not flight_data.get('visa_info')
+                or not flight_data.get('consent_given')
+                or flight_data.get('payment_type') not in {'card', 'crypto'}
+                or not flight_data.get('payment_details')):
+            return False
         try:
             async with self.pool.acquire() as conn:
-                query = f"""
-                    INSERT INTO {self.db_schema_travel}.travel_flight_request 
-                    (username, user_id, visa_status, passport_data, city_from, city_to, needs_baggage, preferences, status)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
-                """
-                await conn.execute(
-                    query,
-                    flight_data['username'],
-                    flight_data['user_id'],
-                    flight_data.get('visa_status', 'not_have'),
-                    flight_data.get('passport_data', ''),
-                    flight_data.get('city_from', ''),
-                    flight_data.get('city_to', ''),
-                    flight_data.get('needs_baggage', False),
-                    flight_data.get('preferences', '')
-                )
+                async with conn.transaction():
+                    # Enforce membership at submission, even if it changed during the form.
+                    allowed = await conn.fetchval(f"""
+                        SELECT 1 FROM {self.db_schema}.user_conferences
+                        WHERE LOWER(username) = LOWER($1) AND conference_name = $2
+                    """, (flight_data['username'] or '').lstrip('@').strip(), flight_data['conference'])
+                    if not allowed:
+                        return False
+                    request_id = await conn.fetchval(f"""
+                        INSERT INTO {self.db_schema_travel}.travel_flight_request
+                        (username, user_id, visa_status, passport_data, city_from, city_to,
+                         needs_baggage, preferences, conference, visa_info, hotel_needed,
+                         selected_flight_id, payment_type, payment_details, consent_given, status)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending')
+                        RETURNING id
+                    """,
+                        flight_data['username'], flight_data['user_id'],
+                        flight_data.get('visa_status', 'not_have'),
+                        flight_data.get('passport_data', ''),
+                        flight_data.get('city_from', ''), flight_data.get('city_to', ''),
+                        flight_data.get('needs_baggage', False), flight_data.get('preferences', ''),
+                        flight_data['conference'], flight_data['visa_info'],
+                        flight_data.get('hotel_needed', False), flight_data.get('selected_flight_id'),
+                        flight_data['payment_type'], flight_data['payment_details'],
+                        flight_data['consent_given']
+                    )
+                    await conn.execute(f"""
+                        INSERT INTO {self.db_schema_travel}.travel_per_diem_requests
+                        (username, user_id, payment_type, payment_details, consent_given, flight_request_id)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                    """, flight_data['username'], flight_data['user_id'],
+                        flight_data['payment_type'], flight_data['payment_details'],
+                        flight_data['consent_given'], request_id
+                    )
                 return True
         except Exception as e:
             logger.error(f"Error saving flight request: {e}")
@@ -2227,6 +2288,30 @@ class Database:
             logger.error(f"Error checking conference access: {e}")
             return await self.check_whitelist(clean_username)
 
+    async def get_user_travel_requests(self, user_id: int, username: str = None) -> list:
+        """Actual request statuses, scoped to the Telegram user, including older requests."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(f"""
+                SELECT tfr.id, tfr.conference, tfr.created_at,
+                       tfr.visa_request_status, tfr.flight_request_status,
+                       pdr.id AS per_diem_id, pdr.status AS per_diem_status
+                FROM {self.db_schema_travel}.travel_flight_request tfr
+                LEFT JOIN LATERAL (
+                    SELECT id, status
+                    FROM {self.db_schema_travel}.travel_per_diem_requests
+                    WHERE flight_request_id = tfr.id
+                       OR (tfr.conference IS NULL AND flight_request_id IS NULL
+                           AND user_id = tfr.user_id)
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT 1
+                ) pdr ON true
+                WHERE tfr.user_id = $1
+                   OR (tfr.user_id IS NULL AND $2::text IS NOT NULL
+                       AND LOWER(tfr.username) = LOWER($2))
+                ORDER BY tfr.created_at DESC, tfr.id DESC
+            """, user_id, username.lstrip('@').strip() if username else None)
+            return [dict(row) for row in rows]
+
     async def get_travel_request_status(self, username: str, request_type: str) -> dict:
         """Получить статус travel-заявки пользователя"""
         try:
@@ -2592,7 +2677,7 @@ class Database:
             logger.error(f"Error saving passport data: {e}")
             return False
 
-    async def get_available_flights(self, username: str, departure_from: str, return_to: str) -> List[Dict]:
+    async def get_available_flights(self, username: str, departure_from: str, return_to: str, conference: str = None) -> List[Dict]:
         """Получить доступные рейсы для пользователя"""
         try:
             async with self.pool.acquire() as conn:
@@ -2601,8 +2686,9 @@ class Database:
                     WHERE username = $1 
                     AND departure_from ILIKE $2
                     AND arrival_city ILIKE $3
+                    AND ($4::text IS NULL OR conference = $4)
                     ORDER BY departure_date, departure_time
-                """, username, f"%{departure_from}%", f"%{return_to}%")
+                """, username, f"%{departure_from}%", f"%{return_to}%", conference)
                 return [dict(row) for row in rows]
         except Exception as e:
             logger.error(f"Error getting available flights: {e}")
@@ -3180,7 +3266,9 @@ class Database:
                     LEFT JOIN LATERAL (
                         SELECT payment_type, payment_details, status
                         FROM {self.db_schema_travel}.travel_per_diem_requests
-                        WHERE user_id = tfr.user_id
+                        WHERE flight_request_id = tfr.id
+                           OR (tfr.conference IS NULL AND flight_request_id IS NULL
+                               AND user_id = tfr.user_id)
                         ORDER BY created_at DESC
                         LIMIT 1
                     ) pdr ON true

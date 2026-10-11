@@ -1,10 +1,16 @@
 """Show the department only in menus and the first information screen below them."""
 
 import logging
+import re
 from contextvars import ContextVar
+from html import escape
 
 from aiogram import BaseMiddleware
 from aiogram.client.session.middlewares.base import BaseRequestMiddleware
+from aiogram.client.default import Default
+from aiogram.enums import ParseMode
+from aiogram.types import MessageEntity
+from aiogram.utils.text_decorations import markdown_decoration
 
 from database import db
 from utility.lang_utils import get_text_sync, get_user_lang
@@ -66,11 +72,34 @@ class DepartmentStatusMiddleware(BaseRequestMiddleware):
             department = await db.get_chat_department(chat_id)
             if department:
                 lang = await get_user_lang(chat_id)
-                status = get_text_sync(lang, 'department_status', department=department.upper())
+                department_name = department.upper()
+                entity_field = 'entities' if field == 'text' else 'caption_entities'
+                entities = getattr(method, entity_field, None)
+                parse_mode = getattr(method, 'parse_mode', None)
+                if isinstance(parse_mode, Default):
+                    parse_mode = bot.default.parse_mode
+                updates = {}
+                if entities or parse_mode not in (ParseMode.HTML, ParseMode.MARKDOWN, ParseMode.MARKDOWN_V2):
+                    status = get_text_sync(lang, 'department_status', department=department_name)
+                    prefix = f'{text}\n\n' if text else ''
+                    # Telegram entity offsets count UTF-16 units (emoji may take two).
+                    start = prefix + status[:status.rfind(department_name)]
+                    bold = MessageEntity(type='bold', offset=len(start.encode('utf-16-le')) // 2,
+                                         length=len(department_name.encode('utf-16-le')) // 2)
+                    updates.update({entity_field: [*(entities or []), bold], 'parse_mode': None})
+                else:
+                    if parse_mode == ParseMode.HTML:
+                        bold_name = f'<b>{escape(department_name)}</b>'
+                    elif parse_mode == ParseMode.MARKDOWN_V2:
+                        bold_name = f'*{markdown_decoration.quote(department_name)}*'
+                    else:
+                        quoted_name = re.sub(r'([\\_*`\[])', r'\\\1', department_name)
+                        bold_name = f'*{quoted_name}*'
+                    status = get_text_sync(lang, 'department_status', department=bold_name)
                 decorated = f'{text}\n\n{status}' if text else status
                 # Preserve text/entities and Telegram's text/caption length limits.
                 if len(decorated) <= (4096 if field == 'text' else 1024):
-                    method = method.model_copy(update={field: decorated})
+                    method = method.model_copy(update={field: decorated, **updates})
         except Exception:
             logger.exception('Could not add department status for user %s', chat_id)
 

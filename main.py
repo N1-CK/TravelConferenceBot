@@ -1,6 +1,7 @@
 # main.py
 import logging
 from aiogram import Bot, Dispatcher
+from aiogram.filters import Command
 from aiogram.fsm.storage.memory import MemoryStorage
 from dotenv import load_dotenv
 import os
@@ -72,6 +73,9 @@ async def main():
         from handlers.travel_module import router as travel_router
         from handlers.dinner.affiliate_integrated import router as affiliate_router
         from handlers.managers_chat import router as managers_chat_router
+
+        from handlers.menu import cancel_edit
+        dp.message.register(cancel_edit, Command("cancel"))
 
         dp.include_router(start_router)
         dp.include_router(menu_router)

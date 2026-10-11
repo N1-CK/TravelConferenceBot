@@ -11,19 +11,9 @@ from keyboards import get_back_next_keyboard, get_event_menu_keyboard
 from database import db
 from utility.lang_utils import t
 
-EVENT_MANAGER_CHAT_ID = int(os.getenv("TG_EVENT_MANAGER_CHAT_ID", "0"))
 
 router = Router()
 logger = logging.getLogger(__name__)
-
-
-class EventCertificateForm(StatesGroup):
-    waiting_for_name = State()
-    waiting_for_position = State()
-    waiting_for_company = State()
-    waiting_for_company_legal = State()
-    waiting_for_addressee = State()
-    waiting_for_dates = State()
 
 
 class EventQuestionForm(StatesGroup):
@@ -229,7 +219,7 @@ async def process_ticket_position(message: Message, state: FSMContext):
 
     await message.answer(
         await t(user_id, 'ticket_step', step=3, total=6) + "\n\n" + await t(user_id, 'ticket_company'),
-        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step2", user_id=user_id)
+        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step3", user_id=user_id)
     )
 
 
@@ -246,7 +236,7 @@ async def process_ticket_company(message: Message, state: FSMContext):
 
     await message.answer(
         await t(user_id, 'ticket_step', step=4, total=6) + "\n\n" + await t(user_id, 'ticket_email'),
-        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step3", user_id=user_id)
+        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step4", user_id=user_id)
     )
 
 
@@ -268,7 +258,7 @@ async def process_ticket_email(message: Message, state: FSMContext):
 
     await message.answer(
         await t(user_id, 'ticket_step', step=5, total=6) + "\n\n" + await t(user_id, 'ticket_phone'),
-        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step4", user_id=user_id)
+        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step5", user_id=user_id)
     )
 
 
@@ -289,7 +279,7 @@ async def process_ticket_phone(message: Message, state: FSMContext):
 
     await message.answer(
         await t(user_id, 'ticket_step', step=6, total=6) + "\n\n" + await t(user_id, 'ticket_country_prompt'),
-        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step5", user_id=user_id)
+        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step6", user_id=user_id)
     )
 
 
@@ -411,7 +401,7 @@ async def ticket_back_to_company(callback: CallbackQuery, state: FSMContext):
     current = data.get('company', await t(user_id, 'not_specified'))
     await callback.message.edit_text(
         await t(user_id, 'ticket_step', step=3, total=6) + "\n\n" + await t(user_id, 'ticket_company') + f"\n(текущее: {current})",
-        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step2", user_id=user_id)
+        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step3", user_id=user_id)
     )
 
 
@@ -423,7 +413,7 @@ async def ticket_back_to_email(callback: CallbackQuery, state: FSMContext):
     current = data.get('email', await t(user_id, 'not_specified'))
     await callback.message.edit_text(
         await t(user_id, 'ticket_step', step=4, total=6) + "\n\n" + await t(user_id, 'ticket_email') + f"\n(текущий: {current})",
-        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step3", user_id=user_id)
+        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step4", user_id=user_id)
     )
 
 
@@ -433,7 +423,7 @@ async def ticket_back_to_phone(callback: CallbackQuery, state: FSMContext):
     await state.set_state(EventTicketForm.waiting_for_phone)
     await callback.message.edit_text(
         await t(user_id, 'ticket_step', step=5, total=6) + "\n\n" + await t(user_id, 'ticket_phone'),
-        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step4", user_id=user_id)
+        reply_markup=await get_back_next_keyboard(back_to="ticket_back_step5", user_id=user_id)
     )
 
 

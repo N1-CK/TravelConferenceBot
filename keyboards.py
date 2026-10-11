@@ -33,6 +33,7 @@ async def get_main_menu_keyboard(user_id: int = None) -> InlineKeyboardMarkup:
         help_text = get_text_sync(lang, 'help')
         profile_text = get_text_sync(lang, 'my_profile')
     else:
+        lang = 'ru'
         pr_text = "📢 PR"
         event_text = "🎪 EVENT"
         travel_text = "✈️ TRAVEL"
@@ -112,8 +113,8 @@ async def get_travel_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text=get_text_sync(lang, 'travel_hotel'), callback_data="travel_hotel")
     )
     builder.row(
-        InlineKeyboardButton(text=get_text_sync(lang, 'travel_per_diem'), callback_data="travel_per_diem"),
-        InlineKeyboardButton(text=get_text_sync(lang, 'travel_my_requests'), callback_data="travel_my_requests")
+        InlineKeyboardButton(text=get_text_sync(lang, 'travel_my_requests'), callback_data="travel_my_requests"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'travel_compensation'), callback_data="travel_compensation")
     )
     builder.row(
         InlineKeyboardButton(text=get_text_sync(lang, 'question_button'), callback_data="travel_question"),
@@ -139,21 +140,17 @@ async def get_back_next_keyboard(back_to: str, next_disabled: bool = False,
 
     if cancel:
         cancel_text = get_text_sync(lang, 'cancel')
-        builder.row(InlineKeyboardButton(text=cancel_text, callback_data="cancel_form"))
+        # Keep the owner on the button, even if another form is opened later.
+        department = ('event' if back_to.startswith(('menu_event', 'event_', 'ticket_'))
+                      else 'pr' if back_to.startswith(('pr_', 'menu_pr', 'banner_', 'business_cards_'))
+                      else 'travel' if back_to.startswith(('travel_', 'visa_')) else None)
+        cancel_callback = f"cancel_form:{department}" if department else "cancel_form"
+        builder.row(InlineKeyboardButton(text=cancel_text, callback_data=cancel_callback))
 
     return builder.as_markup()
 
 
 # Специальные клавиатуры
-def get_visa_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ У меня есть виза", callback_data="visa_have")],
-        [InlineKeyboardButton(text="❌ У меня нет визы", callback_data="visa_not_have")],
-        [InlineKeyboardButton(text="🔄 Особый случай", callback_data="visa_special")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="menu_travel")]
-    ])
-
-
 def get_baggage_keyboard(back_callback: str = "visa_back_step3") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Да", callback_data="baggage_yes")],
