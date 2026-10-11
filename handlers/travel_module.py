@@ -2,10 +2,11 @@ import logging
 import re
 from uuid import uuid4
 from html import escape
+from pathlib import Path
 from datetime import datetime
 from typing import Union
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.enums import ParseMode
@@ -13,7 +14,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from handlers.managers_chat import send_question_to_manager, get_manager_chat_id, send_request_notification_to_manager
 
 from database import db
-from utility.lang_utils import t
+from utility.lang_utils import t, get_user_lang
 
 
 router = Router()
@@ -682,15 +683,17 @@ async def send_request_to_manager(update: Union[Message, CallbackQuery], state: 
         [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_back_to_menu")]
     ])
 
+    completion_text = (await t(user_id, 'form_complete') + "\n\n"
+                       + await t(user_id, 'travel_request_event_reminder'))
     if isinstance(update, Message):
         await update.answer(
-            await t(user_id, 'form_complete'),
+            completion_text,
             reply_markup=keyboard,
             parse_mode=ParseMode.MARKDOWN
         )
     else:
         await update.message.edit_text(
-            await t(user_id, 'form_complete'),
+            completion_text,
             reply_markup=keyboard,
             parse_mode=ParseMode.MARKDOWN
         )
@@ -1245,6 +1248,14 @@ async def travel_compensation_handler(callback: CallbackQuery, state: FSMContext
     text = await t(user_id, 'compensation_info')
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
     await callback.answer()
+
+    lang = await get_user_lang(user_id)
+    filename = 'Компенсация (Визы-Такси).pdf' if lang == 'ru' else 'Compensation (Visa-Taxi).pdf'
+    document_path = Path(__file__).resolve().parent.parent / 'instructions' / 'limits' / filename
+    if document_path.is_file():
+        await callback.message.answer_document(document=FSInputFile(document_path))
+    else:
+        logger.warning('Compensation document is not available: %s', document_path)
 
 
 @router.callback_query(F.data == "back_to_per_diem_type")

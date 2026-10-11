@@ -1,4 +1,5 @@
 from typing import Optional
+from html import escape
 import logging
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ COMMON_TEXTS = {
         'select_conference': "Выберите вашу конференцию:",
         'select_conference_button': "Выбрать конференцию",
         'switch_conference': "🔄 Сменить конференцию",
-        'conference_selected': "Выбрана конференция: *{conference}*",
+        'conference_selected': "Выбрана конференция: <b>{conference}</b>",
         'conference_status': "Выбранная конференция: {conference}",
         'conference_not_selected': "Не выбрана",
         'department_status': "Выбранный отдел: {department}",
@@ -288,6 +289,7 @@ COMMON_TEXTS = {
         'requests_older': 'Старее ▶️',
         'conference_request_status': '📅 <b>{conference}</b>\nЗаявка #{request_id} · {created}\n\n🛂 Виза: {visa}\n✈️ Билет: {flight}\n💰 Суточные: {per_diem}',
         'compensation_info': 'Компенсацию за расходы на такси и визу сотрудники оформляют самостоятельно через систему PayFinHeroes https://pay.finheroes.pro',
+        'travel_request_event_reminder': 'Спасибо за заполнение данных для приобретения авиабилета, бронирования отеля и расчёта суточных.\nЕсли вы регистрировались на конференцию, не забудьте также оформить билет на неё. Для этого перейдите в раздел «Event» и оставьте заявку на билет на нужную конференцию.',
         'flight_visa_question': "У вас есть виза? Нажмите «Да» или «Нет», либо напишите, до какой даты действует виза.",
         'select_conference_for_flight_request': "Выберите конференцию, в рамках которой необходим авиабилет:",
         'visa_support_title': "🛂 Визовая поддержка\n\nВыберите ваш статус:",
@@ -534,7 +536,7 @@ COMMON_TEXTS = {
         'select_conference': "Select your conference:",
         'select_conference_button': "Select conference",
         'switch_conference': "🔄 Switch conference",
-        'conference_selected': "Selected conference: {conference}",
+        'conference_selected': "Selected conference: <b>{conference}</b>",
         'conference_status': "Selected conference: {conference}",
         'conference_not_selected': "Not selected",
         'department_status': "Selected department: {department}",
@@ -791,6 +793,7 @@ COMMON_TEXTS = {
         'requests_older': 'Older ▶️',
         'conference_request_status': '📅 <b>{conference}</b>\nRequest #{request_id} · {created}\n\n🛂 Visa: {visa}\n✈️ Ticket: {flight}\n💰 Daily allowance: {per_diem}',
         'compensation_info': 'Employees can request reimbursement for taxi and visa expenses directly through the PayFinHeroes system https://pay.finheroes.pro',
+        'travel_request_event_reminder': 'Thank you for providing the information required to book your flight, hotel, and daily allowance.\nIf you have registered for a conference, please make sure to request a conference ticket separately. To do so, go to the “Event” section and submit a ticket request for the relevant conference.',
         'flight_visa_question': "Do you have a visa? Tap \"Yes\" or \"No\", or type its expiry date.",
         'select_conference_for_flight_request': "Select the conference for which you need a flight ticket:",
         'visa_support_title': "🛂 Visa Support\n\nChoose your status:",
@@ -1045,7 +1048,7 @@ _CONFERENCE_UNSET = object()
 
 async def format_main_menu_text(user_id: int, selected_conf=_CONFERENCE_UNSET,
                                 include_welcome: bool = True) -> str:
-    """Показать действующее направление переписки рядом с конференцией."""
+    """HTML-текст меню с выделенными конференцией и отделом."""
     from database import db
 
     if selected_conf is _CONFERENCE_UNSET:
@@ -1055,8 +1058,8 @@ async def format_main_menu_text(user_id: int, selected_conf=_CONFERENCE_UNSET,
     conference = selected_conf or get_text_sync(lang, 'conference_not_selected')
     department_name = department.upper() if department else get_text_sync(lang, 'department_not_selected')
     status = '\n'.join((
-        get_text_sync(lang, 'conference_status', conference=conference),
-        get_text_sync(lang, 'department_status', department=department_name),
+        get_text_sync(lang, 'conference_status', conference=f'<b>{escape(conference)}</b>'),
+        get_text_sync(lang, 'department_status', department=f'<b>{escape(department_name)}</b>'),
     ))
     title = get_text_sync(lang, 'main_menu_title')
     if include_welcome:

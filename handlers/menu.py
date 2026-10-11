@@ -1,6 +1,8 @@
 # handlers/menu.py - ИСПРАВЛЕННАЯ ВЕРСИЯ
 
 from aiogram import Router, F
+from html import escape
+from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
@@ -48,7 +50,7 @@ async def show_main_menu(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text(
             text,
             reply_markup=markup,
-            parse_mode=None
+            parse_mode=ParseMode.HTML
         )
         await callback.answer()
     except TelegramBadRequest:
@@ -56,7 +58,7 @@ async def show_main_menu(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer(
             text,
             reply_markup=markup,
-            parse_mode=None
+            parse_mode=ParseMode.HTML
         )
 
 
@@ -93,17 +95,17 @@ async def render_department_menu(update, state: FSMContext, department: str, can
     text = await t(user_id, f'{department}_title')
     text += "\n\n" + await t(user_id, 'department_menu_prompt')
     if selected_conf:
-        text += "\n\n" + await t(user_id, 'conference_selected', conference=selected_conf)
+        text += "\n\n" + await t(user_id, 'conference_selected', conference=escape(selected_conf))
     if cancelled:
         text = await t(user_id, 'form_cancelled') + "\n\n" + text
     keyboard_factory = {'pr': get_pr_menu_keyboard, 'event': get_event_menu_keyboard,
                         'travel': get_travel_menu_keyboard}[department]
     keyboard = await keyboard_factory(user_id)
     if isinstance(update, Message):
-        await update.answer(text, reply_markup=keyboard)
+        await update.answer(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
         return
     try:
-        await update.message.edit_text(text, reply_markup=keyboard)
+        await update.message.edit_text(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
     except TelegramBadRequest as exc:
         if 'message is not modified' not in str(exc).lower():
             # A photo/document cannot be edited into a text menu.
@@ -111,7 +113,7 @@ async def render_department_menu(update, state: FSMContext, department: str, can
                 await update.message.edit_reply_markup(reply_markup=None)
             except TelegramBadRequest:
                 pass
-            await update.message.answer(text, reply_markup=keyboard)
+            await update.message.answer(text, reply_markup=keyboard, parse_mode=ParseMode.HTML)
     await update.answer()
 
 

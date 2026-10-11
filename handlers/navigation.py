@@ -1,5 +1,6 @@
 # handlers/navigation.py
 from aiogram import Router, F
+from aiogram.enums import ParseMode
 from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
 from utility.lang_utils import format_main_menu_text
@@ -14,7 +15,8 @@ async def go_to_main_menu(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.message.edit_text(
         await format_main_menu_text(callback.from_user.id),
-        reply_markup=await get_main_menu_keyboard(callback.from_user.id)
+        reply_markup=await get_main_menu_keyboard(callback.from_user.id),
+        parse_mode=ParseMode.HTML
     )
 
 
