@@ -113,7 +113,8 @@ async def get_travel_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text=get_text_sync(lang, 'travel_hotel'), callback_data="travel_hotel")
     )
     builder.row(
-        InlineKeyboardButton(text=get_text_sync(lang, 'travel_my_requests'), callback_data="travel_my_requests")
+        InlineKeyboardButton(text=get_text_sync(lang, 'travel_my_requests'), callback_data="travel_my_requests"),
+        InlineKeyboardButton(text=get_text_sync(lang, 'travel_compensation'), callback_data="travel_compensation")
     )
     builder.row(
         InlineKeyboardButton(text=get_text_sync(lang, 'question_button'), callback_data="travel_question"),

@@ -2288,6 +2288,30 @@ class Database:
             logger.error(f"Error checking conference access: {e}")
             return await self.check_whitelist(clean_username)
 
+    async def get_user_travel_requests(self, user_id: int, username: str = None) -> list:
+        """Actual request statuses, scoped to the Telegram user, including older requests."""
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(f"""
+                SELECT tfr.id, tfr.conference, tfr.created_at,
+                       tfr.visa_request_status, tfr.flight_request_status,
+                       pdr.id AS per_diem_id, pdr.status AS per_diem_status
+                FROM {self.db_schema_travel}.travel_flight_request tfr
+                LEFT JOIN LATERAL (
+                    SELECT id, status
+                    FROM {self.db_schema_travel}.travel_per_diem_requests
+                    WHERE flight_request_id = tfr.id
+                       OR (tfr.conference IS NULL AND flight_request_id IS NULL
+                           AND user_id = tfr.user_id)
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT 1
+                ) pdr ON true
+                WHERE tfr.user_id = $1
+                   OR (tfr.user_id IS NULL AND $2::text IS NOT NULL
+                       AND LOWER(tfr.username) = LOWER($2))
+                ORDER BY tfr.created_at DESC, tfr.id DESC
+            """, user_id, username.lstrip('@').strip() if username else None)
+            return [dict(row) for row in rows]
+
     async def get_travel_request_status(self, username: str, request_type: str) -> dict:
         """Получить статус travel-заявки пользователя"""
         try:
