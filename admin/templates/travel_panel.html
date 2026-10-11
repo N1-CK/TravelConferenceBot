@@ -339,6 +339,7 @@
                                 <div class="d-md-none">
                                     <span class="badge bg-light text-dark border me-1">#{{ req.id }}</span>
                                     <strong>@{{ req.username }}</strong>
+                                    {% if req.conference %}<div class="small text-secondary">{{ req.conference }}</div>{% endif %}
                                 </div>
                                 <div class="text-end d-md-none">
                                     <span class="text-secondary fw-bold">{{ req.first_name or '' }}</span>
@@ -349,7 +350,9 @@
                             <td class="col-secondary"><strong>@{{ req.username }}</strong></td>
 
                             <!-- Full Name (Desktop) -->
-                            <td class="col-secondary">{{ req.first_name or '-' }}</td>
+                            <td class="col-secondary">{{ req.first_name or '-' }}
+                                {% if req.conference %}<div class="small text-secondary">{{ req.conference }}</div>{% endif %}
+                            </td>
 
                             <!-- Route -->
                             <td class="col-secondary">{{ req.city_from or '-' }}</td>
@@ -667,6 +670,7 @@
             'personal_info': '{{ get_text("personal_info") }}',
             'route_info': '{{ get_text("route_info") }}',
             'visa_info': '{{ get_text("visa_info") }}',
+            'conference': '{{ get_text("conference") }}',
             'flight_info': '{{ get_text("flight_info") }}',
             'additional_info': '{{ get_text("additional_info") }}',
             'full_name': '{{ get_text("full_name") }}',
@@ -762,6 +766,7 @@
                     </tr>
 
                     <tr class="table-secondary"><th colspan="2">✈️ ${getText('route_info')}</th></tr>
+                    <tr><th>${getText('conference')}</th><td>${escapeHtml(data.conference || '-')}</td></tr>
                     <tr><th>${getText('departure_from')}</th><td>${escapeHtml(data.city_from || '-')}</td></tr>
                     <tr><th>${getText('return_to')}</th><td>${escapeHtml(data.city_to || '-')}</td></tr>
                     <tr><th>${getText('needs_baggage')}</th><td>${data.needs_baggage ? '✅ ' + getText('yes') : '❌ ' + getText('no')}</td></tr>
@@ -769,6 +774,7 @@
 
                     <tr class="table-secondary"><th colspan="2">🛂 ${getText('visa_info')}</th></tr>
                     <tr><th>${getText('visa_status')}</th><td>${getVisaStatusText(data.visa_status)}</td></tr>
+                    <tr><th>${getText('visa_info')}</th><td style="white-space: pre-wrap;">${escapeHtml(data.visa_info || '-')}</td></tr>
                     <tr><th>${getText('visa_request_status')}</th><td>${getStatusBadge(data.visa_request_status)}</td></tr>
 
                     <tr class="table-secondary"><th colspan="2">🎫 ${getText('flight_info')}</th></tr>

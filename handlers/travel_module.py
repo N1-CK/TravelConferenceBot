@@ -1,5 +1,6 @@
 import logging
 import re
+from uuid import uuid4
 from datetime import datetime
 from typing import Union
 from aiogram import Router, F
@@ -25,6 +26,8 @@ logger = logging.getLogger(__name__)
 class TravelStates(StatesGroup):
 
     # Для Flight Request
+    waiting_for_conference = State()
+    waiting_for_visa_info = State()
     waiting_for_passport_consent = State()
     waiting_for_baggage = State()
     waiting_for_hotel_needed = State()
@@ -252,127 +255,42 @@ async def show_hotel_details(callback: CallbackQuery):
 
 @router.callback_query(F.data == "travel_visa_support")
 async def show_visa_support(callback: CallbackQuery, state: FSMContext):
-    """Показать меню визовой поддержки"""
-    user_id = callback.from_user.id
-
-    # Получаем клавиатуру и обновляем текст кнопок
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=await t(user_id, 'visa_have'), callback_data="visa_have")],
-        [InlineKeyboardButton(text=await t(user_id, 'visa_not_have'), callback_data="visa_not_have")],
-        [InlineKeyboardButton(text=await t(user_id, 'visa_special'), callback_data="visa_special")],
-        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_back_to_menu")]
-    ])
-
+    """Возврат к визовому вопросу; старые сообщения тоже ведут в новую форму."""
+    data = await state.get_data()
+    if not data.get('conference'):
+        await start_flight_request(callback, state)
+        return
+    await state.set_state(TravelStates.waiting_for_visa_info)
     await callback.message.edit_text(
-        await t(user_id, 'visa_support_title'),
-        reply_markup=keyboard
+        await t(callback.from_user.id, 'flight_visa_question'),
+        reply_markup=await get_form_back_keyboard("travel_flight_request", callback.from_user.id)
     )
 
 
-@router.callback_query(F.data.in_({"visa_have", "visa_not_have", "visa_special"}))
-async def process_visa_status(callback: CallbackQuery, state: FSMContext):
-    """Обработка статуса визы"""
-    user_id = callback.from_user.id
-    visa_status = callback.data.replace("visa_", "")
-
-    if visa_status == "not_have":
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=await t(user_id, 'visa_need_help'), callback_data="visa_need_help")],
-            [InlineKeyboardButton(text=await t(user_id, 'visa_bought_myself'), callback_data="visa_bought_myself")],
-            [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_visa_support")]
-        ])
-
-        await callback.message.edit_text(
-            await t(user_id, 'visa_support_title'),
-            reply_markup=keyboard
-        )
-    elif visa_status == "have":
-        await state.update_data(visa_status="have")
-        await state.set_state(TravelStates.waiting_for_passport_consent)
-
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text=await t(user_id, 'confirm_data_storage'), callback_data="passport_consent_yes")],
-            [InlineKeyboardButton(text=await t(user_id, 'dont_store'), callback_data="passport_consent_no")],
-            [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_visa_support")]
-        ])
-
-        await callback.message.edit_text(
-            await t(user_id, 'passport_consent'),
-            reply_markup=keyboard,
-            parse_mode=ParseMode.MARKDOWN
-        )
-    else:
-        await callback.message.edit_text(
-            await t(user_id, 'special_case_processing'),
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_visa_support")]
-            ])
-        )
-
-
-@router.callback_query(F.data == "visa_need_help")
-async def visa_need_help(callback: CallbackQuery, state: FSMContext):
-    """Пользователю нужна помощь с билетами"""
-    user_id = callback.from_user.id
-    await state.update_data(visa_status="not_have", needs_help=True)
+@router.message(TravelStates.waiting_for_visa_info)
+async def process_visa_info(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    visa_info = (message.text or '').strip()
+    if not visa_info:
+        await message.answer(await t(user_id, 'flight_visa_question'))
+        return
+    await state.update_data(
+        visa_info=visa_info,
+        visa_status="not_have" if visa_info.casefold() in {"нет", "no"} else "have"
+    )
     await state.set_state(TravelStates.waiting_for_passport_consent)
-
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=await t(user_id, 'confirm_data_storage'), callback_data="passport_consent_yes")],
         [InlineKeyboardButton(text=await t(user_id, 'dont_store'), callback_data="passport_consent_no")],
         [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_visa_support")]
     ])
-
-    await callback.message.edit_text(
-        await t(user_id, 'passport_consent'),
-        reply_markup=keyboard,
+    await message.answer(
+        await t(user_id, 'passport_consent'), reply_markup=keyboard,
         parse_mode=ParseMode.MARKDOWN
     )
 
 
-@router.callback_query(F.data == "visa_bought_myself")
-async def visa_bought_myself(callback: CallbackQuery, state: FSMContext):
-    """Пользователь купил всё сам"""
-    user_id = callback.from_user.id
-    await state.update_data(visa_status="not_have", needs_help=False)
-
-    visa_data = {
-        'username': callback.from_user.username,
-        'user_id': user_id,
-        'visa_status': "not_have",
-        'needs_help': False,
-        'passport_data': '-',
-        'city_from': '-',
-        'city_to': '-',
-        'needs_baggage': False,
-        'preferences': 'User booked independently'
-    }
-    await db.save_visa_request(visa_data)
-
-    # Отправляем уведомление
-    await send_request_notification_to_manager(
-        bot=callback.message.bot,
-        department="travel",
-        request_title="🛂 Статус визы (Куплено самостоятельно)",
-        user_data={'user_id': user_id, 'username': callback.from_user.username},
-        details={
-            "Статус визы": "not_have",
-            "Помощь": "Не требуется (User booked independently)"
-        }
-    )
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_back_to_menu")]
-    ])
-
-    await callback.message.edit_text(
-        await t(user_id, 'thanks_for_info'),
-        reply_markup=keyboard
-    )
-    await state.clear()
-
-
-@router.callback_query(F.data.startswith("passport_consent_"))
+@router.callback_query(F.data.startswith("passport_consent_"), TravelStates.waiting_for_passport_consent)
 async def process_passport_consent(callback: CallbackQuery, state: FSMContext):
     """Обработка согласия на хранение паспортных данных"""
     user_id = callback.from_user.id
@@ -623,8 +541,8 @@ async def process_hotel_needed(callback: CallbackQuery, state: FSMContext):
             passport_data=data
         )
 
-    # Показываем выбор рейсов
-    await show_flight_choice(callback, state, callback.from_user.username)
+    # Суточные заполняются в той же заявке после вопроса об отеле.
+    await start_per_diem_form(callback, state)
 
 
 async def show_flight_choice(update: Union[Message, CallbackQuery], state: FSMContext, username: str):
@@ -632,11 +550,14 @@ async def show_flight_choice(update: Union[Message, CallbackQuery], state: FSMCo
     user_id = update.from_user.id if hasattr(update, 'from_user') else update.message.from_user.id
     data = await state.get_data()
 
-    flights = await db.get_available_flights(username, data.get('departure_from'), data.get('return_to'))
+    flights = await db.get_available_flights(
+        username, data.get('departure_from'), data.get('return_to'), data.get('conference')
+    )
 
     if flights:
         await state.set_state(TravelStates.waiting_for_flight_choice)
 
+        await state.update_data(available_flight_ids=[flight['id'] for flight in flights])
         # Создаем клавиатуру с локализованными кнопками
         builder = InlineKeyboardBuilder()
         for flight in flights:
@@ -690,7 +611,14 @@ async def send_request_to_manager(update: Union[Message, CallbackQuery], state: 
     flight_data = {
         'username': username,
         'user_id': user_id,
+        'conference': data.get('conference'),
         'visa_status': data.get('visa_status', 'not_have'),
+        'visa_info': data.get('visa_info', ''),
+        'hotel_needed': data.get('hotel_needed', False),
+        'selected_flight_id': data.get('selected_flight_id'),
+        'payment_type': data.get('payment_type'),
+        'payment_details': data.get('payment_details'),
+        'consent_given': data.get('consent_given', False),
         'passport_data': passport_data_str,
         'city_from': data.get('departure_from', ''),
         'city_to': data.get('return_to', ''),
@@ -698,7 +626,17 @@ async def send_request_to_manager(update: Union[Message, CallbackQuery], state: 
         'preferences': data.get('preferences', '')
     }
 
-    await db.save_flight_request(flight_data)
+    if not await db.save_flight_request(flight_data):
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=await t(user_id, 'submit'), callback_data="flight_submit_retry")],
+            [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_back_to_menu")]
+        ])
+        await state.set_state(TravelStates.waiting_for_flight_choice)
+        if isinstance(update, Message):
+            await update.answer(await t(user_id, 'error_saving_request'), reply_markup=keyboard)
+        else:
+            await update.message.edit_text(await t(user_id, 'error_saving_request'), reply_markup=keyboard)
+        return
 
     # Отправляем в Travel-чат
     bot_obj = update.bot if isinstance(update, Message) else update.message.bot
@@ -708,6 +646,11 @@ async def send_request_to_manager(update: Union[Message, CallbackQuery], state: 
         request_title="✈️ Заявка на билет",
         user_data={'user_id': user_id, 'username': username},
         details={
+            "Конференция": flight_data.get('conference'),
+            "Виза (ответ пользователя)": flight_data.get('visa_info'),
+            "Суточные": flight_data.get('payment_type'),
+            "Реквизиты": flight_data.get('payment_details'),
+            "Выбранный рейс (ID)": flight_data.get('selected_flight_id') or "Подбор менеджером",
             "Откуда": flight_data.get('city_from'),
             "Куда": flight_data.get('city_to'),
             "Багаж": "Да" if flight_data.get('needs_baggage') else "Нет",
@@ -741,33 +684,23 @@ async def process_flight_choice(callback: CallbackQuery, state: FSMContext):
     """Пользователь выбрал рейс"""
     user_id = callback.from_user.id
     flight_id = int(callback.data.replace("flight_choose_", ""))
+    data = await state.get_data()
+    if flight_id not in data.get('available_flight_ids', []):
+        await callback.answer()
+        return
     await state.update_data(selected_flight_id=flight_id)
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=await t(user_id, 'hotel_needed_yes'), callback_data="hotel_after_flight_yes"),
-         InlineKeyboardButton(text=await t(user_id, 'hotel_needed_no'), callback_data="hotel_after_flight_no")]
-    ])
-
-    await callback.message.edit_text(
-        await t(user_id, 'hotel_question'),
-        reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
-    )
-    await state.set_state(TravelStates.waiting_for_hotel_needed)
+    await send_request_to_manager(callback, state)
 
 
-@router.callback_query(F.data.startswith("hotel_after_flight_"), TravelStates.waiting_for_hotel_needed)
-async def process_hotel_after_flight(callback: CallbackQuery, state: FSMContext):
-    """Обработка ответа об отеле после выбора рейса"""
-    hotel_needed = callback.data == "hotel_after_flight_yes"
-    await state.update_data(hotel_needed=hotel_needed)
+@router.callback_query(F.data == "flight_submit_retry", TravelStates.waiting_for_flight_choice)
+async def retry_flight_request(callback: CallbackQuery, state: FSMContext):
     await send_request_to_manager(callback, state)
 
 
 @router.callback_query(F.data == "flight_no_suitable", TravelStates.waiting_for_flight_choice)
 async def process_no_suitable_flight(callback: CallbackQuery, state: FSMContext):
     """Ни один рейс не подходит"""
-    await state.update_data(no_suitable_flight=True)
+    await state.update_data(no_suitable_flight=True, selected_flight_id=None)
     await send_request_to_manager(callback, state)
 
 
@@ -775,9 +708,56 @@ async def process_no_suitable_flight(callback: CallbackQuery, state: FSMContext)
 # FLIGHT REQUEST (основная кнопка)
 # ============================================
 
-@router.callback_query(F.data == "travel_flight_request")
+@router.callback_query(F.data.in_({"travel_flight_request", "travel_per_diem",
+                                  "visa_have", "visa_not_have", "visa_special",
+                                  "visa_need_help", "visa_bought_myself"}))
 async def start_flight_request(callback: CallbackQuery, state: FSMContext):
-    """Начало формы запроса билета"""
+    """Выбрать доступную пользователю конференцию перед заполнением заявки."""
+    user_id = callback.from_user.id
+    await state.clear()
+    if not callback.from_user.username:
+        await callback.message.edit_text(
+            await t(user_id, 'error_no_username'),
+            reply_markup=await get_form_back_keyboard("travel_back_to_menu", user_id)
+        )
+        return
+    conferences = await db.get_user_active_conferences(callback.from_user.username)
+    names = list(dict.fromkeys(conf['conference_name'] for conf in conferences if conf.get('conference_name')))
+    if not names:
+        await callback.message.edit_text(
+            await t(user_id, 'error_no_conferences'),
+            reply_markup=await get_form_back_keyboard("travel_back_to_menu", user_id)
+        )
+        return
+    token = uuid4().hex[:12]
+    await state.update_data(flight_conferences=names, conference_token=token)
+    await state.set_state(TravelStates.waiting_for_conference)
+    builder = InlineKeyboardBuilder()
+    for index, name in enumerate(names):
+        builder.row(InlineKeyboardButton(text=name, callback_data=f"flight_conf_{token}_{index}"))
+    builder.row(
+        InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_back_to_menu"),
+        InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")
+    )
+    await callback.message.edit_text(
+        await t(user_id, 'select_conference_for_flight_request'), reply_markup=builder.as_markup()
+    )
+
+
+@router.callback_query(F.data.startswith("flight_conf_"), TravelStates.waiting_for_conference)
+async def select_flight_conference(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    token, _, index = callback.data.removeprefix("flight_conf_").partition("_")
+    names = data.get('flight_conferences', [])
+    if token != data.get('conference_token') or not index.isdigit() or int(index) >= len(names):
+        await callback.answer()
+        return
+    conference = names[int(index)]
+    conferences = await db.get_user_active_conferences(callback.from_user.username)
+    if not any(conf.get('conference_name') == conference for conf in conferences):
+        await start_flight_request(callback, state)
+        return
+    await state.update_data(conference=conference)
     await show_visa_support(callback, state)
 
 
@@ -785,16 +765,19 @@ async def start_flight_request(callback: CallbackQuery, state: FSMContext):
 # Daily allowance (Суточные)
 # ============================================
 
-@router.callback_query(F.data == "travel_per_diem")
 async def start_per_diem_form(callback: CallbackQuery, state: FSMContext):
-    """Начало формы суточных"""
+    """Блок суточных в заявке на билет; вопросы и проверки сохранены."""
+    data = await state.get_data()
+    if 'hotel_needed' not in data:
+        await start_flight_request(callback, state)
+        return
     user_id = callback.from_user.id
     await state.set_state(TravelStates.waiting_for_per_diem_payment_type)
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=await t(user_id, 'per_diem_card'), callback_data="per_diem_card")],
         [InlineKeyboardButton(text=await t(user_id, 'per_diem_crypto'), callback_data="per_diem_crypto")],
-        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_back_to_menu")]
+        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="back_to_hotel_needed")]
     ])
 
     await callback.message.edit_text(
@@ -858,7 +841,7 @@ async def per_diem_crypto_network(callback: CallbackQuery, state: FSMContext):
     )
 
 
-@router.message(TravelStates.waiting_for_per_diem_card)
+@router.message(TravelStates.waiting_for_per_diem_card, F.text)
 async def process_per_diem_card(message: Message, state: FSMContext):
     """Обработка номера карты"""
     user_id = message.from_user.id
@@ -873,7 +856,7 @@ async def process_per_diem_card(message: Message, state: FSMContext):
     await show_per_diem_consent(message, state)
 
 
-@router.message(TravelStates.waiting_for_per_diem_crypto_address)
+@router.message(TravelStates.waiting_for_per_diem_crypto_address, F.text)
 async def process_per_diem_crypto_address(message: Message, state: FSMContext):
     """Обработка адреса криптокошелька"""
     user_id = message.from_user.id
@@ -915,51 +898,9 @@ async def show_per_diem_consent(update: Union[Message, CallbackQuery], state: FS
 
 @router.callback_query(F.data == "per_diem_consent", TravelStates.waiting_for_per_diem_consent)
 async def process_per_diem_consent(callback: CallbackQuery, state: FSMContext):
-    """Сохранение заявки на суточные"""
-    user_id = callback.from_user.id
-    data = await state.get_data()
-
-    per_diem_data = {
-        'username': callback.from_user.username,
-        'user_id': user_id,
-        'payment_type': data.get('payment_type'),
-        'payment_details': data.get('payment_details'),
-        'consent_given': True
-    }
-
-    await db.save_per_diem_request(per_diem_data)
-
-    await db.log_user_action(
-        user_id=user_id,
-        username=callback.from_user.username,
-        action="per_diem_request_submitted",
-        details={"payment_type": data.get('payment_type')}
-    )
-
-    # Отправляем в Travel-чат
-    await send_request_notification_to_manager(
-        bot=callback.message.bot,
-        department="travel",
-        request_title="💵 Суточные (Per Diem)",
-        user_data={'user_id': user_id, 'username': callback.from_user.username},
-        details={
-            "Способ выплаты": per_diem_data.get('payment_type'),
-            "Реквизиты": per_diem_data.get('payment_details')
-        }
-    )
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=await t(user_id, 'question_button'), callback_data="travel_question")],
-        [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="travel_back_to_menu")],
-        [InlineKeyboardButton(text=await t(user_id, 'main_menu'), callback_data="menu_main")]
-    ])
-
-    await callback.message.edit_text(
-        await t(user_id, 'per_diem_success'),
-        reply_markup=keyboard,
-        parse_mode=ParseMode.MARKDOWN
-    )
-    await state.clear()
+    """После согласия завершить выбор рейса и сохранить одну общую заявку."""
+    await state.update_data(consent_given=True)
+    await show_flight_choice(callback, state, callback.from_user.username)
 
 
 # ============================================
@@ -1200,6 +1141,20 @@ async def back_to_return_to(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
         await t(user_id, 'passport_step10'),
         reply_markup=await get_form_back_keyboard("back_to_departure_from", user_id)
+    )
+
+
+@router.callback_query(F.data == "back_to_hotel_needed")
+async def back_to_hotel_needed(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(TravelStates.waiting_for_hotel_needed)
+    user_id = callback.from_user.id
+    await callback.message.edit_text(
+        await t(user_id, 'hotel_question'),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=await t(user_id, 'hotel_needed_yes'), callback_data="hotel_needed_yes"),
+             InlineKeyboardButton(text=await t(user_id, 'hotel_needed_no'), callback_data="hotel_needed_no")],
+            [InlineKeyboardButton(text=await t(user_id, 'back'), callback_data="back_to_baggage")]
+        ]), parse_mode=ParseMode.MARKDOWN
     )
 
 

@@ -113,7 +113,6 @@ async def get_travel_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text=get_text_sync(lang, 'travel_hotel'), callback_data="travel_hotel")
     )
     builder.row(
-        InlineKeyboardButton(text=get_text_sync(lang, 'travel_per_diem'), callback_data="travel_per_diem"),
         InlineKeyboardButton(text=get_text_sync(lang, 'travel_my_requests'), callback_data="travel_my_requests")
     )
     builder.row(
@@ -151,15 +150,6 @@ async def get_back_next_keyboard(back_to: str, next_disabled: bool = False,
 
 
 # Специальные клавиатуры
-def get_visa_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ У меня есть виза", callback_data="visa_have")],
-        [InlineKeyboardButton(text="❌ У меня нет визы", callback_data="visa_not_have")],
-        [InlineKeyboardButton(text="🔄 Особый случай", callback_data="visa_special")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="menu_travel")]
-    ])
-
-
 def get_baggage_keyboard(back_callback: str = "visa_back_step3") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ Да", callback_data="baggage_yes")],

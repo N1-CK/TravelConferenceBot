@@ -271,6 +271,8 @@ COMMON_TEXTS = {
         'travel_back_to_menu': "◀️ Назад в TRAVEL",
 
         # Визовая поддержка
+        'flight_visa_question': "Если вы получили визу, напишите даты её действия. Если визы нет, введите в строке ввода слово «нет».",
+        'select_conference_for_flight_request': "Выберите конференцию, в рамках которой необходим авиабилет:",
         'visa_support_title': "🛂 Визовая поддержка\n\nВыберите ваш статус:",
         'visa_have': "✅ У меня есть виза",
         'visa_not_have': "❌ У меня нет визы",
@@ -755,6 +757,8 @@ COMMON_TEXTS = {
         'travel_back_to_menu': "◀️ Back to TRAVEL",
 
         # Visa support
+        'flight_visa_question': "If you have a visa, please enter its validity dates. If you don't have a visa, type \"no\" in the input field.",
+        'select_conference_for_flight_request': "Select the conference for which you need a flight ticket:",
         'visa_support_title': "🛂 Visa Support\n\nChoose your status:",
         'visa_have': "✅ I have a visa",
         'visa_not_have': "❌ I don't have a visa",
