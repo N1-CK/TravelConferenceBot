@@ -107,7 +107,7 @@ class Database:
             return False
 
     async def create_all_tables(self):
-        """Создаем все таблицы для обоих ботов"""
+        """Инициализация схем; назначение и legacy-таблицы: docs/DATABASE_AUDIT_RU.md."""
         try:
             async with self.pool.acquire() as conn:
                 tables = [
@@ -221,16 +221,6 @@ class Database:
                         created_at TIMESTAMP DEFAULT NOW(),
                         updated_at TIMESTAMP DEFAULT NOW(),
                         is_archived BOOLEAN NOT NULL DEFAULT FALSE
-                    )
-                    ''',
-
-                    # ===== ТАБЛИЦЫ AFFILIATE BOT =====
-                    f'''
-                    CREATE TABLE IF NOT EXISTS {self.db_schema}.affiliate_auth_users (
-                        username TEXT PRIMARY KEY REFERENCES {self.db_schema_config}.whitelist(username),
-                        flag BOOLEAN DEFAULT TRUE,
-                        company TEXT,
-                        created_at TIMESTAMP DEFAULT NOW()
                     )
                     ''',
 
@@ -392,6 +382,8 @@ class Database:
                     )
                     ''',
 
+                    # Legacy при стандартной схеме: рабочие ссылки авиакомпаний
+                    # get_airline_url_travel читает из travel_bot.airlines.
                     f'''
                     CREATE TABLE IF NOT EXISTS {self.db_schema}.airlines (
                         id SERIAL PRIMARY KEY,
@@ -401,6 +393,8 @@ class Database:
                     )
                     ''',
 
+                    # Legacy API согласий: check/save_user_agreement не вызываются
+                    # текущими обработчиками. Не путать с паспортным согласием Travel.
                     f'''
                     CREATE TABLE IF NOT EXISTS {self.db_schema}.user_agreements (
                         id SERIAL PRIMARY KEY,
@@ -510,20 +504,8 @@ class Database:
                     )
                 """)
 
-                # Таблица сессий админки
-                await conn.execute(f"""
-                    CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.admin_sessions (
-                        id SERIAL PRIMARY KEY,
-                        admin_id INTEGER REFERENCES {self.db_schema_admin}.admin_users(id),
-                        session_token TEXT UNIQUE,
-                        ip_address TEXT,
-                        user_agent TEXT,
-                        created_at TIMESTAMP DEFAULT NOW(),
-                        expires_at TIMESTAMP
-                    )
-                """)
-
-                # Таблица логов действий админов
+                # Legacy: log_admin_action определён, но не вызывается.
+                # Рабочая история рассылок хранится отдельно в user_logs.
                 await conn.execute(f"""
                     CREATE TABLE IF NOT EXISTS {self.db_schema_admin}.admin_logs (
                         id SERIAL PRIMARY KEY,
@@ -2575,7 +2557,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 rows = await conn.fetch(f"""
-                    SELECT user_id, username, full_name, company
+                    SELECT user_id, username, full_name, company, language
                     FROM {self.db_schema_config}.user_profiles
                     ORDER BY username
                 """)
@@ -2900,14 +2882,14 @@ class Database:
             async with self.pool.acquire() as conn:
                 if companies:
                     query = f"""
-                        SELECT user_id, username, company
+                        SELECT user_id, username, company, language
                         FROM {self.db_schema_config}.user_profiles
                         WHERE company = ANY($1::text[])
                     """
                     rows = await conn.fetch(query, companies)
                 else:
                     query = f"""
-                        SELECT user_id, username, company
+                        SELECT user_id, username, company, language
                         FROM {self.db_schema_config}.user_profiles
                     """
                     rows = await conn.fetch(query)
@@ -2921,7 +2903,7 @@ class Database:
         try:
             async with self.pool.acquire() as conn:
                 query = f"""
-                    SELECT user_id, username, company
+                    SELECT user_id, username, company, language
                     FROM {self.db_schema_config}.user_profiles
                     WHERE user_id = ANY($1::bigint[])
                 """
@@ -2941,7 +2923,8 @@ class Database:
                         up.username, 
                         up.full_name, 
                         up.company,
-                        up.position
+                        up.position,
+                        up.language
                     FROM {self.db_schema_config}.user_profiles up
                     JOIN {self.db_schema}.user_conferences uconf ON up.username = uconf.username
                     WHERE uconf.conference_name = ANY($1::text[])
@@ -3018,7 +3001,7 @@ class Database:
                         (SELECT MAX(timestamp) FROM {self.db_schema}.user_logs WHERE user_id = up.user_id) as last_active,
                         (SELECT COUNT(*) FROM {self.db_schema}.user_logs WHERE user_id = up.user_id AND timestamp > NOW() - INTERVAL '5 minutes') > 0 as is_online
                     FROM {self.db_schema_config}.user_profiles up
-                    ORDER BY up.registered_at DESC
+                    ORDER BY up.registered_at DESC NULLS LAST, up.user_id DESC
                 """)
                 users = [dict(row) for row in rows]
                 if not users:

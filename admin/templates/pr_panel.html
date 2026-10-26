@@ -328,6 +328,7 @@
         .dataTables_wrapper > .row:last-child > div { width: 100%; text-align: center; }
     }
 </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='panel_tables.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -396,7 +397,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="bannersTable" class="table table-hover align-middle">
+                        <table id="bannersTable" class="table table-hover align-middle panel-table">
                             <thead>
                                 <tr>
                                     <th>{{ get_text('id') }}</th>
@@ -568,7 +569,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="cardsTable" class="table table-hover align-middle">
+                        <table id="cardsTable" class="table table-hover align-middle panel-table">
                             <thead>
                                 <tr>
                                     <th>{{ get_text('id') }}</th>
@@ -717,7 +718,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="bookingsTable" class="table table-hover table-affiliate align-middle">
+                        <table id="bookingsTable" class="table table-hover table-affiliate align-middle panel-table">
                             <thead>
                                 <tr>
                                     <th>{{ get_text('id') }}</th>
@@ -768,7 +769,7 @@
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table id="reportsTable" class="table table-hover table-affiliate align-middle">
+                    <table id="reportsTable" class="table table-hover table-affiliate align-middle panel-table">
                         <thead>
                             <tr>
                                 <th>{{ get_text('id') }}</th>

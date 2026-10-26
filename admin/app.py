@@ -30,7 +30,7 @@ from werkzeug.utils import secure_filename
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import db
-from utility.chat_routing import prepare_department_message
+from utility.chat_routing import prepare_department_message, filter_broadcast_users
 from locales import get_text
 from utility.notifications import (
     notify_banner_status_change,
@@ -470,6 +470,9 @@ def broadcast():
     if request.method == 'POST':
         message = request.form.get('message')
         target_type = request.form.get('target_type', 'all')
+        language = request.form.get('language', 'all') if target_type in ('company', 'conference') else 'all'
+        if language not in ('all', 'ru', 'en'):
+            abort(400, description='Invalid broadcast language')
         files = request.files.getlist('files')
         saved_files = []
 
@@ -522,6 +525,7 @@ def broadcast():
             # Only selected users who still belong to the chosen conferences may receive it.
             users_to_send = [user for user in conference_users if user['user_id'] in selected_ids]
 
+        users_to_send = filter_broadcast_users(users_to_send, language)
         if not users_to_send:
             flash('Нет пользователей для рассылки', 'warning')
             return render_template('broadcast.html', companies=companies, conferences=conferences, users=users)
@@ -556,6 +560,8 @@ def broadcast():
                 pass
 
         company_info = ', '.join(request.form.getlist('companies')) if target_type == 'company' else target_type
+        if language != 'all':
+            company_info += f' [{language}]'
         run_async(db.log_broadcast(
             username=session.get('username', 'admin'),
             broadcast_type=target_type,
@@ -707,9 +713,11 @@ def api_users_count():
         data = request.get_json()
         companies = data.get('companies', [])
         conferences = data.get('conferences', [])
+        language = data.get('language', 'all')
     else:
         companies = request.args.get('companies', '').split(',')
         conferences = request.args.get('conferences', '').split(',')
+        language = request.args.get('language', 'all')
         if companies == ['']: companies = []
         if conferences == ['']: conferences = []
 
@@ -719,7 +727,9 @@ def api_users_count():
         users = run_async(db.get_users_by_conference_list(conferences))
     else:
         users = run_async(db.get_users_by_company_list())
-    return jsonify({'count': len(users)})
+    if language not in ('all', 'ru', 'en'):
+        abort(400, description='Invalid broadcast language')
+    return jsonify({'count': len(filter_broadcast_users(users, language))})
 
 # ============================================
 # ПАНЕЛИ И СПЕЦИФИЧЕСКИЕ API
@@ -1114,10 +1124,13 @@ def api_get_all_users():
 def api_get_users_by_conferences():
     data = request.get_json()
     conferences = data.get('conferences', [])
+    language = data.get('language', 'all')
+    if language not in ('all', 'ru', 'en'):
+        abort(400, description='Invalid broadcast language')
     if not conferences:
         return jsonify([])
     users = run_async(db.get_users_by_conference_list(conferences))
-    return jsonify(users)
+    return jsonify(filter_broadcast_users(users, language))
 
 @app.route('/api/visa/<int:request_id>')
 @login_required

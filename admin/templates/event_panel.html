@@ -281,6 +281,7 @@
         }
     }
 </style>
+<link rel="stylesheet" href="{{ url_for('static', filename='panel_tables.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -355,7 +356,7 @@
                         <span class="badge bg-secondary rounded-pill" id="ticketArchiveCount">0</span>
                     </button>
                     <div class="table-responsive">
-                        <table id="ticketsTable" class="table table-hover align-middle">
+                        <table id="ticketsTable" class="table table-hover align-middle panel-table">
                             <thead class="table-header">
                                 <tr>
                                     <th>{{ get_text('id') }}</th>
@@ -428,7 +429,7 @@
                                                     </div>
                                                     <div class="info-row">
                                                         <span class="info-label">{{ get_text('email') }}:</span>
-                                                        <span class="text-truncate" style="max-width: 180px;">{{ req.email or '-' }}</span>
+                                                        <span>{{ req.email or '-' }}</span>
                                                     </div>
                                                     <div class="info-row">
                                                         <span class="info-label">{{ get_text('phone') }}:</span>
@@ -450,6 +451,9 @@
                                     <!-- Кнопки действий -->
                                     <td class="t-col-actions">
                                         <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button" class="btn btn-outline-primary btn-view-ticket" onclick='viewTicketDetails({{ req|tojson }})' title="{{ get_text('view_details') }}">
+                                                <i class="bi bi-eye"></i><span class="d-md-none ms-1">{{ get_text('details') }}</span>
+                                            </button>
                                             <button class="btn btn-outline-warning"
                                                     onclick="updateTicketStatus({{ req.id }}, 'pending')"
                                                     {% if req.status == 'pending' %}disabled{% endif %}
@@ -553,7 +557,7 @@
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="standsTable" class="table table-hover align-middle">
+                        <table id="standsTable" class="table table-hover align-middle panel-table">
                             <thead class="table-header">
                                 <tr>
                                     <th>{{ get_text('conference') }}</th>
@@ -569,13 +573,13 @@
                             <tbody>
                                 {% for stand in stands %}
                                 <tr>
-                                    <td><strong>{{ stand.conference }}</strong></td>
-                                    <td><span class="badge bg-light text-dark border">{{ stand.company }}</span></td>
-                                    <td>{{ stand.stand_number or '-' }}</td>
-                                    <td>{{ stand.stand_style or '-' }}</td>
-                                    <td>{{ stand.working_hours or '-' }}</td>
-                                    <td>{{ stand.dress_code or '-' }}</td>
-                                    <td>
+                                    <td data-label="{{ get_text('conference') }}"><strong>{{ stand.conference }}</strong></td>
+                                    <td data-label="{{ get_text('company') }}"><span class="badge bg-light text-dark border">{{ stand.company }}</span></td>
+                                    <td data-label="{{ get_text('stand_number') }}">{{ stand.stand_number or '-' }}</td>
+                                    <td data-label="{{ get_text('stand_style') }}">{{ stand.stand_style or '-' }}</td>
+                                    <td data-label="{{ get_text('working_hours') }}">{{ stand.working_hours or '-' }}</td>
+                                    <td data-label="{{ get_text('dress_code') }}">{{ stand.dress_code or '-' }}</td>
+                                    <td data-label="{{ get_text('photos') }}">
                                         {% if stand.photo_path %}
                                             <a href="/static/uploads/stands/{{ stand.photo_path }}" target="_blank" title="{{ get_text('open_full_size') }}">
                                                 <img src="/static/uploads/stands/{{ stand.photo_path }}" alt="stand preview" class="stand-thumb">
@@ -584,7 +588,7 @@
                                             <span class="text-muted"><i class="bi bi-image"></i> {{ get_text('no_photo') }}</span>
                                         {% endif %}
                                     </td>
-                                    <td>
+                                    <td data-label="{{ get_text('actions') }}">
                                         <div class="btn-group btn-group-sm">
                                             <!-- Красивая кнопка редактирования в едином стиле с кнопкой удаления -->
                                             <button type="button" class="btn btn-outline-warning"
@@ -672,10 +676,48 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="ticketDetailsModal" tabindex="-1" aria-labelledby="ticketDetailsTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content rounded-4">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ticketDetailsTitle">{{ get_text('request_details') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ get_text('close') }}"></button>
+            </div>
+            <div class="modal-body"><dl class="panel-request-fields" id="ticketDetailsFields"></dl></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('close') }}</button></div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    function viewTicketDetails(ticket) {
+        const fields = document.getElementById('ticketDetailsFields');
+        fields.replaceChildren();
+        const labels = {{ {
+            'id': get_text('id'), 'username': get_text('username'),
+            'full_name': get_text('full_name'), 'position': get_text('position'),
+            'company': get_text('company'), 'email': get_text('email'),
+            'phone': get_text('phone'), 'country': get_text('country'),
+            'created_at': get_text('created_at'), 'status': get_text('status')
+        }|tojson }};
+        const statuses = {{ {'pending': get_text('status_pending_event'), 'in_progress': get_text('status_in_progress'), 'ready': get_text('status_ready')}|tojson }};
+        Object.entries(labels).forEach(([key, label]) => {
+            const term = document.createElement('dt');
+            const value = document.createElement('dd');
+            term.textContent = label;
+            value.textContent = key === 'status' ? (statuses[ticket[key]] || ticket[key] || '—') : (ticket[key] || '—');
+            if (key === 'created_at' && ticket[key]) {
+                const date = new Date(ticket[key]);
+                if (!Number.isNaN(date.getTime())) value.textContent = date.toLocaleString({{ ('ru-RU' if session.get('lang', 'ru') == 'ru' else 'en-GB')|tojson }}, {timeZone:'UTC'});
+            }
+            fields.append(term, value);
+        });
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('ticketDetailsModal')).show();
+    }
+
     let ticketsTable;
     let standsTable;
     let ticketArchiveMode = false;
@@ -784,7 +826,9 @@
                 url: `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`
             },
             pageLength: 25,
-            order: [[0, 'desc']]
+            autoWidth: false,
+            columnDefs: [{ targets: [3, 5, 6], visible: false }, { targets: 10, orderable: false }],
+            order: [[8, 'desc']]
         });
         refreshTicketArchive();
 
@@ -794,6 +838,8 @@
                 url: `//cdn.datatables.net/plug-ins/1.11.5/i18n/${lang === 'ru' ? 'ru' : 'en-GB'}.json`
             },
             pageLength: 25,
+            autoWidth: false,
+            columnDefs: [{ targets: 7, orderable: false }],
             order: [[0, 'asc'], [1, 'asc']]
         });
 

@@ -588,6 +588,7 @@ TEXTS = {
         'company_changed_success': 'Организация успешно изменена!',
         'company_changed_error': 'Ошибка при обновлении организации',
         'registered_at': 'Дата регистрации',
+        'broadcast_all_languages': 'Все языки',
         'requests': 'Заявки',
         'type': 'Тип',
 
@@ -1232,6 +1233,7 @@ TEXTS = {
         'company_changed_success': 'Company updated successfully!',
         'company_changed_error': 'Error updating company',
         'registered_at': 'Registered At',
+        'broadcast_all_languages': 'All languages',
         'requests': 'Requests',
         'type': 'Type',
 

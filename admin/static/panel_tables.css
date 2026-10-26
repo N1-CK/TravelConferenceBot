@@ -1,0 +1,52 @@
+/* Общий вид таблиц Event/PR: как Travel, без распирающих страницу ячеек. */
+.panel-table {width:100%!important;table-layout:fixed;border-collapse:separate;border-spacing:0}
+.panel-table th {font-size:.8rem;vertical-align:middle;color:#667085;background:#f5f7fb;padding:12px 10px;border-bottom:1px solid #e5eaf1;overflow-wrap:anywhere}
+.panel-table td {font-size:.85rem;padding:12px 10px;vertical-align:middle;overflow-wrap:anywhere;white-space:normal}
+.panel-table tbody tr:hover > td {background-color:#f8f9ff}
+.panel-table .badge {max-width:100%;white-space:normal;overflow-wrap:anywhere}
+.panel-table .btn-group {display:inline-flex;flex-wrap:wrap;gap:5px}
+.panel-table .btn-group > .btn {border-radius:8px!important;margin:0!important;flex:0 0 auto}
+.panel-table .status-badge {font-size:.75rem;padding:5px 9px;white-space:normal}
+.panel-table th:first-child {border-radius:10px 0 0 0}
+.panel-table th:last-child {border-radius:0 10px 0 0}
+.panel-table .booking-details,.panel-table .report-details {white-space:normal;max-width:none}
+.dataTables_wrapper {min-width:0}
+.dataTables_wrapper .row > div {min-width:0}
+.card-header {flex-wrap:wrap;gap:10px}
+.panel-request-fields {display:grid;grid-template-columns:minmax(110px,.7fr) minmax(0,1.3fr);gap:14px 20px;padding:16px;margin:0;border:1px solid #e5eaf1;border-radius:14px;background:#fafbfc;font-size:.88rem}
+.panel-request-fields dt {color:#667085;font-weight:500}
+.panel-request-fields dd {margin:0;overflow-wrap:anywhere;color:#1d2939}
+@media(min-width:768px) {
+    #ticketsTable th:first-child,#bannersTable th:first-child,#cardsTable th:first-child,
+    #bookingsTable th:first-child,#reportsTable th:first-child {width:5%}
+    #ticketsTable th:last-child,#bannersTable th:last-child,#cardsTable th:last-child {width:17%}
+    #ticketsTable th:nth-last-child(2),#bannersTable th:nth-last-child(2),#cardsTable th:nth-last-child(2) {width:13%}
+    #bookingsTable th:last-child,#reportsTable th:last-child {width:8%}
+}
+@media(max-width:767.98px) {
+    .panel-table {table-layout:auto}
+    .panel-table td,.panel-table .info-row > span {min-width:0;overflow-wrap:anywhere;white-space:normal}
+    .panel-table .mobile-card-top,#ticketsTable .t-col-header {gap:10px;flex-wrap:wrap}
+    .panel-table .info-row {gap:12px;align-items:flex-start!important}
+    .panel-table .info-row > span:last-child {text-align:right}
+    .panel-table .info-row .info-label {flex:0 0 38%}
+    #ticketsTable td.t-col-actions .btn-group {display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))}
+    #ticketsTable td.t-col-actions .btn,#ticketsTable td.t-col-actions .btn span {overflow-wrap:normal!important;word-break:normal;white-space:normal}
+    #ticketsTable .btn-view-ticket {grid-column:1 / 3;grid-row:1}
+    #ticketsTable .ticket-archive-trigger {grid-column:3;grid-row:1}
+    .dataTables_wrapper .row {margin:0}
+    .dataTables_wrapper .row > div {padding-left:0;padding-right:0;max-width:100%}
+    .dataTables_paginate .pagination {flex-wrap:wrap;justify-content:center!important}
+    #standsTable,#standsTable tbody {display:block;width:100%}
+    #standsTable thead {display:none}
+    #standsTable tbody tr {display:block;border:1px solid #e5eaf1;border-radius:14px;margin-bottom:14px;background:#fff;overflow:hidden}
+    #standsTable tbody td {display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border:0;padding:9px 14px}
+    #standsTable tbody td::before {content:attr(data-label);color:#667085;font-size:.76rem;flex:0 0 38%}
+    #standsTable tbody td:first-child {border-bottom:1px solid #eef1f5;padding-top:14px}
+    #standsTable tbody td:last-child {border-top:1px solid #eef1f5;padding-bottom:14px}
+    #standsTable .dataTables_empty {display:block}
+}
+@media(max-width:380px) {
+    .panel-request-fields {grid-template-columns:1fr;gap:6px}
+    .panel-request-fields dd {margin-bottom:8px}
+}

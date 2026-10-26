@@ -383,6 +383,15 @@
             </div>
 
             <!-- Companies Block -->
+            <div id="broadcastLanguageFilter" class="mb-3" style="display: none;">
+                <label class="form-label fw-bold" for="broadcastLanguage">{{ get_text('language') }}</label>
+                <select class="form-select" name="language" id="broadcastLanguage" onchange="updateCompanyRecipients(); updateConferenceRecipients();">
+                    <option value="all">{{ get_text('broadcast_all_languages') }}</option>
+                    <option value="ru">Русский (RU)</option>
+                    <option value="en">English (ENG)</option>
+                </select>
+            </div>
+
             <div id="companyMultiSelect" style="display: none;">
                 <div class="selection-group">
                     <div class="selection-header">
@@ -544,6 +553,7 @@
     let currentCompanyRecipients = [];
     let currentConferenceRecipients = [];
     let currentConferenceUsers = [];
+    let companyRecipientsRequest = 0;
     let conferenceRecipientsRequest = 0;
     let conferenceRecipientsLoading = false;
     let allUsers = {{ users|tojson }};
@@ -583,6 +593,7 @@
         const companyDiv = document.getElementById('companyMultiSelect');
         const specificDiv = document.getElementById('specificUsersSelect');
         const conferenceDiv = document.getElementById('conferenceMultiSelect');
+        document.getElementById('broadcastLanguageFilter').style.display = targetCompany || targetConference ? 'block' : 'none';
 
         if (companyDiv) companyDiv.style.display = 'none';
         if (specificDiv) specificDiv.style.display = 'none';
@@ -601,6 +612,8 @@
     // COMPANY RECIPIENTS PREVIEW
     // ============================================
     async function updateCompanyRecipients() {
+        const requestId = ++companyRecipientsRequest;
+        const language = document.getElementById('broadcastLanguage').value;
         const selected = Array.from(document.querySelectorAll('#companyCheckboxes input[type="checkbox"]:checked')).map(cb => cb.value);
         if (selected.length === 0) {
             document.getElementById('companyRecipientPreview').style.display = 'none';
@@ -609,17 +622,13 @@
         }
 
         try {
-            const response = await fetch('/api/users/count', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ companies: selected })
-            });
-            const data = await response.json();
-            document.getElementById('companyCount').textContent = data.count;
-
             const usersResp = await fetch('/api/users/all');
+            if (!usersResp.ok) throw new Error('Failed to load recipients');
             const allUsersData = await usersResp.json();
-            currentCompanyRecipients = allUsersData.filter(u => selected.includes(u.company));
+            if (requestId !== companyRecipientsRequest) return;
+            currentCompanyRecipients = allUsersData.filter(u => selected.includes(u.company) &&
+                (language === 'all' || (u.language || 'ru') === language));
+            document.getElementById('companyCount').textContent = currentCompanyRecipients.length;
             renderCompanyPreview();
             document.getElementById('companyRecipientPreview').style.display = 'block';
         } catch(e) { console.error(e); }
@@ -682,7 +691,7 @@
             const usersResponse = await fetch('/api/users/by_conferences', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ conferences: selected })
+                body: JSON.stringify({ conferences: selected, language: document.getElementById('broadcastLanguage').value })
             });
             if (!usersResponse.ok) throw new Error('Failed to load participants');
             const usersData = await usersResponse.json();
