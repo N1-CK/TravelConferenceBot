@@ -321,15 +321,13 @@ async def save_ticket_request(update, state: FSMContext):
         'country': data.get('country', '')
     }
 
-    # Сохраняем в БД
-    success = await db.save_ticket_request(ticket_data)
-
-    # Сохраняем в БД
-    success = await db.save_ticket_request(ticket_data)
+    # Один INSERT на заявку. Непустой tuple (False, None) сам по себе truthy.
+    success, req_id = await db.save_ticket_request(ticket_data)
 
     if success:
-        # success может возвращать tuple (True, request_id) согласно database.py
-        req_id = success[1] if isinstance(success, (tuple, list)) else None
+        # Заявка уже сохранена: ошибка уведомления не должна оставлять форму
+        # готовой к повторной отправке того же билета.
+        await state.clear()
 
         await db.log_user_action(
             user_id=user_id,
@@ -366,8 +364,6 @@ async def save_ticket_request(update, state: FSMContext):
         await message_obj.answer(
             await t(user_id, 'error_saving_request')
         )
-
-    await state.clear()
 
 
 # Обработчики кнопок "Назад" для формы билета

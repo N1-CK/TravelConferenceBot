@@ -2,7 +2,7 @@
 import logging
 from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
-from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.memory import MemoryStorage, SimpleEventIsolation
 from dotenv import load_dotenv
 import os
 from database import db
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 bot = Bot(token=os.getenv("TG_BOT_TOKEN"))
 bot.session.middleware(DepartmentStatusMiddleware())
 storage = MemoryStorage()
-dp = Dispatcher(storage=storage)
+dp = Dispatcher(storage=storage, events_isolation=SimpleEventIsolation())
 dp.callback_query.middleware(DepartmentScreenMiddleware())
 
 
