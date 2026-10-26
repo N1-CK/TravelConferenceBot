@@ -272,7 +272,6 @@
             display: flex !important;
             gap: 6px !important;
         }
-        #ticketsTable .ticket-archive-trigger { flex: 0 0 auto !important; }
         #ticketsTable td.t-col-actions .btn {
             flex: 1 !important;
             border-radius: 8px !important;
@@ -359,7 +358,7 @@
                         <table id="ticketsTable" class="table table-hover align-middle panel-table">
                             <thead class="table-header">
                                 <tr>
-                                    <th>{{ get_text('id') }}</th>
+                                    <th>{{ get_text('created_at') }}</th>
                                     <th>{{ get_text('username') }}</th>
                                     <th>{{ get_text('full_name') }}</th>
                                     <th>{{ get_text('position') }}</th>
@@ -367,7 +366,6 @@
                                     <th>{{ get_text('email') }}</th>
                                     <th>{{ get_text('phone') }}</th>
                                     <th>{{ get_text('country') }}</th>
-                                    <th>{{ get_text('created_at') }}</th>
                                     <th>{{ get_text('status') }}</th>
                                     <th>{{ get_text('actions') }}</th>
                                 </tr>
@@ -375,11 +373,11 @@
                             <tbody>
                                 {% for req in ticket_requests %}
                                 <tr data-ticket-id="{{ req.id }}" data-archived="{{ '1' if req.is_archived else '0' }}" data-status="{{ req.status }}">
-                                    <!-- ID (На вебе только чистый ID, на мобилке шапка карточки) -->
-                                    <td class="t-col-header">
-                                        <span class="d-none d-md-inline">{{ req.id }}</span>
+                                    <!-- Дата создания; на телефоне — краткая карточка пользователя. -->
+                                    <td class="t-col-header" data-order="{{ req.created_at.strftime('%Y-%m-%d %H:%M:%S') if req.created_at else '' }}">
+                                        <span class="d-none d-md-inline">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</span>
                                         <div class="d-md-none">
-                                            <span class="badge bg-light text-dark border me-1">#{{ req.id }}</span>
+                                            <small class="d-block text-muted mb-1">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</small>
                                             <strong>@{{ req.username }}</strong>
                                         </div>
                                         <div class="d-md-none text-end">
@@ -395,9 +393,6 @@
                                     <td class="t-col-hide">{{ req.email or '-' }}</td>
                                     <td class="t-col-hide">{{ req.phone or '-' }}</td>
                                     <td class="t-col-hide">{{ req.country or '-' }}</td>
-                                    <td class="t-col-hide" data-order="{{ req.created_at.strftime('%Y-%m-%d %H:%M:%S') if req.created_at else '' }}">
-                                        {{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}
-                                    </td>
 
                                     <!-- Статус + Мобильный аккордеон с полями -->
                                     <td class="t-col-status">
@@ -453,29 +448,6 @@
                                         <div class="btn-group btn-group-sm" role="group">
                                             <button type="button" class="btn btn-outline-primary btn-view-ticket" onclick='viewTicketDetails({{ req|tojson }})' title="{{ get_text('view_details') }}">
                                                 <i class="bi bi-eye"></i><span class="d-md-none ms-1">{{ get_text('details') }}</span>
-                                            </button>
-                                            <button class="btn btn-outline-warning"
-                                                    onclick="updateTicketStatus({{ req.id }}, 'pending')"
-                                                    {% if req.status == 'pending' %}disabled{% endif %}
-                                                    title="{{ get_text('set_pending') }}">
-                                                <i class="bi bi-hourglass-split"></i> <span class="d-md-none ms-1">{{ get_text('status_pending_short') }}</span>
-                                            </button>
-                                            <button class="btn btn-outline-info"
-                                                    onclick="updateTicketStatus({{ req.id }}, 'in_progress')"
-                                                    {% if req.status == 'in_progress' %}disabled{% endif %}
-                                                    title="{{ get_text('set_in_progress') }}">
-                                                <i class="bi bi-arrow-repeat"></i> <span class="d-md-none ms-1">{{ get_text('status_in_progress_short') }}</span>
-                                            </button>
-                                            <button class="btn btn-outline-success"
-                                                    onclick="updateTicketStatus({{ req.id }}, 'ready')"
-                                                    {% if req.status == 'ready' %}disabled{% endif %}
-                                                    title="{{ get_text('set_ready') }}">
-                                                <i class="bi bi-check-lg"></i> <span class="d-md-none ms-1">{{ get_text('status_ready_short') }}</span>
-                                            </button>
-                                            <button type="button" class="btn btn-outline-secondary ticket-archive-trigger"
-                                                    title="{{ get_text('unarchive') if req.is_archived else get_text('to_archive') }}"
-                                                    aria-label="{{ get_text('unarchive') if req.is_archived else get_text('to_archive') }}">
-                                                <i class="bi bi-three-dots"></i>
                                             </button>
                                         </div>
                                     </td>
@@ -684,7 +656,16 @@
                 <h5 class="modal-title" id="ticketDetailsTitle">{{ get_text('request_details') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ get_text('close') }}"></button>
             </div>
-            <div class="modal-body"><dl class="panel-request-fields" id="ticketDetailsFields"></dl></div>
+            <div class="modal-body">
+                <dl class="panel-request-fields" id="ticketDetailsFields"></dl>
+                <section class="ticket-status-control mt-3" aria-label="{{ get_text('status') }}">
+                    <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                        <strong>{{ get_text('status') }}</strong>
+                        <span class="status-badge" id="ticketDetailsStatus"></span>
+                    </div>
+                    <div class="ticket-status-buttons" id="ticketStatusButtons"></div>
+                </section>
+            </div>
             <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ get_text('close') }}</button></div>
         </div>
     </div>
@@ -693,29 +674,53 @@
 
 {% block extra_js %}
 <script>
+    let currentTicketDetails = null;
+    let ticketStatusSaving = false;
+    const ticketStatusNames = {{ {'pending': get_text('status_pending_event'), 'in_progress': get_text('status_in_progress'), 'ready': get_text('status_ready')}|tojson }};
+
     function viewTicketDetails(ticket) {
+        const row = ticketsTable.rows().nodes().toArray().find(node => Number(node.dataset.ticketId) === Number(ticket.id));
+        currentTicketDetails = {...ticket, status: row ? row.dataset.status : ticket.status};
         const fields = document.getElementById('ticketDetailsFields');
         fields.replaceChildren();
-        const labels = {{ {
-            'id': get_text('id'), 'username': get_text('username'),
-            'full_name': get_text('full_name'), 'position': get_text('position'),
-            'company': get_text('company'), 'email': get_text('email'),
-            'phone': get_text('phone'), 'country': get_text('country'),
-            'created_at': get_text('created_at'), 'status': get_text('status')
-        }|tojson }};
-        const statuses = {{ {'pending': get_text('status_pending_event'), 'in_progress': get_text('status_in_progress'), 'ready': get_text('status_ready')}|tojson }};
-        Object.entries(labels).forEach(([key, label]) => {
+        const labels = {{ [
+            ['created_at', get_text('created_at')], ['username', get_text('username')],
+            ['full_name', get_text('full_name')], ['position', get_text('position')],
+            ['company', get_text('company')], ['email', get_text('email')],
+            ['phone', get_text('phone')], ['country', get_text('country')]
+        ]|tojson }};
+        labels.forEach(([key, label]) => {
             const term = document.createElement('dt');
             const value = document.createElement('dd');
             term.textContent = label;
-            value.textContent = key === 'status' ? (statuses[ticket[key]] || ticket[key] || '—') : (ticket[key] || '—');
+            value.textContent = ticket[key] || '—';
             if (key === 'created_at' && ticket[key]) {
                 const date = new Date(ticket[key]);
                 if (!Number.isNaN(date.getTime())) value.textContent = date.toLocaleString({{ ('ru-RU' if session.get('lang', 'ru') == 'ru' else 'en-GB')|tojson }}, {timeZone:'UTC'});
             }
             fields.append(term, value);
         });
+        renderTicketStatusControls();
         bootstrap.Modal.getOrCreateInstance(document.getElementById('ticketDetailsModal')).show();
+    }
+
+    function renderTicketStatusControls() {
+        if (!currentTicketDetails) return;
+        const current = currentTicketDetails.status;
+        const badge = document.getElementById('ticketDetailsStatus');
+        badge.className = 'status-badge status-' + current;
+        badge.textContent = ticketStatusNames[current] || current;
+        const buttons = document.getElementById('ticketStatusButtons');
+        buttons.replaceChildren();
+        [['pending', 'warning'], ['in_progress', 'info'], ['ready', 'success']].forEach(([status, color]) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn-sm btn-outline-' + color;
+            button.textContent = ticketStatusNames[status];
+            button.disabled = ticketStatusSaving || status === current;
+            button.addEventListener('click', () => updateTicketStatus(currentTicketDetails.id, status));
+            buttons.append(button);
+        });
     }
 
     let ticketsTable;
@@ -761,16 +766,6 @@
             if (!row) return;
             event.preventDefault();
             showTicketContext(row, event.clientX, event.clientY);
-        });
-        table.addEventListener('click', event => {
-            const trigger = event.target.closest('.ticket-archive-trigger');
-            if (!trigger) return;
-            event.stopPropagation();
-            const row = trigger.closest('tr[data-ticket-id]');
-            if (row) {
-                const rect = trigger.getBoundingClientRect();
-                showTicketContext(row, rect.left, rect.bottom);
-            }
         });
         let timer, startX, startY, longPressed = false;
         table.addEventListener('touchstart', event => {
@@ -827,8 +822,8 @@
             },
             pageLength: 25,
             autoWidth: false,
-            columnDefs: [{ targets: [3, 5, 6], visible: false }, { targets: 10, orderable: false }],
-            order: [[8, 'desc']]
+            columnDefs: [{ targets: [3, 5, 6], visible: false }, { targets: 9, orderable: false }],
+            order: [[0, 'desc']]
         });
         refreshTicketArchive();
 
@@ -850,32 +845,36 @@
     });
 
 
-    function updateTicketStatus(requestId, status) {
-        const statusNames = {
-            'pending': '{{ get_text("status_pending_event") }}',
-            'in_progress': '{{ get_text("status_in_progress") }}',
-            'ready': '{{ get_text("status_ready") }}'
-        };
-
-        if (confirm(`{{ get_text("confirm_status_change") }} ${statusNames[status]}?`)) {
-            fetch(`/api/ticket/${requestId}/status`, {
+    async function updateTicketStatus(requestId, status) {
+        if (ticketStatusSaving || !Object.hasOwn(ticketStatusNames, status)) return;
+        if (!confirm({{ get_text('confirm_status_change')|tojson }} + ' ' + ticketStatusNames[status] + '?')) return;
+        ticketStatusSaving = true;
+        renderTicketStatusControls();
+        try {
+            const response = await fetch(`/api/ticket/${requestId}/status`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `status=${status}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showToast(`{{ get_text("status_changed") }} ${statusNames[status]}`, 'success');
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    showToast('{{ get_text("error_status_change") }}', 'danger');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showToast('{{ get_text("error_status_change") }}', 'danger');
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: new URLSearchParams({status})
             });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error('Status update failed');
+            const row = ticketsTable.rows().nodes().toArray().find(node => Number(node.dataset.ticketId) === Number(requestId));
+            if (row) {
+                row.dataset.status = status;
+                const badge = row.querySelector('.t-col-status .status-badge');
+                badge.className = 'status-badge status-' + status;
+                badge.textContent = ticketStatusNames[status];
+                ticketsTable.row(row).invalidate('dom');
+            }
+            if (currentTicketDetails && Number(currentTicketDetails.id) === Number(requestId)) currentTicketDetails.status = status;
+            refreshTicketArchive();
+            showToast({{ get_text('status_changed')|tojson }} + ' ' + ticketStatusNames[status], 'success');
+        } catch (error) {
+            console.error(error);
+            showToast({{ get_text('error_status_change')|tojson }}, 'danger');
+        } finally {
+            ticketStatusSaving = false;
+            renderTicketStatusControls();
         }
     }
 

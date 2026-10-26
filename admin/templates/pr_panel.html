@@ -400,13 +400,12 @@
                         <table id="bannersTable" class="table table-hover align-middle panel-table">
                             <thead>
                                 <tr>
-                                    <th>{{ get_text('id') }}</th>
+                                    <th>{{ get_text('created_at') }}</th>
                                     <th>{{ get_text('username') }}</th>
                                     <th>{{ get_text('full_name') }}</th>
                                     <th>{{ get_text('position') }}</th>
                                     <th>{{ get_text('company') }}</th>
                                     <th>{{ get_text('language') }}</th>
-                                    <th>{{ get_text('created_at') }}</th>
                                     <th>{{ get_text('status') }}</th>
                                     <th>{{ get_text('actions') }}</th>
                                 </tr>
@@ -414,12 +413,11 @@
                             <tbody>
                                 {% for req in banner_requests %}
                                 <tr data-status="{{ req.status }}">
-                                    <!-- Общая ячейка ID и мобильной карточки: 9 ячеек на 9 заголовков -->
-                                    <td class="pr-primary-cell" data-order="{{ req.id }}"><span class="d-none d-md-inline">{{ req.id }}</span>
+                                    <td class="pr-primary-cell" data-order="{{ req.created_at.strftime('%Y-%m-%d %H:%M:%S') if req.created_at else '' }}"><span class="d-none d-md-inline">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</span>
                                         <div class="mobile-pr-card">
                                             <div class="mobile-card-top">
                                                 <div>
-                                                    <span class="badge bg-light text-dark border me-1">#{{ req.id }}</span>
+                                                    <small class="d-block text-muted mb-1">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</small>
                                                     <strong>@{{ req.username }}</strong>
                                                 </div>
                                                 <span class="text-secondary fw-bold">{{ req.full_name or '' }}</span>
@@ -489,7 +487,6 @@
                                     <td class="desktop-td d-none d-md-table-cell">{{ req.position or '-' }}</td>
                                     <td class="desktop-td d-none d-md-table-cell">{{ req.company or '-' }}</td>
                                     <td class="desktop-td d-none d-md-table-cell">{{ '🇷🇺 RU' if req.language == 'ru' else '🇬🇧 EN' }}</td>
-                                    <td class="desktop-td d-none d-md-table-cell">{{ req.created_at.strftime('%d.%m.%Y %H:%M') if req.created_at else '-' }}</td>
                                     <td class="desktop-td d-none d-md-table-cell">
                                         <span class="status-badge status-{{ req.status }}">
                                             {% if req.status == 'pending' %}
@@ -572,13 +569,12 @@
                         <table id="cardsTable" class="table table-hover align-middle panel-table">
                             <thead>
                                 <tr>
-                                    <th>{{ get_text('id') }}</th>
+                                    <th>{{ get_text('created_at') }}</th>
                                     <th>{{ get_text('username') }}</th>
                                     <th>{{ get_text('full_name') }}</th>
                                     <th>{{ get_text('position') }}</th>
                                     <th>{{ get_text('company') }}</th>
                                     <th>{{ get_text('brand_style') }}</th>
-                                    <th>{{ get_text('created_at') }}</th>
                                     <th>{{ get_text('status') }}</th>
                                     <th>{{ get_text('actions') }}</th>
                                 </tr>
@@ -587,11 +583,11 @@
                                 {% for card in business_cards %}
                                 <tr data-status="{{ card.status }}">
                                     <!-- МОБИЛЬНАЯ КАРТОЧКА ВИЗИТКИ НА 100% ШИРИНЫ -->
-                                    <td class="pr-primary-cell" data-order="{{ card.id }}"><span class="d-none d-md-inline">{{ card.id }}</span>
+                                    <td class="pr-primary-cell" data-order="{{ card.created_at.strftime('%Y-%m-%d %H:%M:%S') if card.created_at else '' }}"><span class="d-none d-md-inline">{{ card.created_at.strftime('%d.%m.%Y %H:%M') if card.created_at else '-' }}</span>
                                         <div class="mobile-pr-card">
                                             <div class="mobile-card-top">
                                                 <div>
-                                                    <span class="badge bg-light text-dark border me-1">#{{ card.id }}</span>
+                                                    <small class="d-block text-muted mb-1">{{ card.created_at.strftime('%d.%m.%Y %H:%M') if card.created_at else '-' }}</small>
                                                     <strong>@{{ card.username }}</strong>
                                                 </div>
                                                 <span class="text-secondary fw-bold">{{ card.full_name or '' }}</span>
@@ -667,7 +663,6 @@
                                         <span class="badge bg-secondary">{{ get_text('no') }}</span>
                                         {% endif %}
                                     </td>
-                                    <td class="desktop-td d-none d-md-table-cell">{{ card.created_at.strftime('%d.%m.%Y %H:%M') if card.created_at else '-' }}</td>
                                     <td class="desktop-td d-none d-md-table-cell">
                                         <span class="status-badge status-{{ card.status }}">
                                             {% if card.status == 'pending' %}
@@ -885,12 +880,13 @@
         // Date cells contain localized text/HTML; compare numeric timestamps.
         $.fn.dataTable.ext.type.order['pr-date-pre'] = prDateSortValue;
         const dateConfig = column => ({
-            ...dtConfig, columnDefs: [{ targets: column, type: 'pr-date' }]
+            ...dtConfig, order: [[column, 'desc']],
+            columnDefs: [{ targets: column, type: 'pr-date' }, { targets: -1, orderable: false }]
         });
-        bannersTable = $('#bannersTable').DataTable(dateConfig(6));
-        cardsTable = $('#cardsTable').DataTable(dateConfig(6));
-        bookingsTable = $('#bookingsTable').DataTable(dateConfig(3));
-        reportsTable = $('#reportsTable').DataTable(dateConfig(3));
+        bannersTable = $('#bannersTable').DataTable(dateConfig(0));
+        cardsTable = $('#cardsTable').DataTable(dateConfig(0));
+        bookingsTable = $('#bookingsTable').DataTable({...dateConfig(3), order: [[3, 'desc'], [0, 'desc']]});
+        reportsTable = $('#reportsTable').DataTable({...dateConfig(3), order: [[3, 'desc'], [0, 'desc']]});
 
         // Пересчет размеров колонок при переключении вкладок
         $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function(e) {

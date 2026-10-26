@@ -1462,6 +1462,10 @@
             } else if (e.ctrlKey && e.key === 'i') {
                 e.preventDefault();
                 wrapChatText('<i>', '</i>');
+            } else if (e.key === 'Enter' && e.metaKey) {
+                e.preventDefault();
+                this.setRangeText('\n', this.selectionStart, this.selectionEnd, 'end');
+                this.dispatchEvent(new Event('input', {bubbles: true}));
             } else if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 document.getElementById('replyForm').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
